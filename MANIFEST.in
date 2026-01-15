@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include work_by_roles/templates *.yaml *.yml
+recursive-include templates *.yaml *.yml
+

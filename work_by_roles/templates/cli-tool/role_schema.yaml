@@ -1,0 +1,120 @@
+# Role Schema Definition
+# Schema Version: 1.0
+
+schema_version: "1.0"
+roles:
+  - id: "product_analyst"
+    name: "Product Analyst"
+    description: "Defines requirements and scope"
+    instruction_template: |
+      1. Analyze the user's high-level goal.
+      2. Define clear functional and non-functional requirements.
+      3. Create a STAGE1_REQUIREMENTS.md file with Project Overview and Success Criteria.
+      4. Use spec-kit format if applicable.
+    extends: null
+    constraints:
+      allowed_actions:
+        - "define_requirements"
+        - "define_scope"
+        - "create_checklist"
+        - "document_success_criteria"
+      forbidden_actions:
+        - "write_code"
+        - "approve_architecture"
+        - "skip_requirements"
+    required_skills:
+      - skill_id: "requirements_analysis"
+        min_level: 2
+        focus:
+          - "acceptance_criteria"
+          - "scope_alignment"
+    validation_rules:
+      - "must_produce_requirements_doc"
+      - "must_define_success_criteria"
+      - "must_identify_open_questions"
+
+  - id: "system_architect"
+    name: "System Architect"
+    description: "Designs architecture and DSL following specs in {{project.paths.docs}}"
+    instruction_template: |
+      1. Read the requirements in STAGE1_REQUIREMENTS.md.
+      2. Design a system architecture that fulfills these requirements.
+      3. Create STAGE2_ARCHITECTURE.md with component diagrams and data flows.
+      4. Define any necessary YAML/JSON schemas.
+    extends: null
+    constraints:
+      allowed_actions:
+        - "design_architecture"
+        - "define_schemas"
+        - "make_decisions"
+        - "resolve_open_questions"
+      forbidden_actions:
+        - "write_implementation"
+        - "skip_requirements"
+        - "skip_architecture"
+    required_skills:
+      - skill_id: "system_design"
+        min_level: 2
+      - skill_id: "schema_design"
+        min_level: 2
+    validation_rules:
+      - "must_produce_architecture_doc in {{project.paths.docs}}"
+      - "must_define_schemas"
+      - "must_resolve_open_questions"
+
+  - id: "core_framework_engineer"
+    name: "Core Framework Engineer"
+    description: "Implements the framework code in {{project.paths.src}} based on specs"
+    instruction_template: |
+      1. Review requirements and architecture documents.
+      2. Implement the core logic in {{project.paths.src}} using Python.
+      3. Write unit and integration tests in {{project.paths.tests}}.
+      4. Ensure all code passes linting and type checks.
+    extends: null
+    constraints:
+      allowed_actions:
+        - "write_code"
+        - "write_tests"
+        - "implement_schemas"
+      forbidden_actions:
+        - "skip_architecture"
+        - "skip_tests"
+        - "bypass_quality_gates"
+    required_skills:
+      - skill_id: "python_engineering"
+        min_level: 2
+      - skill_id: "test_driven_development"
+        min_level: 2
+    validation_rules:
+      - "must_implement_all_schemas"
+      - "must_write_tests in {{project.paths.tests}}"
+      - "must_pass_linters using {{project.standards.ruff}}"
+
+  - id: "qa_reviewer"
+    name: "QA / Quality Gate Reviewer"
+    description: "Validates implementation and enforces quality gates"
+    instruction_template: |
+      1. Run all registered quality gates for the project.
+      2. Verify that all required outputs are present and meet standards.
+      3. Generate a validation_report.json.
+      4. Ensure the workflow state is correctly updated.
+    extends: null
+    constraints:
+      allowed_actions:
+        - "run_quality_gates"
+        - "validate_implementation"
+        - "generate_reports"
+        - "block_transitions"
+      forbidden_actions:
+        - "skip_validation"
+        - "bypass_gates"
+        - "approve_without_validation"
+    required_skills:
+      - skill_id: "quality_assurance"
+        min_level: 2
+    validation_rules:
+      - "must_run_all_quality_gates"
+      - "must_generate_validation_report"
+      - "must_verify_all_stages_complete"
+
+

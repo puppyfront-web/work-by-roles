@@ -1,0 +1,142 @@
+# Workflow Schema Definition
+# Schema Version: 1.0
+
+schema_version: "1.0"
+workflow:
+  id: "standard_delivery"
+  name: "Standard Software Delivery"
+  description: "Four-stage delivery workflow with role-based constraints"
+
+  stages:
+    - id: "requirements"
+      name: "Requirements & Scope"
+      role: "product_analyst"
+      order: 1
+      goal_template: "Extract and document project requirements into STAGE1_REQUIREMENTS.md"
+      prerequisites: []
+      entry_criteria:
+        - "project_goal_defined"
+      exit_criteria:
+        - "requirements_doc_complete"
+        - "checklist_complete"
+      quality_gates:
+        - type: "document_validation"
+          criteria:
+            - "must_contain_project_overview"
+            - "must_contain_success_criteria"
+          validator: "yaml_checker"
+        - type: "completeness"
+          criteria:
+            - "all_sections_filled"
+          validator: "content_validator"
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true
+          name: "STAGE1_REQUIREMENTS.md"
+
+    - id: "architecture"
+      name: "Architecture & DSL Design"
+      role: "system_architect"
+      order: 2
+      goal_template: "Design the system architecture and define schemas based on STAGE1_REQUIREMENTS.md"
+      prerequisites:
+        - "requirements"
+      entry_criteria:
+        - "requirements_approved"
+      exit_criteria:
+        - "architecture_doc_complete"
+        - "schemas_defined"
+        - "open_questions_resolved"
+      quality_gates:
+        - type: "schema_validation"
+          criteria:
+            - "role_schema_valid"
+            - "workflow_schema_valid"
+          validator: "schema_validator"
+        - type: "completeness"
+          criteria:
+            - "all_decisions_documented"
+          validator: "content_validator"
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true
+          name: "STAGE2_ARCHITECTURE.md"
+        - type: "schema"
+          format: "yaml"
+          required: true
+          name: "role_schema.yaml"
+        - type: "schema"
+          format: "yaml"
+          required: true
+          name: "workflow_schema.yaml"
+
+    - id: "implementation"
+      name: "Minimal Runnable Implementation"
+      role: "core_framework_engineer"
+      order: 3
+      goal_template: "Implement the project core code and tests based on architecture and schemas"
+      prerequisites:
+        - "architecture"
+      entry_criteria:
+        - "architecture_approved"
+      exit_criteria:
+        - "code_implements_schemas"
+        - "tests_pass"
+      quality_gates:
+        - type: "code_quality"
+          criteria:
+            - "linter_passes"
+            - "type_checks_pass"
+          validator: "linter"
+        - type: "functionality"
+          criteria:
+            - "can_load_schemas"
+            - "can_validate_roles"
+            - "can_execute_workflow"
+          validator: "test_runner"
+      outputs:
+        - type: "code"
+          format: "python"
+          required: true
+          name: "workflow_engine.py"
+        - type: "tests"
+          format: "python"
+          required: true
+          name: "test_workflow.py"
+
+    - id: "validation"
+      name: "Validation & Quality Gates"
+      role: "qa_reviewer"
+      order: 4
+      goal_template: "Validate all project outputs and ensure all quality gates are passed"
+      prerequisites:
+        - "implementation"
+      entry_criteria:
+        - "implementation_complete"
+      exit_criteria:
+        - "all_quality_gates_passed"
+        - "validation_report_generated"
+      quality_gates:
+        - type: "end_to_end"
+          criteria:
+            - "example_workflow_runs"
+            - "violations_detected_correctly"
+          validator: "e2e_tester"
+        - type: "documentation"
+          criteria:
+            - "readme_complete"
+            - "examples_provided"
+          validator: "doc_checker"
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true
+          name: "STAGE4_VALIDATION.md"
+        - type: "report"
+          format: "json"
+          required: true
+          name: "validation_report.json"
+
+

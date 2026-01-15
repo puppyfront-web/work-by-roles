@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "work-by-roles"
+version = "0.1.0"
+description = "Multi-Role Skills Workflow Framework - enforce role-based workflows and quality gates"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+  {name = "Work-by-Roles Contributors", email = "open@work-by-roles.example"}
+]
+keywords = ["workflow", "roles", "quality-gates", "skills", "collaboration"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+  "pyyaml>=6.0",
+  "pytest>=7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=23.0.0",
+  "ruff>=0.1.0",
+  "mypy>=1.0.0",
+  "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+workflow = "work_by_roles.cli:main"
+workflow-cli = "work_by_roles.cli:main"
+workflow-bootstrap = "work_by_roles.bootstrap:main"
+
+[tool.setuptools]
+packages = ["work_by_roles", "work_by_roles.core", "work_by_roles.validators", "work_by_roles.utils"]
+
+[tool.setuptools.package-data]
+work_by_roles = ["templates/**/*.yaml", "templates/**/*.yml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+

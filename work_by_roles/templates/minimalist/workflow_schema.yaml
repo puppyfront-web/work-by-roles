@@ -1,0 +1,49 @@
+schema_version: "1.0"
+workflow:
+  id: "minimal_workflow"
+  name: "Minimal Workflow"
+  description: "Three-stage workflow for small projects"
+  stages:
+    - id: "requirements"
+      name: "Requirements"
+      role: "product_analyst"
+      order: 1
+      prerequisites: []
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true
+          name: "REQUIREMENTS.md"
+
+    - id: "development"
+      name: "Development"
+      role: "developer"
+      order: 2
+      prerequisites: ["requirements"]
+      quality_gates:
+        - type: "completeness"
+          criteria:
+            - "core_logic_implemented"
+          validator: "content_validator"
+      outputs:
+        - type: "code"
+          format: "python"
+          required: true
+          name: "app.py"
+
+    - id: "validation"
+      name: "Validation"
+      role: "developer"
+      order: 3
+      prerequisites: ["development"]
+      quality_gates:
+        - type: "functionality"
+          criteria:
+            - "tests_pass"
+          validator: "test_runner"
+      outputs:
+        - type: "report"
+          format: "json"
+          required: true
+          name: "validation_results.json"
+

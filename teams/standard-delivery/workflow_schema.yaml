@@ -1,0 +1,133 @@
+# Workflow Schema Definition
+# Schema Version: 1.0
+
+schema_version: "1.0"
+workflow:
+  id: "standard_delivery"
+  name: "Standard Software Delivery"
+  description: "Four-stage delivery workflow with role-based constraints"
+
+  stages:
+    - id: "requirements"
+      name: "Requirements & Scope"
+      role: "product_analyst"
+      order: 1
+      goal_template: "分析项目需求并生成需求文档 STAGE1_REQUIREMENTS.md"
+      prerequisites: []
+      # entry_criteria 和 exit_criteria 已简化，由 Agent 自动判断
+      quality_gates:
+        - type: "document_validation"
+          criteria:
+            - "must_contain_project_overview"
+            - "must_contain_success_criteria"
+          validator: "yaml_checker"
+          strict: false  # 文档验证可选，不阻塞流程
+        - type: "completeness"
+          criteria:
+            - "all_sections_filled"
+          validator: "content_validator"
+          strict: false  # 完整性检查可选，不阻塞流程
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true  # 需求文档必需，符合 Lovable 工作流模式
+          name: "STAGE1_REQUIREMENTS.md"
+
+    - id: "architecture"
+      name: "Architecture & DSL Design"
+      role: "system_architect"
+      order: 2
+      goal_template: "设计系统架构并生成架构文档 STAGE2_ARCHITECTURE.md，基于需求文档 STAGE1_REQUIREMENTS.md"
+      prerequisites:
+        - "requirements"
+      # entry_criteria 和 exit_criteria 已简化，由 Agent 自动判断
+      quality_gates:
+        - type: "schema_validation"
+          criteria:
+            - "role_schema_valid"
+            - "workflow_schema_valid"
+          validator: "schema_validator"
+          strict: false  # 宽松模式：不阻塞流程
+        - type: "completeness"
+          criteria:
+            - "all_decisions_documented"
+          validator: "content_validator"
+          strict: false  # 宽松模式：不阻塞流程
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true  # 架构文档必需，符合 Lovable 工作流模式
+          name: "STAGE2_ARCHITECTURE.md"
+        - type: "schema"
+          format: "yaml"
+          required: true  # Schema文件必需（用于工作流配置）
+          name: "role_schema.yaml"
+        - type: "schema"
+          format: "yaml"
+          required: true  # Schema文件必需（用于工作流配置）
+          name: "workflow_schema.yaml"
+
+    - id: "implementation"
+      name: "Minimal Runnable Implementation"
+      role: "core_framework_engineer"
+      order: 3
+      goal_template: "基于需求文档 STAGE1_REQUIREMENTS.md 和架构文档 STAGE2_ARCHITECTURE.md 实现项目核心代码和测试"
+      prerequisites:
+        - "architecture"
+      # entry_criteria 和 exit_criteria 已简化，由 Agent 自动判断
+      quality_gates:
+        - type: "code_quality"
+          criteria:
+            - "linter_passes"
+            - "type_checks_pass"
+          validator: "linter"
+          strict: false  # 宽松模式：不阻塞流程
+        - type: "functionality"
+          criteria:
+            - "can_load_schemas"
+            - "can_validate_roles"
+            - "can_execute_workflow"
+          validator: "test_runner"
+          strict: false  # 宽松模式：不阻塞流程
+      outputs:
+        - type: "code"
+          format: "python"
+          required: true
+          name: "workflow_engine.py"
+        - type: "tests"
+          format: "python"
+          required: true
+          name: "test_workflow.py"
+
+    - id: "validation"
+      name: "Validation & Quality Gates"
+      role: "qa_reviewer"
+      order: 4
+      goal_template: "验证项目输出和质量门禁（报告可选）"
+      prerequisites:
+        - "implementation"
+      # entry_criteria 和 exit_criteria 已简化，由 Agent 自动判断
+      quality_gates:
+        - type: "end_to_end"
+          criteria:
+            - "example_workflow_runs"
+            - "violations_detected_correctly"
+          validator: "e2e_tester"
+          strict: false  # 宽松模式：不阻塞流程
+        - type: "documentation"
+          criteria:
+            - "readme_complete"
+            - "examples_provided"
+          validator: "doc_checker"
+          strict: false  # 宽松模式：不阻塞流程
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: false  # 文档可选，用户无特殊要求不生成
+          name: "STAGE4_VALIDATION.md"
+        - type: "report"
+          format: "json"
+          required: false  # 报告可选，用户无特殊要求不生成
+          name: "validation_report.json"
+
+

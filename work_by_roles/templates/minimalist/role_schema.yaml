@@ -1,0 +1,37 @@
+schema_version: "1.0"
+roles:
+  - id: "product_analyst"
+    name: "Product Analyst"
+    description: "Defines requirements and scope"
+    extends: null
+    constraints:
+      allowed_actions:
+        - "define_requirements"
+        - "define_scope"
+      forbidden_actions:
+        - "write_code"
+    required_skills:
+      - skill_id: "requirements_analysis"
+        min_level: 1
+    validation_rules:
+      - "must_produce_requirements_doc"
+
+  - id: "developer"
+    name: "Developer"
+    description: "Unified role for architecture, implementation and testing"
+    extends: null
+    constraints:
+      allowed_actions:
+        - "design_architecture"
+        - "write_code"
+        - "write_tests"
+      forbidden_actions:
+        - "skip_requirements"
+    required_skills:
+      - skill_id: "system_design"
+        min_level: 1
+      - skill_id: "python_engineering"
+        min_level: 1
+    validation_rules:
+      - "must_pass_tests"
+

@@ -1,0 +1,43 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Workflow runtime files and directories
+.workflow/
+.workflow-*/
+validation_report.json
+
+# OS
+.DS_Store
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Backup files
+*.bak
+*.backup
+*.bak2
+*~
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+.workflow/temp/

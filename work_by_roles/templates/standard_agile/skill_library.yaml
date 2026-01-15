@@ -1,0 +1,132 @@
+# Skill Library Definition
+# Schema Version: 1.0
+
+schema_version: "1.0"
+skills:
+  - id: "requirements_analysis"
+    name: "Requirements Analysis"
+    description: "Ability to elicit, structure, and validate requirements"
+    dimensions:
+      - "elicitation"
+      - "scope_alignment"
+      - "acceptance_criteria"
+    levels:
+      1: "Understands basic templates and can capture user needs"
+      2: "Can model flows, risks, and non-functional needs"
+      3: "Leads complex discovery, reconciles conflicting stakeholders"
+    tools:
+      - "markdown"
+      - "diagrams"
+    constraints:
+      - "must_define_acceptance_criteria"
+      - "must_document_risks"
+
+  - id: "schema_design"
+    name: "Schema and DSL Design"
+    description: "Design structured schemas and DSLs with validation rules"
+    dimensions:
+      - "structure_modelling"
+      - "validation_rules"
+      - "extensibility"
+    levels:
+      1: "Designs simple schemas with required fields"
+      2: "Adds validation, versioning, and compatibility rules"
+      3: "Designs evolvable DSLs with backward compatibility"
+    tools:
+      - "yaml"
+      - "jsonschema"
+    constraints:
+      - "must_define_schema_version"
+      - "must_define_validation_rules"
+
+  - id: "system_design"
+    name: "System Architecture"
+    description: "Architect systems with clear separation of concerns"
+    dimensions:
+      - "componentization"
+      - "data_flow"
+      - "quality_attributes"
+    levels:
+      1: "Defines core components and interactions"
+      2: "Covers resiliency, extensibility, and validation flows"
+      3: "Optimizes for scale, evolution, and governance"
+    tools:
+      - "mermaid"
+      - "architecture_decision_records"
+    constraints:
+      - "must_define_quality_gates"
+
+  - id: "python_engineering"
+    name: "Python Engineering"
+    description: "Build production-grade Python in {{project.paths.src}} with typing and testing"
+    dimensions:
+      - "typing"
+      - "testing"
+      - "error_handling"
+    levels:
+      1: "Writes typed functions and basic tests"
+      2: "Designs modules with dataclasses and robust errors"
+      3: "Delivers frameworks with strong contracts and tooling"
+    tools:
+      - "{{project.standards.ruff or 'ruff'}}"
+      - "{{project.standards.mypy or 'mypy'}}"
+      - "{{project.standards.pytest or 'pytest'}}"
+    constraints:
+      - "must_use_type_hints"
+      - "must_cover_tests in {{project.paths.tests}}"
+
+  - id: "test_driven_development"
+    name: "Test Driven Development"
+    description: "Designs tests in {{project.paths.tests}} before implementation"
+    dimensions:
+      - "unit_tests"
+      - "integration_tests"
+      - "coverage_goals"
+    levels:
+      1: "Writes unit tests for core logic"
+      2: "Covers edge cases and negative paths"
+      3: "Designs executable specifications and fixtures"
+    tools:
+      - "{{project.standards.pytest or 'pytest'}}"
+      - "coverage"
+    constraints:
+      - "must_block_on_test_failure"
+
+  - id: "quality_assurance"
+    name: "Quality Assurance & Validation"
+    description: "Validates outputs, gates, and workflow compliance"
+    dimensions:
+      - "gate_definition"
+      - "reporting"
+      - "automation"
+    levels:
+      1: "Runs manual checks and reports results"
+      2: "Automates gate execution and reporting"
+      3: "Designs reusable validation suites and metrics"
+    tools:
+      - "pytest"
+      - "report_generators"
+    constraints:
+      - "must_record_findings"
+
+skill_bundles:
+  - id: "web_delivery_bundle"
+    name: "Web Delivery"
+    description: "Standard bundle for web application delivery"
+    skills:
+      - skill_id: "requirements_analysis"
+        min_level: 2
+      - skill_id: "schema_design"
+        min_level: 2
+      - skill_id: "python_engineering"
+        min_level: 2
+
+  - id: "core_framework_bundle"
+    name: "Core Framework"
+    description: "Essential skills for framework engineering"
+    skills:
+      - skill_id: "python_engineering"
+        min_level: 2
+      - skill_id: "test_driven_development"
+        min_level: 2
+

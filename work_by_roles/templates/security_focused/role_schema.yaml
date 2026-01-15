@@ -1,0 +1,62 @@
+schema_version: "1.0"
+roles:
+  - id: "product_analyst"
+    name: "Product Analyst"
+    description: "Defines requirements with security considerations"
+    extends: null
+    constraints:
+      allowed_actions: ["define_requirements", "define_scope", "threat_modelling"]
+      forbidden_actions: ["write_code"]
+    required_skills:
+      - skill_id: "requirements_analysis"
+        min_level: 2
+    validation_rules: ["must_include_security_requirements"]
+
+  - id: "system_architect"
+    name: "System Architect"
+    description: "Designs secure architecture"
+    extends: null
+    constraints:
+      allowed_actions: ["design_architecture", "define_schemas", "security_design"]
+      forbidden_actions: ["write_implementation"]
+    required_skills:
+      - skill_id: "system_design"
+        min_level: 2
+    validation_rules: ["must_produce_secure_architecture"]
+
+  - id: "core_framework_engineer"
+    name: "Core Framework Engineer"
+    description: "Implements secure code"
+    extends: null
+    constraints:
+      allowed_actions: ["write_code", "write_tests", "secure_coding"]
+      forbidden_actions: ["skip_security_checks"]
+    required_skills:
+      - skill_id: "python_engineering"
+        min_level: 2
+    validation_rules: ["must_pass_security_scans"]
+
+  - id: "security_auditor"
+    name: "Security Auditor"
+    description: "Conducts security reviews and audits"
+    extends: null
+    constraints:
+      allowed_actions: ["audit_code", "run_security_scans", "approve_security_gate"]
+      forbidden_actions: ["write_production_code"]
+    required_skills:
+      - skill_id: "security_assurance"
+        min_level: 3
+    validation_rules: ["must_provide_audit_report"]
+
+  - id: "qa_reviewer"
+    name: "QA Reviewer"
+    description: "Final quality and compliance check"
+    extends: null
+    constraints:
+      allowed_actions: ["run_quality_gates", "generate_reports"]
+      forbidden_actions: ["skip_validation"]
+    required_skills:
+      - skill_id: "quality_assurance"
+        min_level: 2
+    validation_rules: ["must_verify_all_gates"]
+

@@ -1,0 +1,69 @@
+schema_version: "1.0"
+workflow:
+  id: "security_focused_workflow"
+  name: "Security Focused Workflow"
+  description: "Workflow with an explicit security audit stage"
+  stages:
+    - id: "requirements"
+      name: "Requirements & Threat Modelling"
+      role: "product_analyst"
+      order: 1
+      prerequisites: []
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true
+          name: "SECURE_REQUIREMENTS.md"
+
+    - id: "architecture"
+      name: "Secure Architecture Design"
+      role: "system_architect"
+      order: 2
+      prerequisites: ["requirements"]
+      outputs:
+        - type: "document"
+          format: "markdown"
+          required: true
+          name: "SECURE_ARCHITECTURE.md"
+
+    - id: "implementation"
+      name: "Secure Implementation"
+      role: "core_framework_engineer"
+      order: 3
+      prerequisites: ["architecture"]
+      quality_gates:
+        - type: "code_quality"
+          criteria: ["static_analysis_pass"]
+          validator: "linter"
+      outputs:
+        - type: "code"
+          format: "python"
+          required: true
+          name: "secure_app.py"
+
+    - id: "security_audit"
+      name: "Independent Security Audit"
+      role: "security_auditor"
+      order: 4
+      prerequisites: ["implementation"]
+      quality_gates:
+        - type: "security_scan"
+          criteria: ["no_high_vulnerabilities"]
+          validator: "security_scanner"
+      outputs:
+        - type: "report"
+          format: "markdown"
+          required: true
+          name: "SECURITY_AUDIT.md"
+
+    - id: "validation"
+      name: "Final Validation"
+      role: "qa_reviewer"
+      order: 5
+      prerequisites: ["security_audit"]
+      outputs:
+        - type: "report"
+          format: "json"
+          required: true
+          name: "FINAL_VALIDATION.json"
+
