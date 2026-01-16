@@ -3215,6 +3215,9 @@ def cmd_wfauto(args):
       4) 依次 complete 每个阶段（执行质量门禁）
       5) 已完成阶段自动跳过（但在重置后不会发生）
     """
+    # Initialize failed stages tracking
+    failed_stages = []
+    
     try:
         engine, _, _ = _init_engine(args)
         if not engine.workflow:
@@ -3462,7 +3465,8 @@ def cmd_wfauto(args):
                             print(f"❌ 阶段 {stage.id} 未通过质量门禁:", file=sys.stderr)
                             for err in errors:
                                 print(f"  - {err}", file=sys.stderr)
-                            sys.exit(1)
+                            # 记录阶段失败，但不立即退出，继续检查其他阶段
+                            failed_stages.append(stage.id)
                 else:
                     # 传统模式：只检查质量门禁
                     passed, errors = engine.complete_stage(stage.id)
@@ -3472,14 +3476,22 @@ def cmd_wfauto(args):
                         print(f"❌ 阶段 {stage.id} 未通过质量门禁:", file=sys.stderr)
                         for err in errors:
                             print(f"  - {err}", file=sys.stderr)
-                        sys.exit(1)
+                        # 记录阶段失败，但不立即退出，继续检查其他阶段
+                        failed_stages.append(stage.id)
         
-        # Check if all stages are completed
+        # Check execution results
         if engine.executor and engine.workflow:
             completed = engine.executor.get_completed_stages()
             all_stages = {s.id for s in engine.workflow.stages}
             
-            if completed == all_stages:
+            if failed_stages:
+                print("\n" + "=" * 60)
+                print("❌ wfauto: 执行完成，但有阶段失败")
+                print("=" * 60)
+                print(f"失败阶段: {', '.join(failed_stages)}")
+                print(f"完成阶段: {len(completed)}/{len(all_stages)}")
+                sys.exit(1)
+            elif completed == all_stages:
                 print("\n" + "=" * 60)
                 print("🎉 wfauto: 所有阶段执行完成")
                 print("=" * 60)
@@ -3491,9 +3503,19 @@ def cmd_wfauto(args):
                 else:
                     print("\n💡 提示: 如需将本次能力沉淀为技能，可运行 'workflow skill-accumulate'")
             else:
-                print("\n🎉 wfauto: 执行完成")
+                print("\n" + "=" * 60)
+                print("⚠️  wfauto: 执行完成，但部分阶段未完成")
+                print("=" * 60)
+                print(f"完成阶段: {len(completed)}/{len(all_stages)}")
+                pending = all_stages - completed
+                if pending:
+                    print(f"待完成阶段: {', '.join(pending)}")
         else:
-            print("\n🎉 wfauto: 执行完成")
+            if failed_stages:
+                print("\n❌ wfauto: 执行完成，但有阶段失败")
+                sys.exit(1)
+            else:
+                print("\n⚠️  wfauto: 执行完成（工作流状态未知）")
     except Exception as e:
         print(f"❌ wfauto 执行失败: {e}", file=sys.stderr)
         sys.exit(1)
@@ -3888,6 +3910,32 @@ def main():
     )
     skill_workflow_graph_parser.set_defaults(func=cmd_skill_workflow_graph)
     
+    # Checkpoint commands
+    checkpoint_parser = subparsers.add_parser('checkpoint', help='检查点管理')
+    checkpoint_subparsers = checkpoint_parser.add_subparsers(dest='checkpoint_command', help='检查点子命令')
+    
+    checkpoint_create_parser = checkpoint_subparsers.add_parser('create', help='创建检查点')
+    checkpoint_create_parser.add_argument('--name', help='检查点名称')
+    checkpoint_create_parser.add_argument('--description', help='检查点描述')
+    checkpoint_create_parser.add_argument('--stage', help='阶段ID')
+    checkpoint_create_parser.set_defaults(func=cmd_checkpoint_create)
+    
+    checkpoint_list_parser = checkpoint_subparsers.add_parser('list', help='列出所有检查点')
+    checkpoint_list_parser.add_argument('--workflow', help='工作流ID（可选）')
+    checkpoint_list_parser.set_defaults(func=cmd_checkpoint_list)
+    
+    checkpoint_restore_parser = checkpoint_subparsers.add_parser('restore', help='从检查点恢复')
+    checkpoint_restore_parser.add_argument('checkpoint_id', help='检查点ID')
+    checkpoint_restore_parser.set_defaults(func=cmd_checkpoint_restore)
+    
+    checkpoint_delete_parser = checkpoint_subparsers.add_parser('delete', help='删除检查点')
+    checkpoint_delete_parser.add_argument('checkpoint_id', help='检查点ID')
+    checkpoint_delete_parser.set_defaults(func=cmd_checkpoint_delete)
+    
+    checkpoint_info_parser = checkpoint_subparsers.add_parser('info', help='显示检查点详情')
+    checkpoint_info_parser.add_argument('checkpoint_id', help='检查点ID')
+    checkpoint_info_parser.set_defaults(func=cmd_checkpoint_info)
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -3897,6 +3945,11 @@ def main():
     # Handle team subcommands
     if args.command == "team" and hasattr(args, 'team_command') and args.team_command:
         # Team subcommand is already set via set_defaults(func=...)
+        pass
+    
+    # Handle checkpoint subcommands
+    if args.command == "checkpoint" and hasattr(args, 'checkpoint_command') and args.checkpoint_command:
+        # Checkpoint subcommand is already set via set_defaults(func=...)
         pass
     
     args.func(args)

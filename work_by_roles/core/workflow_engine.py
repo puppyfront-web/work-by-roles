@@ -50,7 +50,7 @@ class WorkflowEngine:
         self.state_storage = state_storage or FileStateStorage()
         self.auto_save_state = auto_save_state
         self.state_file = state_file or (self.workspace_path / ".workflow" / "state.yaml")
-        
+    
         # Checkpoint manager (lazy initialization)
         self._checkpoint_manager: Optional[Any] = None
         self.auto_checkpoint = False  # Auto-create checkpoints on stage transitions
@@ -105,6 +105,14 @@ class WorkflowEngine:
             except Exception:
                 # Already handled gracefully in StateStorage.save()
                 pass
+    
+    @property
+    def checkpoint_manager(self) -> Any:
+        """Lazy initialization of checkpoint manager"""
+        if self._checkpoint_manager is None:
+            from .checkpoint_manager import CheckpointManager
+            self._checkpoint_manager = CheckpointManager(self.workspace_path)
+        return self._checkpoint_manager
 
     def load_all_configs(
         self,

@@ -383,9 +383,9 @@ class Checkpoint:
     """Workflow checkpoint for state recovery"""
     checkpoint_id: str
     name: str
+    workflow_id: str
     description: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
-    workflow_id: str
     stage_id: Optional[str] = None
     execution_state: 'ExecutionState' = None
     progress_data: Optional[Dict[str, Any]] = None  # WorkflowProgress as dict
