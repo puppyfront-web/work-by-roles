@@ -92,7 +92,41 @@ class Agent:
             self.context.decisions.append(decision)
             print(f"💭 Agent Decision: {decision}")
 
-    def produce_output(self, name: str, content: str, output_type: str = "code"):
+    def _get_output_path(self, name: str, output_type: str, stage_id: Optional[str] = None) -> Path:
+        """
+        Get the output path for a file based on type, workflow_id, and stage_id.
+        
+        Args:
+            name: Output file name
+            output_type: Type of output ("document", "report", "code", etc.)
+            stage_id: Optional stage ID (if not provided, tries to get from engine state)
+            
+        Returns:
+            Path object for the output file
+        """
+        # Get workflow_id
+        workflow_id = "default"
+        if self.engine.workflow:
+            workflow_id = self.engine.workflow.id
+        
+        # Get stage_id if not provided
+        if stage_id is None:
+            if self.engine.executor and self.engine.executor.state:
+                stage_id = self.engine.executor.state.current_stage
+            if stage_id is None:
+                stage_id = "default"
+        
+        # Determine path based on type
+        if output_type in ("document", "report"):
+            # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+            path = self.engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / name
+        else:
+            # Code, tests, and other types go to workspace root
+            path = self.engine.workspace_path / name
+        
+        return path
+
+    def produce_output(self, name: str, content: str, output_type: str = "code", stage_id: Optional[str] = None):
         """
         Produce an output file
         
@@ -100,23 +134,21 @@ class Agent:
             name: Output file name
             content: File content
             output_type: Type of output ("document", "report", "code", etc.)
-                        Documents and reports are saved to .workflow/temp/ to avoid cluttering the project
+                        Documents and reports are saved to .workflow/outputs/{workflow_id}/{stage_id}/ to avoid cluttering the project
+            stage_id: Optional stage ID (if not provided, tries to get from engine state)
         """
         if not self.context:
             raise ValueError("Agent not prepared")
         
-        # 文档和报告类型生成到临时目录，避免侵入项目
-        if output_type in ("document", "report"):
-            path = self.engine.workspace_path / ".workflow" / "temp" / name
-        else:
-            path = self.engine.workspace_path / name
+        # Get output path using unified path calculation
+        path = self._get_output_path(name, output_type, stage_id)
         
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding='utf-8')
         self.context.outputs[name] = str(path)
         
         if output_type in ("document", "report"):
-            print(f"📄 Agent produced output (temp): {name} -> {path.relative_to(self.engine.workspace_path)}")
+            print(f"📄 Agent produced output: {name} -> {path.relative_to(self.engine.workspace_path)}")
         else:
             print(f"📄 Agent produced output: {name}")
 

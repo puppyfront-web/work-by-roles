@@ -695,12 +695,8 @@ class AgentOrchestrator:
             return
         
         for output in stage.outputs:
-            # Determine output path based on type
-            if output.type in ("document", "report"):
-                output_path = self.engine.workspace_path / ".workflow" / "temp" / output.name
-            else:
-                # Code, tests, and other types go to workspace root
-                output_path = self.engine.workspace_path / output.name
+            # Get output path using agent's unified path calculation
+            output_path = agent._get_output_path(output.name, output.type, stage.id)
             
             # Check if file already exists (skip if optional and exists)
             if output_path.exists() and not output.required:
@@ -736,7 +732,8 @@ class AgentOrchestrator:
                     agent.produce_output(
                         name=output.name,
                         content=content,
-                        output_type=output.type
+                        output_type=output.type,
+                        stage_id=stage.id
                     )
                 except Exception as e:
                     if output.required:

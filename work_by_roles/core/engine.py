@@ -316,11 +316,16 @@ class WorkflowEngine:
         self.role_manager = role_manager or RoleManager()
         self.workflow: Optional[Workflow] = None
         self.executor: Optional[WorkflowExecutor] = None
-        self.quality_gates = quality_gates or QualityGateSystem(self.role_manager)
+        # Initialize quality gates with workflow_id (will be None initially, updated when workflow loads)
+        self.quality_gates = quality_gates or QualityGateSystem(self.role_manager, workflow_id=None)
         self.context: Optional[ProjectContext] = None
         self.state_storage = state_storage or FileStateStorage()
         self.auto_save_state = auto_save_state
         self.state_file = state_file or (self.workspace_path / ".workflow" / "state.yaml")
+        
+        # Checkpoint manager (lazy initialization)
+        self._checkpoint_manager: Optional[Any] = None
+        self.auto_checkpoint = False  # Auto-create checkpoints on stage transitions
     
     def load_context(self, context_file: Path) -> None:
         """Load project context from file"""
@@ -372,6 +377,76 @@ class WorkflowEngine:
             except Exception:
                 # Already handled gracefully in StateStorage.save()
                 pass
+    
+    @property
+    def checkpoint_manager(self) -> Any:
+        """Lazy initialization of checkpoint manager"""
+        if self._checkpoint_manager is None:
+            from .checkpoint_manager import CheckpointManager
+            self._checkpoint_manager = CheckpointManager(self.workspace_path)
+        return self._checkpoint_manager
+    
+    def create_checkpoint(
+        self,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        stage_id: Optional[str] = None,
+        progress_manager: Optional[Any] = None
+    ) -> Any:
+        """
+        Create a checkpoint for workflow state recovery.
+        
+        Args:
+            name: Optional checkpoint name
+            description: Optional checkpoint description
+            stage_id: Optional current stage ID
+            progress_manager: Optional progress manager to capture progress
+            
+        Returns:
+            Created checkpoint
+        """
+        if not self.workflow or not self.executor:
+            raise WorkflowError("Workflow and executor must be initialized to create checkpoint")
+        
+        workflow_id = self.workflow.id
+        execution_state = self.executor.state
+        
+        # Capture progress data if progress manager provided
+        progress_data = None
+        if progress_manager and hasattr(progress_manager, 'current_progress') and progress_manager.current_progress:
+            progress_data = progress_manager.current_progress.to_dict()
+        
+        checkpoint = self.checkpoint_manager.create_checkpoint(
+            workflow_id=workflow_id,
+            execution_state=execution_state,
+            progress_manager=progress_manager,
+            name=name,
+            description=description,
+            stage_id=stage_id
+        )
+        
+        return checkpoint
+    
+    def _create_checkpoint_auto(self, stage_id: str, description: str) -> None:
+        """
+        Automatically create a checkpoint after stage completion.
+        
+        Args:
+            stage_id: Stage ID that was completed
+            description: Checkpoint description
+        """
+        if not self.auto_checkpoint:
+            return
+        
+        try:
+            self.create_checkpoint(
+                name=f"Auto checkpoint: {stage_id}",
+                description=description,
+                stage_id=stage_id
+            )
+        except Exception as e:
+            import warnings
+            warnings.warn(f"Failed to create auto checkpoint: {e}")
 
     def load_all_configs(
         self,
@@ -496,6 +571,10 @@ class WorkflowEngine:
             stages=stages
         )
         
+        # Update quality_gates workflow_id now that workflow is loaded
+        if self.quality_gates:
+            self.quality_gates.workflow_id = self.workflow.id
+        
         self.executor = WorkflowExecutor(self.workflow, self.role_manager)
         
         # Auto-restore state after workflow is loaded
@@ -549,6 +628,11 @@ class WorkflowEngine:
         if all_passed:
             self.executor.complete_stage(stage_id)
             self._auto_save_state()
+            
+            # Auto-create checkpoint if enabled
+            if self.auto_checkpoint:
+                self._create_checkpoint_auto(stage_id, f"Stage complete: {stage_id}")
+            
             # Update vibe context
             if self.auto_save_state:
                 self.update_vibe_context()
@@ -563,6 +647,33 @@ class WorkflowEngine:
             # Include warnings in error output
             all_errors.extend(warnings_only)
             return False, all_errors
+    
+    def _get_output_path(self, output_name: str, output_type: str, stage_id: str) -> Path:
+        """
+        Get the output path for a file based on type, workflow_id, and stage_id.
+        
+        Args:
+            output_name: Output file name
+            output_type: Type of output ("document", "report", "code", etc.)
+            stage_id: Stage ID
+            
+        Returns:
+            Path object for the output file
+        """
+        # Get workflow_id
+        workflow_id = "default"
+        if self.workflow:
+            workflow_id = self.workflow.id
+        
+        # Determine path based on type
+        if output_type in ("document", "report"):
+            # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+            path = self.workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / output_name
+        else:
+            # Code, tests, and other types go to workspace root
+            path = self.workspace_path / output_name
+        
+        return path
     
     def _check_required_outputs(self, stage: Stage) -> List[str]:
         """
@@ -583,11 +694,8 @@ class WorkflowEngine:
             if not output.required:
                 continue  # Skip optional outputs
             
-            # Determine output path based on type
-            if output.type in ("document", "report"):
-                output_path = self.workspace_path / ".workflow" / "temp" / output.name
-            else:
-                output_path = self.workspace_path / output.name
+            # Get output path using unified path calculation
+            output_path = self._get_output_path(output.name, output.type, stage.id)
             
             if not output_path.exists():
                 errors.append(
@@ -679,11 +787,8 @@ class WorkflowEngine:
             if current_stage.outputs:
                 lines.append("**Required Outputs:**")
                 for output in current_stage.outputs:
-                    # 文档类型输出在临时目录
-                    if output.type == "document" or output.type == "report":
-                        output_path = self.workspace_path / ".workflow" / "temp" / output.name
-                    else:
-                        output_path = self.workspace_path / output.name
+                    # Get output path using unified path calculation
+                    output_path = self._get_output_path(output.name, output.type, current_stage.id)
                     marker = "✅" if output_path.exists() else "⏳"
                     lines.append(f"- {marker} `{output.name}` ({output.type}, required={output.required})")
                 lines.append("")
@@ -1858,9 +1963,10 @@ class ContextSummary:
             stage = engine.executor._get_stage_by_id(stage_id)
             if stage and stage.outputs:
                 for output in stage.outputs:
-                    # 文档类型输出在临时目录
-                    if output.type == "document" or output.type == "report":
-                        output_path = engine.workspace_path / ".workflow" / "temp" / output.name
+                    # Get output path using unified path calculation
+                    workflow_id = engine.workflow.id if engine.workflow else "default"
+                    if output.type in ("document", "report"):
+                        output_path = engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage.id / output.name
                     else:
                         output_path = engine.workspace_path / output.name
                     if output_path.exists():
@@ -1928,7 +2034,41 @@ class Agent:
             self.context.decisions.append(decision)
             print(f"💭 Agent Decision: {decision}")
 
-    def produce_output(self, name: str, content: str, output_type: str = "code"):
+    def _get_output_path(self, name: str, output_type: str, stage_id: Optional[str] = None) -> Path:
+        """
+        Get the output path for a file based on type, workflow_id, and stage_id.
+        
+        Args:
+            name: Output file name
+            output_type: Type of output ("document", "report", "code", etc.)
+            stage_id: Optional stage ID (if not provided, tries to get from engine state)
+            
+        Returns:
+            Path object for the output file
+        """
+        # Get workflow_id
+        workflow_id = "default"
+        if self.engine.workflow:
+            workflow_id = self.engine.workflow.id
+        
+        # Get stage_id if not provided
+        if stage_id is None:
+            if self.engine.executor and self.engine.executor.state:
+                stage_id = self.engine.executor.state.current_stage
+            if stage_id is None:
+                stage_id = "default"
+        
+        # Determine path based on type
+        if output_type in ("document", "report"):
+            # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+            path = self.engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / name
+        else:
+            # Code, tests, and other types go to workspace root
+            path = self.engine.workspace_path / name
+        
+        return path
+
+    def produce_output(self, name: str, content: str, output_type: str = "code", stage_id: Optional[str] = None):
         """
         Produce an output file
         
@@ -1936,23 +2076,21 @@ class Agent:
             name: Output file name
             content: File content
             output_type: Type of output ("document", "report", "code", etc.)
-                        Documents and reports are saved to .workflow/temp/ to avoid cluttering the project
+                        Documents and reports are saved to .workflow/outputs/{workflow_id}/{stage_id}/ to avoid cluttering the project
+            stage_id: Optional stage ID (if not provided, tries to get from engine state)
         """
         if not self.context:
             raise ValueError("Agent not prepared")
         
-        # 文档和报告类型生成到临时目录，避免侵入项目
-        if output_type in ("document", "report"):
-            path = self.engine.workspace_path / ".workflow" / "temp" / name
-        else:
-            path = self.engine.workspace_path / name
+        # Get output path using unified path calculation
+        path = self._get_output_path(name, output_type, stage_id)
         
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding='utf-8')
         self.context.outputs[name] = str(path)
         
         if output_type in ("document", "report"):
-            print(f"📄 Agent produced output (temp): {name} -> {path.relative_to(self.engine.workspace_path)}")
+            print(f"📄 Agent produced output: {name} -> {path.relative_to(self.engine.workspace_path)}")
         else:
             print(f"📄 Agent produced output: {name}")
 

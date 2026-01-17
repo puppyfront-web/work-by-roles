@@ -3,7 +3,7 @@ Quality gate system for evaluating workflow stage quality gates.
 Following Single Responsibility Principle - handles quality gate evaluation only.
 """
 
-from typing import Dict, List, Callable, Any, Tuple
+from typing import Dict, List, Callable, Any, Tuple, Optional
 from pathlib import Path
 
 from .exceptions import ValidationError
@@ -18,8 +18,9 @@ class QualityGateSystem:
     # Type alias for validator function signature
     ValidatorFunc = Callable[[Any, Stage, Path], Tuple[bool, List[str]]]
     
-    def __init__(self, role_manager: RoleManager):
+    def __init__(self, role_manager: RoleManager, workflow_id: Optional[str] = None):
         self.role_manager = role_manager
+        self.workflow_id = workflow_id
         self._validators: Dict[str, QualityGateSystem.ValidatorFunc] = {}
         self._register_default_validators()
     
@@ -120,15 +121,38 @@ class QualityGateSystem:
                     errors.append(f"Schema validation failed for {schema_file.name}: {e}")
         return len(errors) == 0, errors
     
+    def _get_output_path(self, output_name: str, output_type: str, stage_id: str, workspace_path: Path) -> Path:
+        """
+        Get the output path for a file based on type, workflow_id, and stage_id.
+        
+        Args:
+            output_name: Output file name
+            output_type: Type of output ("document", "report", "code", etc.)
+            stage_id: Stage ID
+            workspace_path: Workspace root path
+            
+        Returns:
+            Path object for the output file
+        """
+        # Get workflow_id
+        workflow_id = self.workflow_id or "default"
+        
+        # Determine path based on type
+        if output_type in ("document", "report"):
+            # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+            path = workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / output_name
+        else:
+            # Code, tests, and other types go to workspace root
+            path = workspace_path / output_name
+        
+        return path
+    
     def _validate_completeness(self, gate: QualityGate, stage: Stage, workspace_path: Path) -> Tuple[bool, List[str]]:
         """Validate completeness of stage outputs"""
         errors = []
         for output in stage.outputs:
-            # 文档类型输出生成到临时目录，避免侵入项目
-            if output.type == "document" or output.type == "report":
-                output_path = workspace_path / ".workflow" / "temp" / output.name
-            else:
-                output_path = workspace_path / output.name
+            # Get output path using unified path calculation
+            output_path = self._get_output_path(output.name, output.type, stage.id, workspace_path)
             
             if output.required and not output_path.exists():
                 errors.append(f"Required output '{output.name}' not found")
@@ -149,8 +173,8 @@ class QualityGateSystem:
         errors = []
         for output in stage.outputs:
             if output.type == "document":
-                # 文档生成到临时目录
-                doc_path = workspace_path / ".workflow" / "temp" / output.name
+                # Get document path using unified path calculation
+                doc_path = self._get_output_path(output.name, output.type, stage.id, workspace_path)
                 if doc_path.exists():
                     content = doc_path.read_text(encoding='utf-8')
                     for criterion in gate.criteria:

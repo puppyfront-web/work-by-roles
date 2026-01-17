@@ -21,6 +21,7 @@ try:
         TeamManager,
         RoleExecutor
     )
+    from .core.llm_client_loader import LLMClientLoader
     _agents_available = True
 except (ImportError, ValueError):
     # Fallback: try from .engine (forwarding module)
@@ -35,6 +36,7 @@ except (ImportError, ValueError):
             TeamManager,
             RoleExecutor
         )
+        from .core.llm_client_loader import LLMClientLoader
         _agents_available = True
     except (ImportError, ValueError):
         # Fallback for direct execution during development
@@ -48,6 +50,10 @@ except (ImportError, ValueError):
             TeamManager,
             RoleExecutor
         )
+        try:
+            from work_by_roles.core.llm_client_loader import LLMClientLoader
+        except ImportError:
+            LLMClientLoader = None
         _agents_available = True
 
 
@@ -148,6 +154,20 @@ def _init_engine(args) -> Tuple[WorkflowEngine, Path, Path]:
         engine.load_state(state_file, auto_restore=False)
         
     return engine, workflow_file, state_file
+
+
+def _load_llm_client(workspace: Path) -> Optional[Any]:
+    """
+    Load LLM client from environment variables or configuration file.
+    
+    Args:
+        workspace: Workspace root path
+        
+    Returns:
+        LLM client instance or None if not configured
+    """
+    loader = LLMClientLoader(workspace)
+    return loader.load()
 
 
 def _get_templates_dir() -> Path:
@@ -1150,8 +1170,14 @@ def cmd_complete(args):
             # Show required outputs
             if current.outputs:
                 print("\n必需输出:")
+                workflow_id = engine.workflow.id if engine.workflow else "default"
                 for output in current.outputs:
-                    exists = (engine.workspace_path / output.name).exists()
+                    # Get output path using unified path calculation
+                    if output.type in ("document", "report"):
+                        output_path = engine.workspace_path / ".workflow" / "outputs" / workflow_id / current.id / output.name
+                    else:
+                        output_path = engine.workspace_path / output.name
+                    exists = output_path.exists()
                     marker = "✅" if exists else "⏳"
                     print(f"  {marker} {output.name} ({'已存在' if exists else '缺失'})")
             
@@ -1684,8 +1710,13 @@ def cmd_analyze(args):
         # Required Outputs
         if current_stage.outputs:
             print("\n  必需输出:")
+            workflow_id = engine.workflow.id if engine.workflow else "default"
             for output in current_stage.outputs:
-                output_path = engine.workspace_path / output.name
+                # Get output path using unified path calculation
+                if output.type in ("document", "report"):
+                    output_path = engine.workspace_path / ".workflow" / "outputs" / workflow_id / current_stage.id / output.name
+                else:
+                    output_path = engine.workspace_path / output.name
                 status = "✅ 已完成" if output_path.exists() else "⏳ 待完成"
                 print(f"    - {status}: {output.name} ({output.type})")
         
@@ -1722,9 +1753,14 @@ def cmd_analyze(args):
         # Check if current stage can be completed
         can_complete = True
         missing_outputs = []
+        workflow_id = engine.workflow.id if engine.workflow else "default"
         for output in current_stage.outputs:
             if output.required:
-                output_path = engine.workspace_path / output.name
+                # Get output path using unified path calculation
+                if output.type in ("document", "report"):
+                    output_path = engine.workspace_path / ".workflow" / "outputs" / workflow_id / current_stage.id / output.name
+                else:
+                    output_path = engine.workspace_path / output.name
                 if not output_path.exists():
                     can_complete = False
                     missing_outputs.append(output.name)
@@ -2065,6 +2101,31 @@ def cmd_role_execute(args):
     
     try:
         engine, _, _ = _init_engine(args)
+        workspace = Path(args.workspace or ".")
+        
+        # 加载 LLM 客户端
+        llm_client = _load_llm_client(workspace)
+        
+        # 如果使用 --use-llm 但未配置 LLM 客户端，抛出错误
+        if args.use_llm and not llm_client:
+            error_msg = (
+                "❌ LLM client not configured. Please:\n"
+                "  1. Set environment variable (e.g., OPENAI_API_KEY or ANTHROPIC_API_KEY)\n"
+                "  2. Or create .workflow/config.yaml with llm configuration\n"
+                "  3. Or remove --use-llm flag to use lightweight mode\n"
+                "\n"
+                "Example environment variables:\n"
+                "  export OPENAI_API_KEY='your-api-key'\n"
+                "  export ANTHROPIC_API_KEY='your-api-key'\n"
+                "\n"
+                "Example config file (.workflow/config.yaml):\n"
+                "  llm:\n"
+                "    provider: openai\n"
+                "    api_key: your-api-key\n"
+                "    model: gpt-4"
+            )
+            print(error_msg, file=sys.stderr)
+            raise WorkflowError("LLM client not configured but --use-llm flag is set")
         
         # 解析输入数据
         inputs = {}
@@ -2076,7 +2137,7 @@ def cmd_role_execute(args):
                 sys.exit(1)
         
         # 创建RoleExecutor
-        role_executor = RoleExecutor(engine)
+        role_executor = RoleExecutor(engine, llm_client=llm_client)
         
         print(f"\n🎭 角色执行模式")
         print("=" * 60)
@@ -2142,7 +2203,36 @@ def cmd_agent_execute(args):
     
     try:
         engine, _, _ = _init_engine(args)
-        orchestrator = AgentOrchestrator(engine)
+        workspace = Path(args.workspace or ".")
+        
+        # 加载 LLM 客户端
+        llm_client = _load_llm_client(workspace)
+        
+        # 确定是否使用LLM
+        use_llm = getattr(args, 'use_llm', False) and not getattr(args, 'no_llm', False)
+        
+        # 如果使用 --use-llm 但未配置 LLM 客户端，抛出错误
+        if use_llm and not llm_client:
+            error_msg = (
+                "❌ LLM client not configured. Please:\n"
+                "  1. Set environment variable (e.g., OPENAI_API_KEY or ANTHROPIC_API_KEY)\n"
+                "  2. Or create .workflow/config.yaml with llm configuration\n"
+                "  3. Or remove --use-llm flag to use lightweight mode\n"
+                "\n"
+                "Example environment variables:\n"
+                "  export OPENAI_API_KEY='your-api-key'\n"
+                "  export ANTHROPIC_API_KEY='your-api-key'\n"
+                "\n"
+                "Example config file (.workflow/config.yaml):\n"
+                "  llm:\n"
+                "    provider: openai\n"
+                "    api_key: your-api-key\n"
+                "    model: gpt-4"
+            )
+            print(error_msg, file=sys.stderr)
+            raise WorkflowError("LLM client not configured but --use-llm flag is set")
+        
+        orchestrator = AgentOrchestrator(engine, llm_client=llm_client)
         
         stage_id = args.stage
         if not stage_id:
@@ -2176,8 +2266,6 @@ def cmd_agent_execute(args):
         if not current or current.id != stage_id:
             engine.start_stage(stage_id, stage.role)
         
-        # 确定是否使用LLM
-        use_llm = getattr(args, 'use_llm', False) and not getattr(args, 'no_llm', False)
         collaborate = getattr(args, 'collaborate', False)
         
         print(f"\n🤖 Agent 执行模式 - {stage.name}")
@@ -2304,11 +2392,37 @@ def cmd_team_collaborate(args):
     
     try:
         engine, _, _ = _init_engine(args)
-        orchestrator = AgentOrchestrator(engine)
+        workspace = Path(args.workspace or ".")
         
         goal = args.goal
         role_ids = getattr(args, 'roles', None)
         use_llm = getattr(args, 'use_llm', False)
+        
+        # 加载 LLM 客户端
+        llm_client = _load_llm_client(workspace)
+        
+        # 如果使用 --use-llm 但未配置 LLM 客户端，抛出错误
+        if use_llm and not llm_client:
+            error_msg = (
+                "❌ LLM client not configured. Please:\n"
+                "  1. Set environment variable (e.g., OPENAI_API_KEY or ANTHROPIC_API_KEY)\n"
+                "  2. Or create .workflow/config.yaml with llm configuration\n"
+                "  3. Or remove --use-llm flag to use rule-based decomposition\n"
+                "\n"
+                "Example environment variables:\n"
+                "  export OPENAI_API_KEY='your-api-key'\n"
+                "  export ANTHROPIC_API_KEY='your-api-key'\n"
+                "\n"
+                "Example config file (.workflow/config.yaml):\n"
+                "  llm:\n"
+                "    provider: openai\n"
+                "    api_key: your-api-key\n"
+                "    model: gpt-4"
+            )
+            print(error_msg, file=sys.stderr)
+            raise WorkflowError("LLM client not configured but --use-llm flag is set")
+        
+        orchestrator = AgentOrchestrator(engine, llm_client=llm_client)
         
         print(f"\n🤝 多 Agent 协作模式")
         print("=" * 60)
@@ -2371,12 +2485,37 @@ def cmd_decompose_task(args):
     
     try:
         engine, _, _ = _init_engine(args)
+        workspace = Path(args.workspace or ".")
         from work_by_roles.core.task_decomposer import TaskDecomposer
         
         goal = args.goal
         role_ids = getattr(args, 'roles', None)
         use_llm = getattr(args, 'use_llm', False)
         output_json = getattr(args, 'json', False)
+        
+        # 加载 LLM 客户端
+        llm_client = _load_llm_client(workspace)
+        
+        # 如果使用 --use-llm 但未配置 LLM 客户端，抛出错误
+        if use_llm and not llm_client:
+            error_msg = (
+                "❌ LLM client not configured. Please:\n"
+                "  1. Set environment variable (e.g., OPENAI_API_KEY or ANTHROPIC_API_KEY)\n"
+                "  2. Or create .workflow/config.yaml with llm configuration\n"
+                "  3. Or remove --use-llm flag to use rule-based decomposition\n"
+                "\n"
+                "Example environment variables:\n"
+                "  export OPENAI_API_KEY='your-api-key'\n"
+                "  export ANTHROPIC_API_KEY='your-api-key'\n"
+                "\n"
+                "Example config file (.workflow/config.yaml):\n"
+                "  llm:\n"
+                "    provider: openai\n"
+                "    api_key: your-api-key\n"
+                "    model: gpt-4"
+            )
+            print(error_msg, file=sys.stderr)
+            raise WorkflowError("LLM client not configured but --use-llm flag is set")
         
         # Get available roles
         if role_ids:
@@ -2389,7 +2528,6 @@ def cmd_decompose_task(args):
             available_roles = list(engine.role_manager.roles.values())
         
         # Create decomposer
-        llm_client = None  # TODO: Get from args if available
         decomposer = TaskDecomposer(engine, llm_client)
         
         # Decompose
@@ -3172,13 +3310,14 @@ def cmd_skill_workflow_graph(args):
         sys.exit(1)
 
 
-def _check_required_outputs_for_stage(stage, workspace_path: Path) -> List[Tuple[str, Path]]:
+def _check_required_outputs_for_stage(stage, workspace_path: Path, workflow_id: Optional[str] = None) -> List[Tuple[str, Path]]:
     """
     Check if all required outputs exist for a stage.
     
     Args:
         stage: Stage definition
         workspace_path: Workspace root path
+        workflow_id: Optional workflow ID (defaults to "default" if not provided)
         
     Returns:
         List of tuples (output_name, output_path) for missing required outputs
@@ -3187,14 +3326,19 @@ def _check_required_outputs_for_stage(stage, workspace_path: Path) -> List[Tuple
     if not stage.outputs:
         return missing
     
+    # Get workflow_id
+    workflow_id = workflow_id or "default"
+    
     for output in stage.outputs:
         if not output.required:
             continue
         
-        # Determine output path based on type
+        # Get output path using unified path calculation
         if output.type in ("document", "report"):
-            output_path = workspace_path / ".workflow" / "temp" / output.name
+            # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+            output_path = workspace_path / ".workflow" / "outputs" / workflow_id / stage.id / output.name
         else:
+            # Code, tests, and other types go to workspace root
             output_path = workspace_path / output.name
         
         if not output_path.exists():
@@ -3220,6 +3364,33 @@ def cmd_wfauto(args):
     
     try:
         engine, _, _ = _init_engine(args)
+        workspace = Path(args.workspace or ".")
+        
+        # 加载 LLM 客户端
+        llm_client = _load_llm_client(workspace)
+        
+        # 检查是否使用 LLM
+        use_llm = getattr(args, 'use_llm', False)
+        if use_llm and not llm_client:
+            error_msg = (
+                "❌ LLM client not configured. Please:\n"
+                "  1. Set environment variable (e.g., OPENAI_API_KEY or ANTHROPIC_API_KEY)\n"
+                "  2. Or create .workflow/config.yaml with llm configuration\n"
+                "  3. Or remove --use-llm flag to use lightweight mode\n"
+                "\n"
+                "Example environment variables:\n"
+                "  export OPENAI_API_KEY='your-api-key'\n"
+                "  export ANTHROPIC_API_KEY='your-api-key'\n"
+                "\n"
+                "Example config file (.workflow/config.yaml):\n"
+                "  llm:\n"
+                "    provider: openai\n"
+                "    api_key: your-api-key\n"
+                "    model: gpt-4"
+            )
+            print(error_msg, file=sys.stderr)
+            raise WorkflowError("LLM client not configured but --use-llm flag is set")
+        
         if not engine.workflow:
             print("❌ 未加载工作流，检查 workflow 文件配置", file=sys.stderr)
             sys.exit(1)
@@ -3253,9 +3424,6 @@ def cmd_wfauto(args):
             elif is_explicit_partial:
                 # 用户明确指定部分阶段，使用智能路由
                 from work_by_roles.core.engine import IntentRouter
-                
-                # 获取LLM客户端（如果可用）
-                llm_client = getattr(args, 'llm_client', None)
                 
                 router = IntentRouter(engine, llm_client=llm_client)
                 
@@ -3409,7 +3577,8 @@ def cmd_wfauto(args):
                         
                         # 检查必需输出是否已生成（Lovable 工作流模式）
                         import time
-                        missing_outputs = _check_required_outputs_for_stage(stage, engine.workspace_path)
+                        workflow_id = engine.workflow.id if engine.workflow else None
+                        missing_outputs = _check_required_outputs_for_stage(stage, engine.workspace_path, workflow_id=workflow_id)
                         if missing_outputs:
                             print(f"\n⚠️  阶段 {stage.id} 的必需输出未生成，等待生成...")
                             for output_name, output_path in missing_outputs:
@@ -3422,7 +3591,7 @@ def cmd_wfauto(args):
                             while missing_outputs and waited < max_wait:
                                 time.sleep(wait_interval)
                                 waited += wait_interval
-                                missing_outputs = _check_required_outputs_for_stage(stage, engine.workspace_path)
+                                missing_outputs = _check_required_outputs_for_stage(stage, engine.workspace_path, workflow_id=workflow_id)
                             
                             # 如果仍然缺失，报错
                             if missing_outputs:
@@ -3525,6 +3694,7 @@ def cmd_intent(args):
     """分析用户意图并返回需要执行的阶段（IDE集成）"""
     try:
         engine, _, _ = _init_engine(args)
+        workspace = Path(args.workspace or ".")
         
         user_input = getattr(args, 'input', None) or getattr(args, 'intent', None)
         if not user_input:
@@ -3532,8 +3702,34 @@ def cmd_intent(args):
             print("用法: workflow intent '<用户输入>' 或 workflow intent --intent '<用户输入>'", file=sys.stderr)
             sys.exit(1)
         
-        # 获取LLM客户端（如果可用）
-        llm_client = getattr(args, 'llm_client', None)
+        # 加载LLM客户端
+        llm_client = _load_llm_client(workspace)
+        
+        # 确定是否使用LLM
+        use_llm = None
+        if hasattr(args, 'use_llm') and args.use_llm:
+            use_llm = True
+            if not llm_client:
+                error_msg = (
+                    "❌ LLM client not configured. Please:\n"
+                    "  1. Set environment variable (e.g., OPENAI_API_KEY or ANTHROPIC_API_KEY)\n"
+                    "  2. Or create .workflow/config.yaml with llm configuration\n"
+                    "  3. Or remove --use-llm flag to use rule-based mode\n"
+                    "\n"
+                    "Example environment variables:\n"
+                    "  export OPENAI_API_KEY='your-api-key'\n"
+                    "  export ANTHROPIC_API_KEY='your-api-key'\n"
+                    "\n"
+                    "Example config file (.workflow/config.yaml):\n"
+                    "  llm:\n"
+                    "    provider: openai\n"
+                    "    api_key: your-api-key\n"
+                    "    model: gpt-4"
+                )
+                print(error_msg, file=sys.stderr)
+                raise WorkflowError("LLM client not configured but --use-llm flag is set")
+        elif hasattr(args, 'no_llm') and args.no_llm:
+            use_llm = False
         
         from work_by_roles.core.engine import IntentRouter
         router = IntentRouter(engine, llm_client=llm_client)

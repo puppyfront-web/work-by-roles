@@ -196,6 +196,7 @@ your-project/
 │   │   └── ...
 │   ├── workflow_schema.yaml  # 工作流定义（可选）
 │   ├── project_context.yaml  # 项目上下文
+│   ├── config.yaml        # LLM 配置（可选，见下方说明）
 │   └── USAGE.md            # 使用说明
 └── ...
 ```
@@ -224,6 +225,50 @@ ls /path/to/work-by-roles/work_by_roles/templates/
 
 # 使用指定模板
 workflow init --template standard_agile
+```
+
+### LLM 配置（使用 --use-llm 时需要）
+
+使用 `--use-llm` 参数时需要配置 LLM 客户端。系统支持两种配置方式：
+
+#### 方式 1: 环境变量（推荐）
+
+```bash
+# OpenAI
+export OPENAI_API_KEY='your-api-key'
+
+# 或 Anthropic
+export ANTHROPIC_API_KEY='your-api-key'
+
+# 可选：指定模型
+export LLM_MODEL='gpt-4'
+```
+
+#### 方式 2: 配置文件
+
+创建 `.workflow/config.yaml` 文件：
+
+```yaml
+llm:
+  provider: openai  # 或 "anthropic"
+  api_key: your-api-key  # 或留空，从环境变量读取
+  model: gpt-4  # 可选，默认使用环境变量 LLM_MODEL
+```
+
+**配置优先级**: 环境变量 > 配置文件
+
+**注意**: 
+- 如果使用 `--use-llm` 但未配置 LLM 客户端，系统会抛出错误并提示配置方法
+- 如果不使用 `--use-llm`，系统会使用轻量模式（规则引擎），无需 LLM 配置
+
+#### 使用示例
+
+```bash
+# 使用 LLM 模式（需要配置）
+workflow role-execute product_analyst "分析用户需求" --use-llm
+
+# 使用轻量模式（无需配置）
+workflow role-execute product_analyst "分析用户需求"
 ```
 
 ## ❓ 常见问题
@@ -258,8 +303,29 @@ pip install -e . --upgrade
 # 在 CI 脚本中
 pip install git+https://github.com/puppyfront-web/work-by-roles.git
 workflow setup
-workflow wfauto
+
+# 如果使用 --use-llm，需要配置环境变量
+export OPENAI_API_KEY=$OPENAI_API_KEY  # 从 CI 环境变量读取
+workflow wfauto --use-llm
 ```
+
+### Q: 使用 --use-llm 时提示 LLM 未配置怎么办？
+
+系统会显示详细的配置说明。你需要：
+
+1. **方式 1（推荐）**: 设置环境变量
+   ```bash
+   export OPENAI_API_KEY='your-api-key'
+   ```
+
+2. **方式 2**: 创建配置文件 `.workflow/config.yaml`
+   ```yaml
+   llm:
+     provider: openai
+     api_key: your-api-key
+   ```
+
+3. **方式 3**: 不使用 `--use-llm`，使用轻量模式（规则引擎）
 
 ## Checkpoint 机制
 

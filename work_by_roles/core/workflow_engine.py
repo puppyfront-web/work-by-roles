@@ -45,7 +45,11 @@ class WorkflowEngine:
         self.role_manager = role_manager or RoleManager()
         self.workflow: Optional[Workflow] = None
         self.executor: Optional[WorkflowExecutor] = None
-        self.quality_gates = quality_gates or QualityGateSystem(self.role_manager)
+        # Initialize quality gates with workflow_id if available
+        workflow_id = None
+        if self.workflow:
+            workflow_id = self.workflow.id
+        self.quality_gates = quality_gates or QualityGateSystem(self.role_manager, workflow_id=workflow_id)
         self.context: Optional[ProjectContext] = None
         self.state_storage = state_storage or FileStateStorage()
         self.auto_save_state = auto_save_state
@@ -237,6 +241,10 @@ class WorkflowEngine:
             stages=stages
         )
         
+        # Update quality_gates workflow_id now that workflow is loaded
+        if self.quality_gates:
+            self.quality_gates.workflow_id = self.workflow.id
+        
         self.executor = WorkflowExecutor(self.workflow, self.role_manager)
         
         # Auto-restore state after workflow is loaded
@@ -310,6 +318,33 @@ class WorkflowEngine:
             all_errors.extend(warnings_only)
             return False, all_errors
     
+    def _get_output_path(self, output_name: str, output_type: str, stage_id: str) -> Path:
+        """
+        Get the output path for a file based on type, workflow_id, and stage_id.
+        
+        Args:
+            output_name: Output file name
+            output_type: Type of output ("document", "report", "code", etc.)
+            stage_id: Stage ID
+            
+        Returns:
+            Path object for the output file
+        """
+        # Get workflow_id
+        workflow_id = "default"
+        if self.workflow:
+            workflow_id = self.workflow.id
+        
+        # Determine path based on type
+        if output_type in ("document", "report"):
+            # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+            path = self.workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / output_name
+        else:
+            # Code, tests, and other types go to workspace root
+            path = self.workspace_path / output_name
+        
+        return path
+    
     def _check_required_outputs(self, stage: Stage) -> List[str]:
         """
         Check if all required outputs exist. This is a strict check that always blocks
@@ -329,11 +364,8 @@ class WorkflowEngine:
             if not output.required:
                 continue  # Skip optional outputs
             
-            # Determine output path based on type
-            if output.type in ("document", "report"):
-                output_path = self.workspace_path / ".workflow" / "temp" / output.name
-            else:
-                output_path = self.workspace_path / output.name
+            # Get output path using unified path calculation
+            output_path = self._get_output_path(output.name, output.type, stage.id)
             
             if not output_path.exists():
                 errors.append(
@@ -425,11 +457,8 @@ class WorkflowEngine:
             if current_stage.outputs:
                 lines.append("**Required Outputs:**")
                 for output in current_stage.outputs:
-                    # 文档类型输出在临时目录
-                    if output.type == "document" or output.type == "report":
-                        output_path = self.workspace_path / ".workflow" / "temp" / output.name
-                    else:
-                        output_path = self.workspace_path / output.name
+                    # Get output path using unified path calculation
+                    output_path = self._get_output_path(output.name, output.type, current_stage.id)
                     marker = "✅" if output_path.exists() else "⏳"
                     lines.append(f"- {marker} `{output.name}` ({output.type}, required={output.required})")
                 lines.append("")

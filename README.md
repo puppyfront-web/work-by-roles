@@ -93,6 +93,38 @@ workflow role-execute system_architect "设计微服务架构" --use-llm
 > - `workflow wfauto` 自动使用 Agent + Skills 执行，完全自动化，无需手动干预
 > - `workflow role-execute` 简化模式，无需定义 workflow 阶段，直接在 IDE 中使用
 
+## LLM 配置
+
+使用 `--use-llm` 参数时需要配置 LLM 客户端。系统支持两种配置方式：
+
+### 方式 1: 环境变量（推荐）
+
+```bash
+# OpenAI
+export OPENAI_API_KEY='your-api-key'
+
+# 或 Anthropic
+export ANTHROPIC_API_KEY='your-api-key'
+
+# 可选：指定模型
+export LLM_MODEL='gpt-4'
+```
+
+### 方式 2: 配置文件
+
+创建 `.workflow/config.yaml` 文件：
+
+```yaml
+llm:
+  provider: openai  # 或 "anthropic"
+  api_key: your-api-key  # 或从环境变量读取（留空）
+  model: gpt-4  # 可选
+```
+
+**配置优先级**: 环境变量 > 配置文件
+
+**注意**: 如果使用 `--use-llm` 但未配置 LLM 客户端，系统会抛出错误并提示配置方法。
+
 ## Python API
 
 ```python

@@ -504,9 +504,11 @@ class ContextSummary:
             stage = engine.executor._get_stage_by_id(stage_id)
             if stage and stage.outputs:
                 for output in stage.outputs:
-                    # 文档类型输出在临时目录
-                    if output.type == "document" or output.type == "report":
-                        output_path = engine.workspace_path / ".workflow" / "temp" / output.name
+                    # Get output path using unified path calculation
+                    workflow_id = engine.workflow.id if engine.workflow else "default"
+                    if output.type in ("document", "report"):
+                        # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
+                        output_path = engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage.id / output.name
                     else:
                         output_path = engine.workspace_path / output.name
                     if output_path.exists():
