@@ -3466,6 +3466,16 @@ def cmd_wfauto(args):
             stages = sorted(engine.workflow.stages, key=lambda s: s.order)
             print("🚀 wfauto: 开始全流程执行\n")
         
+        # 将用户意图传递到 engine context
+        if hasattr(args, 'intent') and args.intent:
+            if not engine.context:
+                from work_by_roles.core.models import ProjectContext
+                engine.context = ProjectContext(workspace_path=engine.workspace_path)
+            if not engine.context.specs:
+                engine.context.specs = {}
+            engine.context.specs["global_goal"] = args.intent
+            engine.context.specs["user_intent"] = args.intent
+        
         # 尝试使用 Agent + Skills 自动执行（如果可用）
         use_agent = _agents_available and getattr(args, 'use_agent', True) and not getattr(args, 'no_agent', False)
         use_parallel = getattr(args, 'parallel', False)
@@ -3538,10 +3548,16 @@ def cmd_wfauto(args):
                 # 使用 Agent + Skills 自动执行
                 if use_agent and orchestrator:
                     try:
+                        # 准备输入数据，包含用户意图
+                        stage_inputs = {}
+                        if hasattr(args, 'intent') and args.intent:
+                            stage_inputs["user_intent"] = args.intent
+                            stage_inputs["goal"] = args.intent
+                        
                         # 自动执行阶段（包含技能工作流）
                         stage_result = orchestrator.execute_stage_with_workflows(
                             stage_id=stage.id,
-                            inputs={},
+                            inputs=stage_inputs,
                             auto_execute_workflows=True
                         )
                         

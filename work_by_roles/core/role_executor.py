@@ -3,6 +3,7 @@ Role executor for executing role-specific tasks.
 Following Single Responsibility Principle - handles role execution only.
 """
 
+import json
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -89,6 +90,7 @@ class RoleExecutor:
         
         # 4. 执行技能
         skill_results = []
+        workflow_results = []  # 收集技能执行结果，用于生成输出文件
         for skill_id in selected_skills:
             try:
                 skill_input = self._prepare_skill_input(requirement, inputs or {}, agent.context)
@@ -101,11 +103,28 @@ class RoleExecutor:
                     "skill_id": skill_id,
                     "result": result
                 })
+                # 收集技能执行结果用于输出文件生成
+                if result and isinstance(result, dict):
+                    workflow_results.append({
+                        "workflow_id": f"role_execute_{role_id}",
+                        "status": "success" if result.get("success") else "error",
+                        "outputs": result.get("output", {}),
+                        "errors": [] if result.get("success") else [result.get("error", "Unknown error")]
+                    })
             except Exception as e:
                 skill_results.append({
                     "skill_id": skill_id,
                     "error": str(e)
                 })
+                workflow_results.append({
+                    "workflow_id": f"role_execute_{role_id}",
+                    "status": "error",
+                    "outputs": {},
+                    "errors": [str(e)]
+                })
+        
+        # 4.5. 生成输出文件（如果角色对应有 workflow stage 定义）
+        self._generate_role_output_files(role_id, agent, workflow_results)
         
         # 5. 生成最终响应
         final_response = self._generate_response(
@@ -316,5 +335,53 @@ class RoleExecutor:
             response_parts.append("")
         
         return "\n".join(response_parts)
+    
+    def _generate_role_output_files(
+        self,
+        role_id: str,
+        agent: Agent,
+        workflow_results: List[Dict[str, Any]]
+    ) -> None:
+        """
+        为角色执行生成输出文件。
+        
+        如果角色在 workflow 中有对应的 stage 定义，则生成该 stage 定义的输出文件。
+        
+        Args:
+            role_id: 角色ID
+            agent: Agent实例
+            workflow_results: 技能执行结果列表
+        """
+        # 检查是否有 workflow 定义
+        if not self.engine.workflow:
+            return
+        
+        # 查找角色对应的 stage
+        matching_stage = None
+        for stage in self.engine.workflow.stages:
+            if stage.role == role_id:
+                matching_stage = stage
+                break
+        
+        # 如果没有找到对应的 stage，不生成输出文件
+        if not matching_stage:
+            return
+        
+        # 如果没有输出定义，不生成文件
+        if not matching_stage.outputs:
+            return
+        
+        # 使用 AgentOrchestrator 的输出生成逻辑
+        try:
+            self.orchestrator._generate_stage_output_files(
+                stage=matching_stage,
+                agent=agent,
+                workflow_results=workflow_results,
+                immersive=False  # role-execute 模式不需要沉浸式显示
+            )
+        except Exception as e:
+            # 输出文件生成失败不应该阻止角色执行完成
+            import warnings
+            warnings.warn(f"Failed to generate output files for role {role_id}: {e}")
 
 

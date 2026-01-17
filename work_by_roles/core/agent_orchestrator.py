@@ -177,7 +177,10 @@ class AgentOrchestrator:
         # Create minimal agent context (no LLM prompt generation)
         agent = Agent(role, self.engine, self.skill_selector, self.message_bus)
         goal = "Implement requirements"
-        if self.engine.context and self.engine.context.specs:
+        # Priority: inputs > engine.context.specs > default
+        if inputs and ("goal" in inputs or "user_intent" in inputs):
+            goal = inputs.get("goal") or inputs.get("user_intent", goal)
+        elif self.engine.context and self.engine.context.specs:
             goal = self.engine.context.specs.get("global_goal", goal)
         agent.prepare(goal, inputs)
         
@@ -222,7 +225,10 @@ class AgentOrchestrator:
         # Create agent for reasoning (Reasoning Layer - NO skills)
         agent = Agent(role, self.engine, self.skill_selector, self.message_bus)
         goal = "Implement requirements"
-        if self.engine.context and self.engine.context.specs:
+        # Priority: inputs > engine.context.specs > default
+        if inputs and ("goal" in inputs or "user_intent" in inputs):
+            goal = inputs.get("goal") or inputs.get("user_intent", goal)
+        elif self.engine.context and self.engine.context.specs:
             goal = self.engine.context.specs.get("global_goal", goal)
         agent.prepare(goal, inputs)
         
@@ -556,11 +562,17 @@ class AgentOrchestrator:
         Returns:
             Dict with stage and workflow execution results
         """
+        # Get stage object first for display
+        stage = self.engine.executor._get_stage_by_id(stage_id) if self.engine.executor else None
+        
+        # Display stage start if immersive mode enabled
+        if immersive and self.immersive_display and stage:
+            self.immersive_display.display_stage_start(stage_id, stage.name)
+        
         # Execute stage
         stage_result = self.execute_stage(stage_id, inputs)
         
-        # Get stage and agent objects
-        stage = self.engine.executor._get_stage_by_id(stage_id) if self.engine.executor else None
+        # Get agent object
         agent = stage_result.get("agent")
         
         workflow_results = []
@@ -591,7 +603,7 @@ class AgentOrchestrator:
                     "执行技能工作流",
                     {"workflows": len(auto_workflows)}
                 )
-                print(progress_msg)
+                # display_stage_progress already streams output, no need to print again
             
             for workflow in auto_workflows:
                 try:
@@ -648,11 +660,11 @@ class AgentOrchestrator:
         
         # Display stage completion if immersive mode enabled
         if immersive and self.immersive_display and stage:
-            complete_msg = self.immersive_display.display_stage_complete(
+            # display_stage_complete already streams output, no need to print again
+            self.immersive_display.display_stage_complete(
                 stage_id,
                 conversation_summary
             )
-            print(complete_msg)
         
         # Create checkpoint after stage execution (optional)
         if self.engine.auto_checkpoint and self.engine.workflow:
@@ -714,7 +726,7 @@ class AgentOrchestrator:
             if output.required and not content:
                 if output.type in ("code", "tests"):
                     # For code outputs, generate a basic template
-                    content = self._generate_code_template(output, stage)
+                    content = self._generate_code_template(output, stage, agent)
                 else:
                     # Generate basic template for document/report outputs
                     content = self._generate_basic_template(output, stage)
@@ -735,6 +747,21 @@ class AgentOrchestrator:
                         output_type=output.type,
                         stage_id=stage.id
                     )
+                    
+                    # Use immersive display if available
+                    if immersive and self.immersive_display:
+                        output_path = agent._get_output_path(output.name, output.type, stage.id)
+                        if output.type in ("code", "tests"):
+                            # Display code writing with immersive display (already streams output)
+                            self.immersive_display.display_code_written(
+                                file_path=str(output_path.relative_to(self.engine.workspace_path)),
+                                content=content,
+                                stage_id=stage.id
+                            )
+                        elif output.type in ("document", "report"):
+                            # Display document generation with immersive display (already streams output)
+                            self.immersive_display.display_document_generated(output.name)
+                    
                 except Exception as e:
                     if output.required:
                         # For required outputs, raise error instead of warning
@@ -769,20 +796,36 @@ class AgentOrchestrator:
             if wf_result.get("outputs"):
                 outputs = wf_result["outputs"]
                 # Try common content keys
-                for key in ["content", "document", "summary", "markdown", "text", output.name]:
+                for key in ["content", "document", "summary", "markdown", "text", output.name, f"{output.name}_content", "code", "file_content"]:
                     if key in outputs:
                         value = outputs[key]
                         if isinstance(value, str):
+                            # Check if it's a file path
+                            if value.startswith("/") or value.startswith("./") or "/" in value:
+                                path = Path(value)
+                                if path.exists():
+                                    return path.read_text(encoding='utf-8')
                             return value
                         elif isinstance(value, dict):
                             # Try nested content keys
-                            for nested_key in ["content", "document", "summary", "text", "body"]:
+                            for nested_key in ["content", "document", "summary", "text", "body", "code", "file_content"]:
                                 if nested_key in value:
                                     nested_value = value[nested_key]
                                     if isinstance(nested_value, str):
+                                        # Check if it's a file path
+                                        if nested_value.startswith("/") or nested_value.startswith("./") or "/" in nested_value:
+                                            path = Path(nested_value)
+                                            if path.exists():
+                                                return path.read_text(encoding='utf-8')
                                         return nested_value
                             # If dict has string values, format as markdown
                             return f"```json\n{json.dumps(value, indent=2, ensure_ascii=False)}\n```"
+                # Try to find file paths in outputs
+                for key, value in outputs.items():
+                    if isinstance(value, str) and ("/" in value or value.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".md", ".yaml", ".yml"))):
+                        path = Path(value)
+                        if path.exists():
+                            return path.read_text(encoding='utf-8')
         
         # Priority 2: Check agent context outputs
         if agent and agent.context and agent.context.outputs:
@@ -795,7 +838,7 @@ class AgentOrchestrator:
         if output.required:
             # Generate a basic template based on stage and output type
             if output.type in ("code", "tests"):
-                template = self._generate_code_template(output, stage)
+                template = self._generate_code_template(output, stage, agent)
             else:
                 template = self._generate_basic_template(output, stage)
             return template
@@ -837,14 +880,17 @@ class AgentOrchestrator:
     def _generate_code_template(
         self,
         output: "Output",
-        stage: Optional[Stage]
+        stage: Optional[Stage],
+        agent: Optional[Agent] = None
     ) -> str:
         """
         Generate a basic code template for code/test outputs.
+        Tries to generate content based on user intent if available.
         
         Args:
             output: Output definition
             stage: Optional stage definition
+            agent: Optional agent instance to get user intent
             
         Returns:
             Basic code template content
@@ -852,6 +898,65 @@ class AgentOrchestrator:
         file_ext = output.name.split('.')[-1] if '.' in output.name else 'py'
         stage_name = stage.name if stage else "unknown"
         
+        # Try to get user intent from engine context
+        user_intent = None
+        if agent and agent.engine and agent.engine.context:
+            user_intent = agent.engine.context.specs.get("user_intent") or agent.engine.context.specs.get("global_goal")
+        
+        # If we have user intent and it mentions a component/file, try to generate appropriate code
+        if user_intent and output.type == "code":
+            # Check if user intent mentions the output file name or component name
+            output_base = output.name.replace('.py', '').replace('.ts', '').replace('.tsx', '').replace('.js', '').replace('.jsx', '')
+            intent_lower = user_intent.lower()
+            output_base_lower = output_base.lower()
+            
+            # If intent mentions the component/file, generate more specific template
+            if output_base_lower in intent_lower or any(keyword in intent_lower for keyword in [output_base_lower.replace('_', ''), output_base_lower.replace('-', '')]):
+                # Generate component-specific code based on file extension
+                if file_ext in ['tsx', 'jsx']:
+                    # React component
+                    component_name = output_base.replace('-', '').replace('_', '')
+                    component_name = ''.join(word.capitalize() for word in component_name.split('-') if word)
+                    if not component_name[0].isupper():
+                        component_name = component_name[0].upper() + component_name[1:]
+                    
+                    lines = [
+                        f"import React, {{ useState }} from 'react';",
+                        "",
+                        f"interface {component_name}Props {{",
+                        "  // Add props here",
+                        "}}",
+                        "",
+                        f"export const {component_name}: React.FC<{component_name}Props> = ({{}}) => {{",
+                        "  // Component implementation",
+                        "  return (",
+                        "    <div>",
+                        f"      <h1>{component_name}</h1>",
+                        "      {/* Add component content here */}",
+                        "    </div>",
+                        "  );",
+                        "};",
+                        "",
+                        f"export default {component_name};",
+                        ""
+                    ]
+                    return "\n".join(lines)
+                elif file_ext in ['ts', 'js']:
+                    # TypeScript/JavaScript module
+                    lines = [
+                        f"// {output.name}",
+                        f"// Generated based on user intent: {user_intent}",
+                        "",
+                        "// TODO: Implement functionality based on requirements",
+                        "",
+                        "export function main() {{",
+                        "  // Implementation here",
+                        "}}",
+                        ""
+                    ]
+                    return "\n".join(lines)
+        
+        # Default template based on file type
         if output.type == "tests":
             # Test file template
             lines = [
@@ -869,24 +974,49 @@ class AgentOrchestrator:
             ]
         else:
             # Code file template
-            lines = [
-                f"# {output.name}",
-                f"# Generated by workflow system for stage: {stage_name}",
-                "",
-                "from typing import Any, Dict, List, Optional",
-                "",
-                "",
-                "def main():",
-                "    \"\"\"Main entry point\"\"\"",
-                "    # TODO: Implement functionality",
-                "    pass",
-                "",
-                "",
-                "if __name__ == '__main__':",
-                "    main()",
-                ""
-            ]
-        
+            if file_ext in ['tsx', 'jsx']:
+                # React component default
+                component_name = output.name.replace('.tsx', '').replace('.jsx', '')
+                component_name = ''.join(word.capitalize() for word in component_name.split('-') if word)
+                lines = [
+                    f"import React from 'react';",
+                    "",
+                    f"export const {component_name} = () => {{",
+                    "  return <div>{component_name}</div>;",
+                    "}};",
+                    ""
+                ]
+            elif file_ext in ['ts', 'js']:
+                lines = [
+                    f"// {output.name}",
+                    f"// Generated by workflow system for stage: {stage_name}",
+                    "",
+                    "// TODO: Implement functionality",
+                    "",
+                    "export function main() {{",
+                    "  // Implementation here",
+                    "}}",
+                    ""
+                ]
+            else:
+                # Python default
+                lines = [
+                    f"# {output.name}",
+                    f"# Generated by workflow system for stage: {stage_name}",
+                    "",
+                    "from typing import Any, Dict, List, Optional",
+                    "",
+                    "",
+                    "def main():",
+                    "    \"\"\"Main entry point\"\"\"",
+                    "    # TODO: Implement functionality",
+                    "    pass",
+                    "",
+                    "",
+                    "if __name__ == '__main__':",
+                    "    main()",
+                    ""
+                ]
         return "\n".join(lines)
     
     def _format_workflow_summary(

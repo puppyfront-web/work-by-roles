@@ -58,14 +58,6 @@ workflow:
           format: "markdown"
           required: true  # 架构文档必需，符合 Lovable 工作流模式
           name: "STAGE2_ARCHITECTURE.md"
-        - type: "schema"
-          format: "yaml"
-          required: true  # Schema文件必需（用于工作流配置）
-          name: "role_schema.yaml"
-        - type: "schema"
-          format: "yaml"
-          required: true  # Schema文件必需（用于工作流配置）
-          name: "workflow_schema.yaml"
 
     - id: "implementation"
       name: "Minimal Runnable Implementation"
