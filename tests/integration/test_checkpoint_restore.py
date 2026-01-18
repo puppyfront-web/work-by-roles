@@ -48,16 +48,34 @@ roles:
   - id: "role1"
     name: "Role 1"
     description: "Test role"
+    skills: ["test_skill"]
+    domain: "general"
+    responsibility: "Test responsibility"
     constraints:
       allowed_actions: []
       forbidden_actions: []
-    required_skills: []
     validation_rules: []
 """, encoding='utf-8')
     
     # Create minimal skill library
     skill_dir = workflow_dir / "skills"
     skill_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create a test skill
+    test_skill_dir = skill_dir / "test_skill"
+    test_skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_md = test_skill_dir / "Skill.md"
+    skill_md.write_text("""---
+id: test_skill
+name: Test Skill
+description: A test skill for integration testing
+category: general
+---
+
+# Test Skill
+
+This is a test skill for integration testing.
+""", encoding='utf-8')
     
     yield workspace
     shutil.rmtree(temp_dir, ignore_errors=True)

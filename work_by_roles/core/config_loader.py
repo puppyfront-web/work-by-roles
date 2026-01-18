@@ -110,6 +110,7 @@ class ConfigLoader:
             'id': skill_id,
             'name': name,
             'description': description,
+            'category': frontmatter_data.get('category', 'general'),  # Default to 'general' if not specified
             'dimensions': frontmatter_data.get('dimensions', []),
             'levels': frontmatter_data.get('levels', {}),
             'tools': frontmatter_data.get('tools', []),
@@ -246,10 +247,9 @@ class ConfigLoader:
             for role in roles_data['roles']:
                 role_id = role.get('id', 'unknown')
                 
-                # Check required_skills
-                if 'required_skills' in role:
-                    for req in role['required_skills']:
-                        skill_id = req.get('skill_id')
+                # Check skills (new format: direct skill ID list)
+                if 'skills' in role:
+                    for skill_id in role['skills']:
                         if skill_id and skill_id not in skill_library:
                             errors.append(
                                 f"Role '{role_id}' references skill '{skill_id}' "

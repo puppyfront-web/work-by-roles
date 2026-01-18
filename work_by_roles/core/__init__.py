@@ -48,6 +48,7 @@ from .role_executor import RoleExecutor
 from .skill_invoker import SkillInvoker, PlaceholderSkillInvoker, LLMSkillInvoker, CompositeSkillInvoker
 from .agent import Agent
 from .skill_benchmark import SkillBenchmark
+from .task_router import TaskRouter
 
 # Import remaining classes from engine.py for backward compatibility
 from .engine import (
@@ -88,6 +89,10 @@ __all__ = [
     'ProjectContext',
     'AgentContext',
     'ContextSummary',
+    'Task',
+    'TaskAssignment',
+    'Team',
+    'Company',
     # Execution tracking
     'ExecutionTracker',
     # Skill selection
@@ -118,6 +123,7 @@ __all__ = [
     'AgentOrchestrator',
     'RoleExecutor',
     'SkillBenchmark',
+    'TaskRouter',
     'normalize_path',
 ]
 

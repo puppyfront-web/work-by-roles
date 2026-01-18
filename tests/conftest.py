@@ -34,20 +34,18 @@ def temp_workspace() -> Generator[Path, None, None]:
 @pytest.fixture
 def sample_role() -> Role:
     """Create a sample role for testing."""
-    from work_by_roles.core.models import SkillRequirement
-    
     return Role(
         id="test_role",
         name="Test Role",
         description="A test role",
+        skills=["test_skill"],
+        domain="general",
+        responsibility="Test responsibility",
         extends=None,
         constraints={
             "allowed_actions": ["test_action"],
             "forbidden_actions": []
         },
-        required_skills=[
-            SkillRequirement(skill_id="test_skill", min_level=1)
-        ],
         validation_rules=[],
         instruction_template="Test instruction"
     )
@@ -104,6 +102,7 @@ def sample_skill() -> Skill:
         id="test_skill",
         name="Test Skill",
         description="A test skill",
+        category="general",
         dimensions=["test_dimension"],
         levels={1: "Level 1"},
         tools=["test_tool"],
@@ -155,12 +154,9 @@ def sample_workflow_config(temp_workspace: Path) -> Dict[str, Any]:
                     "allowed_actions": ["test_action"],
                     "forbidden_actions": []
                 },
-                "required_skills": [
-                    {
-                        "skill_id": "test_skill",
-                        "min_level": 1
-                    }
-                ],
+                "skills": ["test_skill"],
+                "domain": "general",
+                "responsibility": "Test responsibility",
                 "validation_rules": []
             }
         ]
@@ -218,6 +214,7 @@ def sample_workflow_config(temp_workspace: Path) -> Dict[str, Any]:
     skill_md = """---
 name: test_skill
 description: A test skill
+category: general
 input_schema:
   type: object
   properties:

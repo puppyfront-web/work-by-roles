@@ -104,10 +104,14 @@ class RoleManager:
 
         library: Dict[str, Skill] = {}
         for skill_data in schema_data.get('skills', []):
-            required_fields = ['id', 'name', 'description', 'dimensions', 'levels', 'tools']
+            required_fields = ['id', 'name', 'description']
             for field in required_fields:
                 if field not in skill_data:
                     raise ValidationError(f"Missing required field '{field}' in skill definition")
+            
+            # category is optional, defaults to 'general'
+            if 'category' not in skill_data:
+                skill_data['category'] = 'general'
 
             skill_id = skill_data['id']
             if skill_id in library:
@@ -153,6 +157,7 @@ class RoleManager:
                 id=skill_id,
                 name=skill_data['name'],
                 description=description,
+                category=skill_data.get('category', 'general'),
                 dimensions=skill_data.get('dimensions', []),
                 levels=skill_data.get('levels', {}),
                 tools=tools,
@@ -382,45 +387,55 @@ class RoleManager:
     
     def _parse_role(self, role_data: Dict[str, Any]) -> Role:
         """Parse role from schema data"""
-        required_fields = ['id', 'name', 'description', 'constraints', 'validation_rules']
+        required_fields = ['id', 'name', 'description', 'skills', 'domain', 'responsibility']
         for field in required_fields:
             if field not in role_data:
                 raise ValidationError(f"Missing required field '{field}' in role definition")
         
-        raw_skills: List[SkillRequirement] = []
-        if 'required_skills' in role_data:
-            for req in role_data['required_skills']:
-                raw_skills.append(self._parse_skill_requirement(req))
-        elif 'skills' in role_data:
-            # Backward compatibility: treat plain skills as min_level 1 requirements
-            for skill_id in role_data.get('skills', []):
-                raw_skills.append(SkillRequirement(skill_id=skill_id, min_level=1))
-
-        # Explicit skill bundles support
-        if 'skill_bundles' in role_data:
-            for bundle_id in role_data['skill_bundles']:
-                if bundle_id in self.skill_bundles:
-                    raw_skills.extend(self.skill_bundles[bundle_id].skills)
-                else:
-                    raise ValidationError(f"Skill bundle '{bundle_id}' not found")
-
-        # Resolve bundles and validate skills
-        required_skills = self._resolve_skill_requirements(raw_skills, role_data['id'])
-
-        if required_skills and self.skill_library is None:
-            raise ValidationError("Skill library not loaded but required_skills are specified")
-
+        # 解析技能列表（新格式：直接引用技能ID）
+        skills: List[str] = []
+        if 'skills' in role_data:
+            if isinstance(role_data['skills'], list):
+                skills = role_data['skills']
+            else:
+                raise ValidationError(f"Field 'skills' must be a list of skill IDs")
+        
+        # 验证技能是否存在
+        if skills and self.skill_library is not None:
+            for skill_id in skills:
+                if skill_id not in self.skill_library:
+                    raise ValidationError(
+                        f"Skill '{skill_id}' referenced by role '{role_data['id']}' not found in skill library",
+                        field="skills",
+                        value=skill_id,
+                        context={"role_id": role_data['id']}
+                    )
+        
+        # 解析领域和职责
+        domain = role_data.get('domain', '')
+        responsibility = role_data.get('responsibility', '')
+        
         # Resolve variables in description and validation rules
         description = VariableResolver.resolve(role_data['description'], self.context)
-        validation_rules = [VariableResolver.resolve(r, self.context) for r in role_data['validation_rules']]
+        validation_rules = [
+            VariableResolver.resolve(r, self.context) 
+            for r in role_data.get('validation_rules', [])
+        ]
+        
+        # 解析约束（可选）
+        constraints = role_data.get('constraints', {})
+        if not isinstance(constraints, dict):
+            constraints = {}
 
         return Role(
             id=role_data['id'],
             name=role_data['name'],
             description=description,
+            skills=skills,
+            domain=domain,
+            responsibility=responsibility,
             extends=role_data.get('extends'),
-            constraints=role_data['constraints'],
-            required_skills=required_skills,
+            constraints=constraints,
             validation_rules=validation_rules,
             instruction_template=role_data.get('instruction_template', "")
         )

@@ -121,13 +121,8 @@ class SkillSelector:
             return []
         
         skills = []
-        for req in role.required_skills:
-            # Handle both SkillRequirement objects and dicts
-            if isinstance(req, dict):
-                skill_id = req.get('skill_id')
-            else:
-                skill_id = req.skill_id
-            
+        # 使用新的简化格式：role.skills 是技能ID列表
+        for skill_id in role.skills:
             if not skill_id or not self.engine.role_manager.skill_library:
                 continue
             

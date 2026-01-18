@@ -21,7 +21,7 @@ except ImportError:
     warnings.warn("jsonschema not available. Schema validation will be skipped.")
 
 from .exceptions import WorkflowError
-from .models import Role, Stage, AgentContext, ContextSummary, Skill, SkillWorkflow, SkillWorkflowExecution, SkillExecution
+from .models import Role, Stage, AgentContext, ContextSummary, Skill, SkillWorkflow, SkillWorkflowExecution, SkillExecution, Task
 from .enums import SkillErrorType
 from .workflow_engine import WorkflowEngine
 from .agent import Agent
@@ -30,6 +30,7 @@ from .skill_invoker import SkillInvoker, PlaceholderSkillInvoker, LLMSkillInvoke
 from .skill_workflow_executor import SkillWorkflowExecutor
 from .execution_tracker import ExecutionTracker
 from .task_decomposer import TaskDecomposer
+from .task_router import TaskRouter
 
 class AgentOrchestrator:
     """
@@ -86,6 +87,9 @@ class AgentOrchestrator:
         
         # Task decomposer for breaking down goals
         self.task_decomposer = TaskDecomposer(engine, llm_client)
+        
+        # Task router for task assignment and feedback handling
+        self.task_router = TaskRouter(engine.role_manager)
         
         # Skill invoker for actual skill execution
         if skill_invoker:

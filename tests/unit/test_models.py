@@ -92,11 +92,13 @@ class TestTask:
         task = Task(
             id="task1",
             description="Test task",
+            category="general",
             assigned_role="role1"
         )
         
         assert task.id == "task1"
         assert task.description == "Test task"
+        assert task.category == "general"
         assert task.assigned_role == "role1"
         assert task.status == "pending"
         assert task.dependencies == []
@@ -107,6 +109,7 @@ class TestTask:
         task = Task(
             id="task2",
             description="Test task",
+            category="general",
             assigned_role="role1",
             dependencies=["task1"]
         )
@@ -118,6 +121,7 @@ class TestTask:
         task = Task(
             id="task1",
             description="Test task",
+            category="general",
             assigned_role="role1"
         )
         
@@ -134,8 +138,8 @@ class TestTaskDecomposition:
     def test_task_decomposition_creation(self):
         """Test creating a TaskDecomposition."""
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1"),
-            Task(id="task2", description="Task 2", assigned_role="role2", dependencies=["task1"])
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1"),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", dependencies=["task1"])
         ]
         
         decomposition = TaskDecomposition(
@@ -151,8 +155,8 @@ class TestTaskDecomposition:
     def test_get_ready_tasks(self):
         """Test getting ready tasks."""
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1", status="completed"),
-            Task(id="task2", description="Task 2", assigned_role="role2", dependencies=["task1"], status="pending")
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1", status="completed"),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", dependencies=["task1"], status="pending")
         ]
         
         decomposition = TaskDecomposition(
@@ -168,8 +172,8 @@ class TestTaskDecomposition:
     def test_get_task(self):
         """Test getting task by ID."""
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1"),
-            Task(id="task2", description="Task 2", assigned_role="role2")
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1"),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2")
         ]
         
         decomposition = TaskDecomposition(
@@ -188,8 +192,8 @@ class TestTaskDecomposition:
     def test_validate_no_errors(self):
         """Test validation with valid decomposition."""
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1"),
-            Task(id="task2", description="Task 2", assigned_role="role2", dependencies=["task1"])
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1"),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", dependencies=["task1"])
         ]
         
         decomposition = TaskDecomposition(
@@ -204,8 +208,8 @@ class TestTaskDecomposition:
     def test_validate_missing_dependency(self):
         """Test validation detects missing dependency."""
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1"),
-            Task(id="task2", description="Task 2", assigned_role="role2", dependencies=["task3"])
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1"),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", dependencies=["task3"])
         ]
         
         decomposition = TaskDecomposition(
@@ -221,8 +225,8 @@ class TestTaskDecomposition:
     def test_validate_circular_dependency(self):
         """Test validation detects circular dependencies."""
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1", dependencies=["task2"]),
-            Task(id="task2", description="Task 2", assigned_role="role2", dependencies=["task1"])
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1", dependencies=["task2"]),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", dependencies=["task1"])
         ]
         
         decomposition = TaskDecomposition(

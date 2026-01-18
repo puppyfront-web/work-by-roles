@@ -42,9 +42,11 @@ class TestTaskDecomposer:
             id="product_analyst",
             name="Product Analyst",
             description="需求分析",
+            skills=[],
+            domain="analysis",
+            responsibility="分析需求",
             extends=None,
             constraints={"allowed_actions": ["analyze"], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -65,9 +67,11 @@ class TestTaskDecomposer:
             id="system_architect",
             name="System Architect",
             description="系统架构",
+            skills=[],
+            domain="architecture",
+            responsibility="设计架构",
             extends=None,
             constraints={"allowed_actions": ["design"], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -105,9 +109,11 @@ class TestTaskDecomposer:
             id="role1",
             name="Role 1",
             description="Role 1 description",
+            skills=[],
+            domain="general",
+            responsibility="Role 1 responsibility",
             extends=None,
             constraints={"allowed_actions": ["action1"], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -116,9 +122,11 @@ class TestTaskDecomposer:
             id="role2",
             name="Role 2",
             description="Role 2 description",
+            skills=[],
+            domain="general",
+            responsibility="Role 2 responsibility",
             extends=None,
             constraints={"allowed_actions": ["action2"], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -166,9 +174,11 @@ class TestTaskDecomposer:
             id="product_analyst",
             name="Product Analyst",
             description="需求分析",
+            skills=[],
+            domain="analysis",
+            responsibility="分析需求",
             extends=None,
             constraints={"allowed_actions": [], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -177,9 +187,11 @@ class TestTaskDecomposer:
             id="system_architect",
             name="System Architect",
             description="系统架构设计",
+            skills=[],
+            domain="architecture",
+            responsibility="设计架构",
             extends=None,
             constraints={"allowed_actions": [], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -201,9 +213,9 @@ class TestTaskDecomposer:
         from work_by_roles.core.models import Task
         
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1", priority=1),
-            Task(id="task2", description="Task 2", assigned_role="role2", dependencies=["task1"], priority=2),
-            Task(id="task3", description="Task 3", assigned_role="role3", dependencies=["task2"], priority=3)
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1", priority=1),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", dependencies=["task1"], priority=2),
+            Task(id="task3", description="Task 3", category="general", assigned_role="role3", dependencies=["task2"], priority=3)
         ]
         
         decomposer = TaskDecomposer(workflow_engine)
@@ -219,9 +231,9 @@ class TestTaskDecomposer:
         from work_by_roles.core.models import Task
         
         tasks = [
-            Task(id="task1", description="Task 1", assigned_role="role1", priority=3),
-            Task(id="task2", description="Task 2", assigned_role="role2", priority=1),
-            Task(id="task3", description="Task 3", assigned_role="role3", priority=2)
+            Task(id="task1", description="Task 1", category="general", assigned_role="role1", priority=3),
+            Task(id="task2", description="Task 2", category="general", assigned_role="role2", priority=1),
+            Task(id="task3", description="Task 3", category="general", assigned_role="role3", priority=2)
         ]
         
         decomposer = TaskDecomposer(workflow_engine)
@@ -237,9 +249,11 @@ class TestTaskDecomposer:
             id="developer",
             name="Developer",
             description="代码开发",
+            skills=[],
+            domain="implementation",
+            responsibility="编写代码",
             extends=None,
             constraints={"allowed_actions": ["write_code", "implement"], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -248,9 +262,11 @@ class TestTaskDecomposer:
             id="tester",
             name="Tester",
             description="测试验证",
+            skills=[],
+            domain="qa",
+            responsibility="测试功能",
             extends=None,
             constraints={"allowed_actions": ["test", "validate"], "forbidden_actions": []},
-            required_skills=[],
             validation_rules=[],
             instruction_template=""
         )
@@ -258,10 +274,10 @@ class TestTaskDecomposer:
         decomposer = TaskDecomposer(workflow_engine)
         
         # Test assignment based on keywords
-        # Note: _assign_role may return first role if no clear match
-        assigned = decomposer._assign_role("实现代码功能", [role1, role2])
+        # Note: _assign_role now requires task_category parameter
+        assigned = decomposer._assign_role("实现代码功能", "implementation", [role1, role2])
         assert assigned in [role1, role2]  # Should return one of them
         
-        assigned = decomposer._assign_role("测试功能", [role1, role2])
+        assigned = decomposer._assign_role("测试功能", "qa", [role1, role2])
         assert assigned in [role1, role2]  # Should return one of them
 

@@ -279,22 +279,22 @@ class RoleExecutor:
         """
         根据需求和角色选择合适的技能。
         
-        优先使用角色required_skills中定义的技能。
+        优先使用角色skills中定义的技能。
         """
         selected = []
         context = context or {}
         
-        # 优先使用角色required_skills中定义的技能
-        if role.required_skills:
-            for skill_req in role.required_skills:
-                if skill_req.skill_id not in selected:
+        # 优先使用角色skills中定义的技能（新格式：直接是技能ID列表）
+        if role.skills:
+            for skill_id in role.skills:
+                if skill_id not in selected:
                     # 检查技能是否存在
                     if self.engine.role_manager.skill_library:
-                        skill = self.engine.role_manager.skill_library.get(skill_req.skill_id)
+                        skill = self.engine.role_manager.skill_library.get(skill_id)
                         if skill:
-                            selected.append(skill_req.skill_id)
+                            selected.append(skill_id)
         
-        # 如果没有required_skills或没有找到技能，使用SkillSelector自动选择
+        # 如果没有skills或没有找到技能，使用SkillSelector自动选择
         if not selected:
             skill = self.skill_selector.select_skill(
                 task_description=requirement,

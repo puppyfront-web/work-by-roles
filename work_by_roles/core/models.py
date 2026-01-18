@@ -4,9 +4,12 @@ Following Single Responsibility Principle - all data models in one module.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from .role_manager import RoleManager
 
 from .exceptions import WorkflowError
 from .enums import SkillWorkflowStepStatus, StageStatus
@@ -22,12 +25,14 @@ class Skill:
     id: str
     name: str
     description: str
-    dimensions: List[str]
-    levels: Dict[int, str]
-    tools: List[str]
-    constraints: List[str]
+    category: str  # 技能分类：frontend, backend, design, etc.
     input_schema: Optional[Dict[str, Any]] = None
     output_schema: Optional[Dict[str, Any]] = None
+    # 可选字段（向后兼容）
+    dimensions: List[str] = field(default_factory=list)
+    levels: Dict[int, str] = field(default_factory=dict)
+    tools: List[str] = field(default_factory=list)
+    constraints: List[str] = field(default_factory=list)
     error_handling: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
 
@@ -268,11 +273,135 @@ class Role:
     id: str
     name: str
     description: str
-    extends: Optional[List[str]]
-    constraints: Dict[str, List[str]]
-    required_skills: List[SkillRequirement]
-    validation_rules: List[str]
+    skills: List[str]  # 简化：直接引用技能ID列表
+    domain: str  # 领域：frontend, backend, fullstack, etc.
+    responsibility: str  # 职责描述，用于任务匹配
+    extends: Optional[List[str]] = None
+    constraints: Dict[str, List[str]] = field(default_factory=dict)
+    validation_rules: List[str] = field(default_factory=list)
     instruction_template: str = ""  # Role-specific base prompt for Agent
+    
+    def can_handle_task(self, task_description: str, role_manager: 'RoleManager') -> bool:
+        """
+        判断角色是否能处理该任务（博弈反馈的核心逻辑）
+        
+        例如：前端角色判断任务是否属于前端工作
+        """
+        task_lower = task_description.lower()
+        desc_lower = self.description.lower()
+        resp_lower = self.responsibility.lower()
+        
+        # 1. 检查领域匹配
+        if self.domain:
+            domain_keywords = {
+                "frontend": ["前端", "ui", "界面", "组件", "react", "vue", "页面", "frontend", "页面"],
+                "backend": ["后端", "api", "服务", "数据库", "server", "backend", "rest"],
+                "fullstack": ["全栈", "fullstack"],
+                "design": ["设计", "ui设计", "ux", "design"],
+                "qa": ["测试", "质量", "qa", "quality"],
+                "general": []  # general domain accepts all
+            }
+            keywords = domain_keywords.get(self.domain.lower(), [])
+            if keywords:  # Only check if domain has specific keywords
+                # 检查是否有其他领域的明显关键词（如果任务明显属于其他领域，则拒绝）
+                other_domains = {k: v for k, v in domain_keywords.items() if k != self.domain.lower() and k != "general"}
+                for other_domain, other_keywords in other_domains.items():
+                    if other_keywords and any(kw in task_lower for kw in other_keywords):
+                        # 如果任务明显属于其他领域，且当前领域不是general，则拒绝
+                        if self.domain.lower() != "general":
+                            return False
+        
+        # 2. 检查职责匹配（更宽松的匹配）
+        if self.responsibility:
+            # 简单关键词匹配（可以用LLM增强）
+            responsibility_keywords = [w for w in resp_lower.split() if len(w) > 1]  # 过滤单字符
+            if len(responsibility_keywords) > 0:
+                matches = sum(1 for kw in responsibility_keywords if kw in task_lower)
+                # 至少20%的关键词匹配，或者至少1个关键词匹配
+                if matches == 0 and len(responsibility_keywords) > 2:
+                    # 如果有很多关键词但一个都不匹配，可能不匹配
+                    # 但对于短职责描述，允许不匹配
+                    if len(responsibility_keywords) > 3:
+                        return False
+        
+        # 3. 检查约束
+        forbidden = self.constraints.get('forbidden_actions', [])
+        if any(action.lower() in task_lower for action in forbidden):
+            return False
+        
+        # 4. 检查技能匹配（更宽松）
+        if self.skills and role_manager and role_manager.skill_library:
+            # 基于技能判断任务是否匹配
+            skill_keywords = []
+            for skill_id in self.skills:
+                skill = role_manager.skill_library.get(skill_id)
+                if skill:
+                    skill_keywords.extend(skill.name.lower().split())
+                    skill_keywords.extend(skill.description.lower().split()[:3])  # 只取前3个词
+            
+            if skill_keywords:
+                matches = sum(1 for kw in skill_keywords if kw in task_lower and len(kw) > 2)  # 只匹配长度>2的关键词
+                # 如果有很多技能关键词但一个都不匹配，且职责也不匹配，才拒绝
+                if matches == 0 and len(skill_keywords) > 5:
+                    # 如果职责也不匹配，才拒绝
+                    if self.responsibility:
+                        resp_keywords = [w for w in self.responsibility.lower().split() if len(w) > 1]
+                        resp_matches = sum(1 for kw in resp_keywords if kw in task_lower)
+                        if resp_matches == 0:
+                            return False
+        
+        return True
+    
+    def evaluate_task(self, task: 'Task', role_manager: 'RoleManager') -> Tuple[bool, Optional[str]]:
+        """
+        评估任务并返回是否接受 + 反馈信息
+        
+        Returns:
+            (can_handle: bool, feedback: str)
+        """
+        can_handle = self.can_handle_task(task.description, role_manager)
+        
+        if can_handle:
+            feedback = f"✅ {self.name} accepts this task. It aligns with my responsibilities: {self.responsibility}"
+        else:
+            feedback = f"❌ {self.name} cannot handle this task. This task is not within my domain ({self.domain}) or responsibilities ({self.responsibility})."
+        
+        return can_handle, feedback
+    
+    def match_score(self, task_description: str, task_category: str, role_manager: Optional['RoleManager'] = None) -> float:
+        """计算角色与任务的匹配分数（用于自动分配）"""
+        score = 0.0
+        task_lower = task_description.lower()
+        
+        # 领域匹配
+        if self.domain.lower() == task_category.lower():
+            score += 0.5
+        
+        # 职责匹配
+        if self.responsibility:
+            resp_lower = self.responsibility.lower()
+            matches = sum(1 for word in resp_lower.split() if word in task_lower)
+            score += matches * 0.1
+        
+        # 技能匹配
+        if self.skills and role_manager and role_manager.skill_library:
+            skill_count = len(self.skills)
+            # 检查技能关键词匹配
+            matched_skills = 0
+            for skill_id in self.skills:
+                skill = role_manager.skill_library.get(skill_id)
+                if skill:
+                    skill_name_lower = skill.name.lower()
+                    skill_desc_lower = skill.description.lower()
+                    if any(kw in task_lower for kw in skill_name_lower.split()):
+                        matched_skills += 1
+                    elif any(kw in task_lower for kw in skill_desc_lower.split()[:3]):
+                        matched_skills += 0.5
+            
+            if skill_count > 0:
+                score += (matched_skills / skill_count) * 0.3
+        
+        return min(score, 1.0)  # 限制在0-1之间
 
 
 @dataclass
@@ -578,15 +707,28 @@ class Task:
     """任务定义"""
     id: str
     description: str
-    assigned_role: str
+    category: str  # 任务分类：frontend, backend, design, etc.
+    assigned_role: Optional[str] = None  # 初始分配的角色
     dependencies: List[str] = field(default_factory=list)  # Task IDs this task depends on
-    status: str = "pending"  # "pending", "in_progress", "completed", "failed"
+    status: str = "pending"  # "pending", "accepted", "rejected", "in_progress", "completed", "failed"
+    rejection_reason: Optional[str] = None  # 如果被拒绝，记录原因
+    reassigned_to: Optional[str] = None  # 如果被重新分配
     priority: int = 0  # Higher number = higher priority
     estimated_time: Optional[float] = None  # Estimated execution time in seconds
     actual_time: Optional[float] = None  # Actual execution time in seconds
     inputs: Dict[str, Any] = field(default_factory=dict)
     outputs: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
+
+
+@dataclass
+class TaskAssignment:
+    """任务分配结果"""
+    task_id: str
+    assigned_role: str
+    status: str  # "accepted" | "rejected" | "pending"
+    feedback: Optional[str] = None  # 角色的反馈信息
+    suggested_role: Optional[str] = None  # 如果拒绝，建议分配给哪个角色
 
 
 @dataclass
@@ -653,3 +795,26 @@ class TaskDecomposition:
                     errors.append(f"Circular dependency detected involving task '{task.id}'")
         
         return errors
+
+
+# ============================================================================
+# Team and Company Models
+# ============================================================================
+
+@dataclass
+class Team:
+    """团队 - 由角色组成"""
+    id: str
+    name: str
+    description: str
+    roles: List[str]  # 角色ID列表
+    company_id: Optional[str] = None  # 可选：所属公司
+
+
+@dataclass
+class Company:
+    """公司 - 由团队组成（可选层级）"""
+    id: str
+    name: str
+    description: str
+    teams: List[str]  # 团队ID列表

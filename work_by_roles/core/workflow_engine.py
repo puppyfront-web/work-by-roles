@@ -117,6 +117,64 @@ class WorkflowEngine:
             from .checkpoint_manager import CheckpointManager
             self._checkpoint_manager = CheckpointManager(self.workspace_path)
         return self._checkpoint_manager
+    
+    def create_checkpoint(
+        self,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        stage_id: Optional[str] = None,
+        progress_manager: Optional[Any] = None
+    ) -> Any:
+        """
+        Create a checkpoint for workflow state recovery.
+        
+        Args:
+            name: Optional checkpoint name
+            description: Optional checkpoint description
+            stage_id: Optional current stage ID
+            progress_manager: Optional progress manager to capture progress
+            
+        Returns:
+            Created checkpoint
+        """
+        if not self.workflow or not self.executor:
+            raise WorkflowError("Workflow and executor must be initialized to create checkpoint")
+        
+        workflow_id = self.workflow.id
+        execution_state = self.executor.state
+        
+        # Capture progress data if progress manager provided
+        progress_data = None
+        if progress_manager and hasattr(progress_manager, 'current_progress') and progress_manager.current_progress:
+            progress_data = progress_manager.current_progress.to_dict()
+        
+        checkpoint = self.checkpoint_manager.create_checkpoint(
+            workflow_id=workflow_id,
+            execution_state=execution_state,
+            progress_manager=progress_manager,
+            name=name,
+            description=description,
+            stage_id=stage_id
+        )
+        
+        return checkpoint
+    
+    def restore_from_checkpoint(self, checkpoint_id: str, progress_manager: Optional[Any] = None) -> Dict[str, Any]:
+        """
+        Restore workflow state from a checkpoint.
+        
+        Args:
+            checkpoint_id: Checkpoint ID to restore from
+            progress_manager: Optional progress manager to restore progress
+            
+        Returns:
+            Dictionary with restoration results
+        """
+        return self.checkpoint_manager.restore_from_checkpoint(
+            checkpoint_id=checkpoint_id,
+            engine=self,
+            progress_manager=progress_manager
+        )
 
     def load_all_configs(
         self,
@@ -440,12 +498,12 @@ class WorkflowEngine:
                         lines.append("")
                     
                     # Required skills
-                    if role.required_skills:
+                    if role.skills:
                         lines.append("### Required Skills\n")
-                        for req in role.required_skills:
-                            skill = self.role_manager.skill_library.get(req.skill_id) if self.role_manager.skill_library else None
+                        for skill_id in role.skills:
+                            skill = self.role_manager.skill_library.get(skill_id) if self.role_manager.skill_library else None
                             if skill:
-                                lines.append(f"- **{skill.name}** (Level ≥{req.min_level})")
+                                lines.append(f"- **{skill.name}**")
                                 if skill.tools:
                                     lines.append(f"  - Tools: {', '.join(skill.tools)}")
                             else:

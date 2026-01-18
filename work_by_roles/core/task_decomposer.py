@@ -120,6 +120,7 @@ class TaskDecomposer:
                 tasks.append(Task(
                     id=f"task_{task_counter}",
                     description=f"分析需求: {goal}",
+                    category="analysis",
                     assigned_role=analyst_role.id,
                     status="pending",
                     priority=1
@@ -134,6 +135,7 @@ class TaskDecomposer:
                 tasks.append(Task(
                     id=f"task_{task_counter}",
                     description=f"设计架构: {goal}",
+                    category="architecture",
                     assigned_role=architect_role.id,
                     dependencies=deps,
                     status="pending",
@@ -149,6 +151,7 @@ class TaskDecomposer:
                 tasks.append(Task(
                     id=f"task_{task_counter}",
                     description=f"实现功能: {goal}",
+                    category="implementation",
                     assigned_role=engineer_role.id,
                     dependencies=deps,
                     status="pending",
@@ -164,6 +167,7 @@ class TaskDecomposer:
                 tasks.append(Task(
                     id=f"task_{task_counter}",
                     description=f"测试验证: {goal}",
+                    category="qa",
                     assigned_role=qa_role.id,
                     dependencies=deps,
                     status="pending",
@@ -179,6 +183,7 @@ class TaskDecomposer:
                 tasks.append(Task(
                     id=f"task_{task_counter}",
                     description=goal,
+                    category="general",
                     assigned_role=default_role.id,
                     status="pending",
                     priority=1
@@ -278,37 +283,35 @@ class TaskDecomposer:
     def _assign_role(
         self,
         task_description: str,
+        task_category: str,
         available_roles: List[Role]
     ) -> Optional[Role]:
         """
         Assign a role to a task based on task description and role capabilities.
         
+        Uses Role.match_score() for intelligent matching.
+        
         Args:
             task_description: Description of the task
+            task_category: Category of the task (frontend, backend, etc.)
             available_roles: List of available roles
             
         Returns:
             Best matching role or None
         """
-        # Simple keyword matching
-        desc_lower = task_description.lower()
+        if not available_roles:
+            return None
         
-        # Check role skills and constraints
+        # Use Role.match_score() for intelligent matching
+        best_match = None
+        best_score = 0.0
+        
         for role in available_roles:
-            role_text = f"{role.id} {role.name} {role.description}".lower()
-            
-            # Check if role constraints match task
-            allowed = role.constraints.get('allowed_actions', [])
-            forbidden = role.constraints.get('forbidden_actions', [])
-            
-            # Skip if task matches forbidden actions
-            if any(action in desc_lower for action in forbidden):
-                continue
-            
-            # Prefer roles with matching allowed actions
-            if any(action in desc_lower for action in allowed):
-                return role
+            score = role.match_score(task_description, task_category, self.engine.role_manager)
+            if score > best_score:
+                best_score = score
+                best_match = role
         
-        # Fallback: return first available role
-        return available_roles[0] if available_roles else None
+        # Fallback: return first available role if no good match
+        return best_match if best_match else available_roles[0]
 

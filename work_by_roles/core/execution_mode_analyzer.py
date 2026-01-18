@@ -34,17 +34,9 @@ class ExecutionModeAnalyzer:
         generic_tools: Set[str] = set()
         execution_capabilities: List[str] = []
         
-        # Check all skills for the role
-        if role.required_skills and skill_library:
-            for skill_req in role.required_skills:
-                skill_id = (
-                    skill_req.skill_id 
-                    if hasattr(skill_req, 'skill_id') 
-                    else skill_req.get('skill_id') 
-                    if isinstance(skill_req, dict) 
-                    else None
-                )
-                
+        # Check all skills for the role (new format: role.skills is a list of skill IDs)
+        if role.skills and skill_library:
+            for skill_id in role.skills:
                 if skill_id and skill_id in skill_library:
                     skill = skill_library[skill_id]
                     if skill.metadata:

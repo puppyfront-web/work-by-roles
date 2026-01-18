@@ -24,7 +24,7 @@ class TestRoleManager:
         """Test loading roles from YAML."""
         manager = RoleManager()
         
-        # First load skill library (required for roles with required_skills)
+        # First load skill library (required for roles with skills)
         skill_data = {
             "schema_version": "1.0",
             "skills": [
@@ -32,6 +32,7 @@ class TestRoleManager:
                     "id": "test_skill",
                     "name": "Test Skill",
                     "description": "A test skill",
+                    "category": "general",
                     "dimensions": ["test"],
                     "levels": {1: "Level 1"},
                     "tools": [],
@@ -50,16 +51,13 @@ class TestRoleManager:
                     "description": "A test role",
                     "instruction_template": "Test instruction",
                     "extends": None,
+                    "skills": ["test_skill"],
+                    "domain": "general",
+                    "responsibility": "Test responsibility",
                     "constraints": {
                         "allowed_actions": ["test_action"],
                         "forbidden_actions": []
                     },
-                    "required_skills": [
-                        {
-                            "skill_id": "test_skill",
-                            "min_level": 1
-                        }
-                    ],
                     "validation_rules": []
                 }
             ]
@@ -81,6 +79,7 @@ class TestRoleManager:
                     "id": "test_skill",
                     "name": "Test Skill",
                     "description": "A test skill",
+                    "category": "general",
                     "dimensions": ["test"],
                     "levels": {1: "Level 1"},
                     "tools": [],
