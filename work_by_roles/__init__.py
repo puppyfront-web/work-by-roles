@@ -23,8 +23,8 @@ from .core.engine import (
 )
 from .quick_start import Workflow
 
-# ContextSummary is available in workflow_engine.py for advanced users
-# Import it directly if needed: from workflow_engine import ContextSummary
+# ContextSummary is available in core.engine for advanced users
+# Import it directly if needed: from work_by_roles.core.engine import ContextSummary
 
 __version__ = "0.1.0"
 __all__ = [
@@ -43,6 +43,6 @@ __all__ = [
     "Agent",
     "AgentOrchestrator",
     "AgentContext",
-    # ContextSummary available via: from workflow_engine import ContextSummary
+    # ContextSummary available via: from work_by_roles.core.engine import ContextSummary
 ]
 

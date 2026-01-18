@@ -2,6 +2,7 @@
 Immersive workflow display for showing complete workflow execution in Cursor IDE conversations.
 """
 
+import sys
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from datetime import datetime
@@ -22,10 +23,23 @@ class ImmersiveWorkflowDisplay:
         self.doc_preview = DocumentPreviewGenerator(workspace_path)
         self.code_tracker = CodeWritingTracker(workspace_path)
         
-        # Streaming support
+        # Streaming support - always enable for command line output
         self.use_streaming = use_streaming
         self.stream_writer = StreamWriter() if use_streaming else None
         self.progress_stream = ProgressStream(self.stream_writer) if use_streaming and self.stream_writer else None
+    
+    def _output(self, content: str) -> None:
+        """
+        Output content to stream or stdout as fallback.
+        
+        Args:
+            content: Content to output
+        """
+        if self.use_streaming and self.stream_writer:
+            self.stream_writer.write_markdown(content, flush=True)
+        else:
+            # Fallback: print directly to stdout
+            print(content, flush=True)
     
     def display_workflow_status(self) -> str:
         """Display complete workflow status"""
@@ -81,9 +95,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         return content
     
@@ -110,9 +123,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         # Update progress stream if available
         if self.progress_stream:
@@ -141,9 +153,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         return content
     
@@ -180,9 +191,8 @@ class ImmersiveWorkflowDisplay:
         
         content_str = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content_str, flush=True)
+        # Output to stream or stdout
+        self._output(content_str)
         
         return content_str
     
@@ -250,9 +260,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         # Update progress stream if available
         if self.progress_stream:
@@ -319,9 +328,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         return content
     
@@ -342,9 +350,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         return content
     
@@ -368,9 +375,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         return content
     
@@ -407,9 +413,8 @@ class ImmersiveWorkflowDisplay:
         
         content_str = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content_str, flush=True)
+        # Output to stream or stdout
+        self._output(content_str)
         
         return content_str
     
@@ -439,9 +444,8 @@ class ImmersiveWorkflowDisplay:
         
         content = "\n".join(lines)
         
-        # Stream output if enabled
-        if self.use_streaming and self.stream_writer:
-            self.stream_writer.write_markdown(content, flush=True)
+        # Output to stream or stdout
+        self._output(content)
         
         return content
 

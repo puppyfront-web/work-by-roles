@@ -76,12 +76,45 @@ class StreamWriter:
     def write_markdown(self, content: str, flush: bool = True) -> None:
         """
         Write markdown content (already formatted).
+        In command line environments, converts markdown to plain text for better readability.
         
         Args:
             content: Markdown content
             flush: Whether to flush immediately
         """
-        self.write(content, flush=flush)
+        # Convert markdown to plain text for command line
+        plain_text = self._markdown_to_plain_text(content)
+        self.write(plain_text, flush=flush)
+    
+    def _markdown_to_plain_text(self, markdown: str) -> str:
+        """
+        Convert markdown to plain text for command line display.
+        
+        Args:
+            markdown: Markdown content
+            
+        Returns:
+            Plain text version
+        """
+        import re
+        text = markdown
+        
+        # Remove markdown bold (**text** -> text)
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        
+        # Remove markdown code blocks (```code``` -> code)
+        text = re.sub(r'```[\w]*\n?(.+?)```', r'\1', text, flags=re.DOTALL)
+        
+        # Remove inline code (`code` -> code)
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+        
+        # Remove markdown headers (# Header -> Header)
+        text = re.sub(r'^#+\s+(.+)$', r'\1', text, flags=re.MULTILINE)
+        
+        # Remove markdown horizontal rules (--- -> -------)
+        text = re.sub(r'^---+$', '-' * 70, text, flags=re.MULTILINE)
+        
+        return text
     
     def is_interactive(self) -> bool:
         """Check if output is interactive (TTY)"""

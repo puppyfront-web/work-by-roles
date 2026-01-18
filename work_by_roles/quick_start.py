@@ -16,9 +16,12 @@ try:
 except ImportError:
     # Fallback for direct execution
     try:
-        from .core.engine import WorkflowEngine
+        from work_by_roles.core.engine import WorkflowEngine
     except ImportError:
-        from workflow_engine import WorkflowEngine
+        raise ImportError(
+            "Cannot import WorkflowEngine. Please ensure work-by-roles is properly installed. "
+            "Run: pip install -e ."
+        )
     import importlib.util
     spec = importlib.util.spec_from_file_location("bootstrap", Path(__file__).parent / "bootstrap.py")
     if spec is None or spec.loader is None:

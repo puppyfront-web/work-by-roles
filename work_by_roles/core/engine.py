@@ -3189,7 +3189,8 @@ class RoleExecutor:
         role_id: str,
         requirement: str,
         inputs: Optional[Dict[str, Any]] = None,
-        use_llm: bool = False
+        use_llm: bool = False,
+        immersive_display: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         执行角色处理需求。
@@ -3199,6 +3200,7 @@ class RoleExecutor:
             requirement: 用户需求描述
             inputs: 可选的输入数据
             use_llm: 是否使用LLM进行推理（需要llm_client）
+            immersive_display: 可选的沉浸式显示实例
             
         Returns:
             包含执行结果的字典
@@ -3207,6 +3209,30 @@ class RoleExecutor:
         role = self.engine.role_manager.get_role(role_id)
         if not role:
             raise WorkflowError(f"Role '{role_id}' not found")
+        
+        # 获取执行模式信息
+        execution_mode_info = None
+        try:
+            from .execution_mode_analyzer import ExecutionModeAnalyzer
+            if self.engine.role_manager.skill_library:
+                execution_mode_info = ExecutionModeAnalyzer.get_execution_mode_info(
+                    role=role,
+                    skill_library=self.engine.role_manager.skill_library,
+                    environment="cursor"
+                )
+        except ImportError:
+            # ExecutionModeAnalyzer 不可用，继续执行
+            pass
+        
+        # 显示角色开始执行（沉浸式）
+        if immersive_display:
+            immersive_display.display_role_start(
+                role_id=role_id,
+                role_name=role.name,
+                role_description=role.description,
+                requirement=requirement,
+                execution_mode_info=execution_mode_info
+            )
         
         # 2. 创建Agent
         agent = Agent(role, self.engine, self.skill_selector)
@@ -3218,16 +3244,41 @@ class RoleExecutor:
         # 4. 根据需求选择合适的技能
         selected_skills = self._select_skills_for_requirement(role, requirement, full_context)
         
+        # 显示技能选择结果（沉浸式）
+        if immersive_display and selected_skills:
+            immersive_display.display_role_progress(
+                role_name=role.name,
+                action=f"已选择 {len(selected_skills)} 个技能: {', '.join(selected_skills)}"
+            )
+        
         # 4. 执行技能
         skill_results = []
         for skill_id in selected_skills:
             try:
+                # 显示技能执行开始（沉浸式）
+                if immersive_display:
+                    immersive_display.display_role_skill_execution(
+                        role_name=role.name,
+                        skill_id=skill_id,
+                        status="executing"
+                    )
+                
                 skill_input = self._prepare_skill_input(requirement, inputs or {}, agent.context)
                 result = self.orchestrator.execute_skill(
                     skill_id=skill_id,
                     input_data=skill_input,
                     role_id=role_id
                 )
+                
+                # 显示技能执行完成（沉浸式）
+                if immersive_display:
+                    status = "success" if result.get("success") else "failed"
+                    immersive_display.display_role_skill_execution(
+                        role_name=role.name,
+                        skill_id=skill_id,
+                        status=status
+                    )
+                
                 skill_results.append({
                     "skill_id": skill_id,
                     "result": result
@@ -3247,13 +3298,23 @@ class RoleExecutor:
             use_llm=use_llm
         )
         
+        # 显示角色完成（沉浸式）
+        if immersive_display:
+            summary = f"[{role.name}] 已完成任务: {requirement}"
+            immersive_display.display_role_complete(
+                role_name=role.name,
+                summary=summary,
+                skills_executed=[r["skill_id"] for r in skill_results]
+            )
+        
         return {
             "role_id": role_id,
             "requirement": requirement,
             "skills_executed": [r["skill_id"] for r in skill_results],
             "skill_results": skill_results,
             "response": final_response,
-            "agent_context": agent.context
+            "agent_context": agent.context,
+            "execution_mode": execution_mode_info
         }
     
     def _build_context(

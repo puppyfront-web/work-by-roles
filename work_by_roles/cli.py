@@ -44,22 +44,43 @@ except (ImportError, ValueError):
         from .core.tool_mapper import ToolMapper
         _agents_available = True
     except (ImportError, ValueError):
-        # Fallback for direct execution during development
-        from workflow_engine import (
-            WorkflowEngine, 
-            WorkflowError, 
-            ValidationError, 
-            StageStatus,
-            ProjectScanner,
-            AgentOrchestrator,
-            TeamManager,
-            RoleExecutor
-        )
+        # Final fallback: try absolute import from core.engine
         try:
-            from work_by_roles.core.llm_client_loader import LLMClientLoader
-        except ImportError:
+            from work_by_roles.core.engine import (
+                WorkflowEngine, 
+                WorkflowError, 
+                ValidationError, 
+                StageStatus,
+                ProjectScanner,
+                AgentOrchestrator,
+                TeamManager,
+                RoleExecutor
+            )
+            try:
+                from work_by_roles.core.llm_client_loader import LLMClientLoader
+            except ImportError:
+                LLMClientLoader = None
+            try:
+                from work_by_roles.core.execution_mode_analyzer import ExecutionModeAnalyzer
+                from work_by_roles.core.tool_mapper import ToolMapper
+            except ImportError:
+                ExecutionModeAnalyzer = None
+                ToolMapper = None
+            _agents_available = True
+        except (ImportError, ValueError):
+            # If all imports fail, set to unavailable
+            _agents_available = False
+            WorkflowEngine = None
+            WorkflowError = Exception
+            ValidationError = Exception
+            StageStatus = None
+            ProjectScanner = None
+            AgentOrchestrator = None
+            TeamManager = None
+            RoleExecutor = None
             LLMClientLoader = None
-        _agents_available = True
+            ExecutionModeAnalyzer = None
+            ToolMapper = None
 
 
 def print_status(engine: WorkflowEngine):
@@ -2215,6 +2236,15 @@ def cmd_role_execute(args):
                 print(f"\n💡 提示: {role.name} 已使用LLM生成响应")
             else:
                 print(f"\n💡 提示: 当前为轻量模式，使用 --use-llm 让 {role.name} 生成更详细的响应")
+        else:
+            # 即使使用沉浸式显示，也要显示最终响应
+            if result.get('response'):
+                print("\n" + "=" * 70)
+                print(f"💬 {role.name} 的响应:")
+                print("-" * 70)
+                response_with_role = f"[{role.name}] {result['response']}"
+                print(response_with_role)
+                print("-" * 70)
         
         return result
         
@@ -2711,7 +2741,7 @@ def cmd_skill_trace(args):
         
         if not hasattr(engine, 'create_orchestrator'):
             # Create orchestrator if not available
-            from workflow_engine import AgentOrchestrator
+            from work_by_roles.core.engine import AgentOrchestrator
             orchestrator = AgentOrchestrator(engine)
         else:
             orchestrator = engine.create_orchestrator()
@@ -2748,7 +2778,7 @@ def cmd_skill_stats(args):
         engine, _, _ = _init_engine(args)
         
         if not hasattr(engine, 'create_orchestrator'):
-            from workflow_engine import AgentOrchestrator
+            from work_by_roles.core.engine import AgentOrchestrator
             orchestrator = AgentOrchestrator(engine)
         else:
             orchestrator = engine.create_orchestrator()
@@ -2780,7 +2810,7 @@ def cmd_export_trace(args):
         engine, _, _ = _init_engine(args)
         
         if not hasattr(engine, 'create_orchestrator'):
-            from workflow_engine import AgentOrchestrator
+            from work_by_roles.core.engine import AgentOrchestrator
             orchestrator = AgentOrchestrator(engine)
         else:
             orchestrator = engine.create_orchestrator()
@@ -2806,11 +2836,11 @@ def cmd_benchmark_skill(args):
         engine, _, _ = _init_engine(args)
         
         if not hasattr(engine, 'create_orchestrator'):
-            from workflow_engine import AgentOrchestrator, SkillBenchmark
+            from work_by_roles.core.engine import AgentOrchestrator, SkillBenchmark
             orchestrator = AgentOrchestrator(engine)
         else:
             orchestrator = engine.create_orchestrator()
-            from workflow_engine import SkillBenchmark
+            from work_by_roles.core.engine import SkillBenchmark
         
         benchmark = SkillBenchmark(engine, orchestrator)
         

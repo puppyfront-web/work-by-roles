@@ -55,13 +55,15 @@ def copy_core_files(target: Path):
     temp_dir = workflow_dir / "temp"
     temp_dir.mkdir(exist_ok=True)
     
-    # 尝试从包中复制
+    # 尝试从包中复制引擎文件（如果需要）
+    # 注意：现在可以直接从包导入，不需要复制文件
+    # 保留此逻辑仅用于向后兼容
     try:
         import work_by_roles
-        # 复制引擎（作为模块）
-        engine_init = Path(work_by_roles.__file__).parent / "engine.py"
-        if engine_init.exists():
-            shutil.copy(engine_init, workflow_dir / "workflow_engine.py")
+        # 复制引擎（从 core/engine.py）
+        engine_path = Path(work_by_roles.__file__).parent / "core" / "engine.py"
+        if engine_path.exists():
+            shutil.copy(engine_path, workflow_dir / "workflow_engine.py")
             print(f"  ✅ workflow_engine.py -> .workflow/")
     except ImportError:
         pass
@@ -81,15 +83,22 @@ def copy_core_files(target: Path):
             shutil.copy(src, workflow_dir / "workflow_cli.py")
             print(f"  ✅ workflow_cli.py -> .workflow/")
         else:
-            # 最后回退：从当前目录复制
-            framework_root = Path(__file__).parent
-            for filename in ["workflow_engine.py", "workflow_cli.py"]:
-                src = framework_root / filename
-                if src.exists():
-                    shutil.copy(src, workflow_dir / filename)
-                    print(f"  ✅ {filename} -> .workflow/")
-                else:
-                    print(f"  ⚠️  警告: {filename} 未找到")
+            # 最后回退：从项目根目录或当前目录复制
+            framework_root = Path(__file__).parent.parent
+            # 尝试从项目根目录复制 workflow_cli.py（如果存在）
+            cli_src = framework_root / "work_by_roles" / "cli.py"
+            if cli_src.exists():
+                shutil.copy(cli_src, workflow_dir / "workflow_cli.py")
+                print(f"  ✅ workflow_cli.py -> .workflow/")
+            else:
+                print(f"  ⚠️  警告: workflow_cli.py 未找到")
+            # 尝试从 core/engine.py 复制
+            engine_src = framework_root / "work_by_roles" / "core" / "engine.py"
+            if engine_src.exists():
+                shutil.copy(engine_src, workflow_dir / "workflow_engine.py")
+                print(f"  ✅ workflow_engine.py -> .workflow/")
+            else:
+                print(f"  ⚠️  警告: workflow_engine.py 未找到")
 
 
 def create_cursorrules(target: Path):

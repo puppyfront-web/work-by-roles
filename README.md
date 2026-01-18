@@ -158,6 +158,7 @@ workflow.complete()
 ## 文档
 
 - 📖 [快速开始](QUICKSTART.md) - 30秒接入指南
+- 🔗 [角色与技能关系指南](ROLES_AND_SKILLS.md) - 理解角色和技能的关系及配置方法
 - 📚 [完整使用指南](docs/USAGE_GUIDE.md) - 包含IDE集成、测试、快速参考
 - 🎭 [Role Executor 指南](docs/ROLE_EXECUTOR_GUIDE.md) - 简化模式使用指南（推荐用于 IDE）
 - 🧠 [API文档](docs/API.md) - 详细API参考
