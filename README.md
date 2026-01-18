@@ -108,6 +108,9 @@ export ANTHROPIC_API_KEY='your-api-key'
 
 # 可选：指定模型
 export LLM_MODEL='gpt-4'
+
+# 可选：指定自定义端点（用于本地部署或其他兼容服务）
+export OPENAI_BASE_URL='http://localhost:11434/v1'
 ```
 
 ### 方式 2: 配置文件
@@ -119,6 +122,21 @@ llm:
   provider: openai  # 或 "anthropic"
   api_key: your-api-key  # 或从环境变量读取（留空）
   model: gpt-4  # 可选
+  base_url: https://api.openai.com/v1  # 可选，用于自定义端点（如本地部署的模型）
+```
+
+**支持自定义模型端点**：通过 `base_url` 可以连接兼容 OpenAI API 的其他服务，如：
+- 本地部署的模型（如 Ollama、LocalAI）
+- 其他云服务商的兼容 API
+- 代理服务
+
+示例（连接本地 Ollama）：
+```yaml
+llm:
+  provider: openai
+  api_key: not-needed  # 本地部署可能不需要 API key
+  model: llama2
+  base_url: http://localhost:11434/v1
 ```
 
 **配置优先级**: 环境变量 > 配置文件

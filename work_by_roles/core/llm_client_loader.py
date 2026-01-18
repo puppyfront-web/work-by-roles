@@ -58,21 +58,26 @@ class LLMClientLoader:
         # Check for OpenAI API key
         openai_key = os.getenv("OPENAI_API_KEY")
         if openai_key:
-            return self._create_openai_client(openai_key)
+            base_url = os.getenv("OPENAI_BASE_URL")
+            model = os.getenv("LLM_MODEL")
+            return self._create_openai_client(openai_key, model=model, base_url=base_url)
         
         # Check for Anthropic API key
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         if anthropic_key:
-            return self._create_anthropic_client(anthropic_key)
+            model = os.getenv("LLM_MODEL")
+            return self._create_anthropic_client(anthropic_key, model=model)
         
         # Check for generic LLM provider
         provider = os.getenv("LLM_PROVIDER")
         api_key = os.getenv("LLM_API_KEY")
         if provider and api_key:
+            base_url = os.getenv("LLM_BASE_URL")
+            model = os.getenv("LLM_MODEL")
             if provider.lower() == "openai":
-                return self._create_openai_client(api_key)
+                return self._create_openai_client(api_key, model=model, base_url=base_url)
             elif provider.lower() == "anthropic":
-                return self._create_anthropic_client(api_key)
+                return self._create_anthropic_client(api_key, model=model)
         
         return None
     
@@ -97,9 +102,16 @@ class LLMClientLoader:
             if not api_key:
                 return None
             
+            # Get base_url from config or environment
+            base_url = llm_config.get("base_url") or os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
+            
             # Create client based on provider
             if provider == "openai":
-                return self._create_openai_client(api_key, model=llm_config.get("model"))
+                return self._create_openai_client(
+                    api_key, 
+                    model=llm_config.get("model"),
+                    base_url=base_url
+                )
             elif provider == "anthropic":
                 return self._create_anthropic_client(api_key, model=llm_config.get("model"))
             elif provider == "custom":
@@ -107,7 +119,11 @@ class LLMClientLoader:
             else:
                 # Default: try OpenAI if api_key is provided
                 if api_key:
-                    return self._create_openai_client(api_key, model=llm_config.get("model"))
+                    return self._create_openai_client(
+                        api_key, 
+                        model=llm_config.get("model"),
+                        base_url=base_url
+                    )
         
         except Exception as e:
             warnings.warn(f"Failed to load LLM config from {self.config_file}: {e}")
@@ -115,13 +131,30 @@ class LLMClientLoader:
         
         return None
     
-    def _create_openai_client(self, api_key: str, model: Optional[str] = None) -> Optional[Any]:
-        """Create OpenAI client"""
+    def _create_openai_client(
+        self, 
+        api_key: str, 
+        model: Optional[str] = None,
+        base_url: Optional[str] = None
+    ) -> Optional[Any]:
+        """
+        Create OpenAI client
+        
+        Args:
+            api_key: API key
+            model: Model name (optional)
+            base_url: Base URL for API endpoint (optional, for custom endpoints)
+        """
         try:
             import openai
             # Try OpenAI v1.x (new API)
             try:
-                client = openai.OpenAI(api_key=api_key)
+                # Build client kwargs
+                client_kwargs = {"api_key": api_key}
+                if base_url:
+                    client_kwargs["base_url"] = base_url
+                
+                client = openai.OpenAI(**client_kwargs)
                 model = model or os.getenv("LLM_MODEL", "gpt-4")
                 
                 # Create a wrapper that matches our interface
@@ -149,6 +182,8 @@ class LLMClientLoader:
             except AttributeError:
                 # Fallback to older OpenAI API
                 openai.api_key = api_key
+                if base_url:
+                    openai.api_base = base_url
                 model = model or os.getenv("LLM_MODEL", "gpt-4")
                 
                 class OpenAIWrapper:

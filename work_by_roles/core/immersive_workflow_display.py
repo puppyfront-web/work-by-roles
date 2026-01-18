@@ -264,4 +264,184 @@ class ImmersiveWorkflowDisplay:
                 )
         
         return content
+    
+    def display_role_start(
+        self,
+        role_id: str,
+        role_name: str,
+        role_description: str,
+        requirement: str,
+        execution_mode_info: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Display role execution start with immersive formatting"""
+        lines = []
+        lines.append("=" * 70)
+        lines.append(f"🎭 **{role_name}** 开始执行任务".center(70))
+        lines.append("=" * 70)
+        lines.append("")
+        lines.append(f"**角色 ID**: `{role_id}`")
+        lines.append(f"**角色名称**: {role_name}")
+        lines.append(f"**角色描述**: {role_description}")
+        
+        if execution_mode_info:
+            mode_icons = {
+                'analysis': '📊',
+                'implementation': '💻',
+                'validation': '✅'
+            }
+            mode_names = {
+                'analysis': '分析模式',
+                'implementation': '实现模式',
+                'validation': '验证模式'
+            }
+            icon = mode_icons.get(execution_mode_info['mode'], '🔧')
+            mode_name = mode_names.get(execution_mode_info['mode'], execution_mode_info['mode'])
+            lines.append(f"{icon} **执行模式**: {mode_name}")
+            
+            if execution_mode_info.get('tools'):
+                tools_str = ', '.join(execution_mode_info['tools'][:5])
+                lines.append(f"🛠️ **可用工具**: {tools_str}")
+                if len(execution_mode_info['tools']) > 5:
+                    lines.append(f"   ... 还有 {len(execution_mode_info['tools']) - 5} 个工具")
+            
+            if execution_mode_info.get('capabilities'):
+                caps_str = ', '.join(execution_mode_info['capabilities'][:5])
+                lines.append(f"⚡ **能力**: {caps_str}")
+                if len(execution_mode_info['capabilities']) > 5:
+                    lines.append(f"   ... 还有 {len(execution_mode_info['capabilities']) - 5} 个能力")
+        
+        lines.append("")
+        lines.append(f"**任务需求**: {requirement}")
+        lines.append(f"**开始时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        
+        content = "\n".join(lines)
+        
+        # Stream output if enabled
+        if self.use_streaming and self.stream_writer:
+            self.stream_writer.write_markdown(content, flush=True)
+        
+        return content
+    
+    def display_role_progress(
+        self,
+        role_name: str,
+        action: str,
+        details: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Display role execution progress update"""
+        lines = []
+        lines.append(f"🔄 **[{role_name}]** {action}")
+        if details:
+            for key, value in details.items():
+                if key != "current_action":
+                    lines.append(f"   - {key}: {value}")
+        lines.append("")
+        
+        content = "\n".join(lines)
+        
+        # Stream output if enabled
+        if self.use_streaming and self.stream_writer:
+            self.stream_writer.write_markdown(content, flush=True)
+        
+        return content
+    
+    def display_role_skill_execution(
+        self,
+        role_name: str,
+        skill_id: str,
+        status: str = "executing"
+    ) -> str:
+        """Display skill execution with role context"""
+        status_icons = {
+            "executing": "🔄",
+            "success": "✅",
+            "failed": "❌"
+        }
+        icon = status_icons.get(status, "⚙️")
+        
+        lines = []
+        lines.append(f"{icon} **[{role_name}]** 执行技能: `{skill_id}`")
+        lines.append("")
+        
+        content = "\n".join(lines)
+        
+        # Stream output if enabled
+        if self.use_streaming and self.stream_writer:
+            self.stream_writer.write_markdown(content, flush=True)
+        
+        return content
+    
+    def display_role_code_written(
+        self,
+        role_name: str,
+        file_path: str,
+        content: str,
+        skill_id: Optional[str] = None
+    ) -> str:
+        """Display code writing with role context"""
+        self.code_tracker.track_file_creation(file_path, content, f"role_{role_name}", skill_id)
+        
+        lines = []
+        lines.append("=" * 70)
+        lines.append(f"💻 **[{role_name}]** 编写代码: `{file_path}`")
+        lines.append("=" * 70)
+        lines.append("")
+        lines.append(f"**文件**: `{file_path}`")
+        lines.append(f"**大小**: {len(content)} 字符, {len(content.splitlines())} 行")
+        if skill_id:
+            lines.append(f"**技能**: `{skill_id}`")
+        lines.append("")
+        lines.append("**代码预览**:")
+        lines.append("```python")
+        # Show first 30 lines of code
+        code_lines = content.splitlines()[:30]
+        lines.append('\n'.join(code_lines))
+        total_lines = len(content.splitlines())
+        if total_lines > 30:
+            lines.append(f"\n... (还有 {total_lines - 30} 行)")
+        lines.append("```")
+        lines.append("")
+        
+        content_str = "\n".join(lines)
+        
+        # Stream output if enabled
+        if self.use_streaming and self.stream_writer:
+            self.stream_writer.write_markdown(content_str, flush=True)
+        
+        return content_str
+    
+    def display_role_complete(
+        self,
+        role_name: str,
+        summary: Optional[str] = None,
+        skills_executed: Optional[List[str]] = None
+    ) -> str:
+        """Display role execution completion"""
+        lines = []
+        lines.append("=" * 70)
+        lines.append(f"✅ **[{role_name}]** 任务完成")
+        lines.append("=" * 70)
+        lines.append("")
+        
+        if summary:
+            lines.append(summary)
+            lines.append("")
+        
+        if skills_executed:
+            lines.append(f"**执行的技能**: {', '.join(skills_executed)}")
+            lines.append("")
+        
+        lines.append(f"**完成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("")
+        
+        content = "\n".join(lines)
+        
+        # Stream output if enabled
+        if self.use_streaming and self.stream_writer:
+            self.stream_writer.write_markdown(content, flush=True)
+        
+        return content
 

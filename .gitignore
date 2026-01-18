@@ -14,6 +14,7 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+.cursorrules
 
 # Workflow runtime files and directories
 .workflow/

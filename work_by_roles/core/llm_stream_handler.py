@@ -10,16 +10,18 @@ from .stream_writer import StreamWriter
 class LLMStreamHandler:
     """Handler for streaming LLM responses"""
     
-    def __init__(self, stream_writer: StreamWriter, markdown_mode: bool = True):
+    def __init__(self, stream_writer: StreamWriter, markdown_mode: bool = True, role_name: Optional[str] = None):
         """
         Initialize LLM stream handler.
         
         Args:
             stream_writer: Stream writer instance
             markdown_mode: Whether to format output as markdown
+            role_name: Optional role name to prefix output
         """
         self.stream_writer = stream_writer
         self.markdown_mode = markdown_mode
+        self.role_name = role_name
         self.buffer = ""
         self.full_response = ""
     
@@ -38,6 +40,13 @@ class LLMStreamHandler:
         if display_chunk:
             if self.markdown_mode:
                 display_chunk = self._format_markdown_chunk(display_chunk)
+            
+            # 如果有角色名称，在流式输出中添加标识（仅在每行开始时添加）
+            if self.role_name and display_chunk.strip():
+                # 检查是否是行首（buffer 为空或最后一个字符是换行）
+                if not self.buffer.rstrip() or self.buffer.rstrip()[-1] == '\n':
+                    display_chunk = f"[{self.role_name}] {display_chunk}"
+            
             self.stream_writer.write(display_chunk, flush=True)
     
     def handle_stream(self, stream: Iterator[str]) -> str:

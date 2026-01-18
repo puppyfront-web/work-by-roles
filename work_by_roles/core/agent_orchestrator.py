@@ -310,38 +310,54 @@ class AgentOrchestrator:
                 self.execution_tracker.record_execution(execution)
                 return error_response
         
+        # 如果有角色ID，更新流式处理器的角色名称
+        original_role_name = None
+        if role_id and self.skill_invoker and hasattr(self.skill_invoker, 'stream_handler'):
+            if self.skill_invoker.stream_handler:
+                original_role_name = getattr(self.skill_invoker.stream_handler, 'role_name', None)
+                # 获取角色名称
+                role = self.engine.role_manager.get_role(role_id) if role_id else None
+                if role:
+                    self.skill_invoker.stream_handler.role_name = role.name
+        
         # Execute skill with retry logic
         start_time = time.time()
         last_error: Optional[Exception] = None
         
-        for attempt in range(10):  # Max 10 attempts
-            try:
-                # Here we would normally invoke the actual skill execution
-                # For now, this is a placeholder that would call LLM or tool
-                result = self._invoke_skill(skill, input_data)
-                
-                execution_time = time.time() - start_time
-                execution = SkillExecution(
-                    skill_id=skill_id,
-                    input=input_data,
-                    output=result,
-                    status="success",
-                    execution_time=execution_time,
-                    retry_count=attempt,
-                    stage_id=stage_id,
-                    role_id=role_id
-                )
-                self.execution_tracker.record_execution(execution)
-                
-                return {
-                    "success": True,
-                    "output": result,
-                    "execution_time": execution_time,
-                    "retry_count": attempt
-                }
-                
-            except Exception as e:
-                last_error = e
+        try:
+            for attempt in range(10):  # Max 10 attempts
+                try:
+                    # Here we would normally invoke the actual skill execution
+                    # For now, this is a placeholder that would call LLM or tool
+                    result = self._invoke_skill(skill, input_data)
+                    
+                    execution_time = time.time() - start_time
+                    execution = SkillExecution(
+                        skill_id=skill_id,
+                        input=input_data,
+                        output=result,
+                        status="success",
+                        execution_time=execution_time,
+                        retry_count=attempt,
+                        stage_id=stage_id,
+                        role_id=role_id
+                    )
+                    self.execution_tracker.record_execution(execution)
+                    
+                    # 恢复原始角色名称
+                    if original_role_name is not None and self.skill_invoker and hasattr(self.skill_invoker, 'stream_handler'):
+                        if self.skill_invoker.stream_handler:
+                            self.skill_invoker.stream_handler.role_name = original_role_name
+                    
+                    return {
+                        "success": True,
+                        "output": result,
+                        "execution_time": execution_time,
+                        "retry_count": attempt
+                    }
+                    
+                except Exception as e:
+                    last_error = e
                 execution_time = time.time() - start_time
                 
                 # Create execution record for this attempt
@@ -366,6 +382,11 @@ class AgentOrchestrator:
                 # Get retry delay and wait
                 retry_config = self.retry_handler.handle_retry(skill_id, input_data, e, skill)
                 time.sleep(retry_config['delay'])
+        finally:
+            # 恢复原始角色名称
+            if original_role_name is not None and self.skill_invoker and hasattr(self.skill_invoker, 'stream_handler'):
+                if self.skill_invoker.stream_handler:
+                    self.skill_invoker.stream_handler.role_name = original_role_name
         
         # All retries exhausted
         error_obj: Exception = last_error if last_error else Exception("Unknown error")

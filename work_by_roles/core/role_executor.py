@@ -15,6 +15,7 @@ from .skill_invoker import SkillInvoker
 from .agent import Agent
 from .agent_orchestrator import AgentOrchestrator
 from .execution_tracker import ExecutionTracker
+from .execution_mode_analyzer import ExecutionModeAnalyzer
 
 class RoleExecutor:
     """
@@ -59,16 +60,27 @@ class RoleExecutor:
         role_id: str,
         requirement: str,
         inputs: Optional[Dict[str, Any]] = None,
-        use_llm: bool = False
+        use_llm: bool = False,
+        immersive_display: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
-        执行角色处理需求。
+        执行角色处理需求（独立执行模式）。
+        
+        这是独立于工作流的角色执行模式，不应用工作流约束：
+        - 不检查工作流阶段状态
+        - 不应用阶段边界限制
+        - 不检查工作流前提条件
+        - 不验证角色在工作流中的 allowed_actions/forbidden_actions 约束
+        - 角色可以自由执行，不受工作流限制
+        
+        适用于通过 `@role_name` 或 `workflow role-execute` 直接调用角色的场景。
         
         Args:
             role_id: 角色ID
             requirement: 用户需求描述
             inputs: 可选的输入数据
             use_llm: 是否使用LLM进行推理（需要llm_client）
+            immersive_display: 可选的沉浸式显示实例
             
         Returns:
             包含执行结果的字典
@@ -77,6 +89,25 @@ class RoleExecutor:
         role = self.engine.role_manager.get_role(role_id)
         if not role:
             raise WorkflowError(f"Role '{role_id}' not found")
+        
+        # 获取执行模式信息
+        execution_mode_info = None
+        if self.engine.role_manager.skill_library:
+            execution_mode_info = ExecutionModeAnalyzer.get_execution_mode_info(
+                role=role,
+                skill_library=self.engine.role_manager.skill_library,
+                environment="cursor"
+            )
+        
+        # 显示角色开始执行（沉浸式）
+        if immersive_display:
+            immersive_display.display_role_start(
+                role_id=role_id,
+                role_name=role.name,
+                role_description=role.description,
+                requirement=requirement,
+                execution_mode_info=execution_mode_info
+            )
         
         # 2. 创建Agent
         agent = Agent(role, self.engine, self.skill_selector)
@@ -88,17 +119,43 @@ class RoleExecutor:
         # 4. 根据需求选择合适的技能
         selected_skills = self._select_skills_for_requirement(role, requirement, full_context)
         
-        # 4. 执行技能
+        # 显示技能选择结果（沉浸式）
+        if immersive_display and selected_skills:
+            immersive_display.display_role_progress(
+                role_name=role.name,
+                action=f"已选择 {len(selected_skills)} 个技能: {', '.join(selected_skills)}"
+            )
+        
+        # 4. 执行技能（独立执行模式：stage_id=None，不应用工作流约束）
         skill_results = []
         workflow_results = []  # 收集技能执行结果，用于生成输出文件
         for skill_id in selected_skills:
             try:
+                # 显示技能执行开始（沉浸式）
+                if immersive_display:
+                    immersive_display.display_role_skill_execution(
+                        role_name=role.name,
+                        skill_id=skill_id,
+                        status="executing"
+                    )
+                
                 skill_input = self._prepare_skill_input(requirement, inputs or {}, agent.context)
+                # 注意：stage_id=None 表示独立执行模式，不应用工作流约束
                 result = self.orchestrator.execute_skill(
                     skill_id=skill_id,
                     input_data=skill_input,
+                    stage_id=None,  # 独立执行模式，不关联工作流阶段
                     role_id=role_id
                 )
+                
+                # 显示技能执行完成（沉浸式）
+                if immersive_display:
+                    status = "success" if result.get("success") else "failed"
+                    immersive_display.display_role_skill_execution(
+                        role_name=role.name,
+                        skill_id=skill_id,
+                        status=status
+                    )
                 skill_results.append({
                     "skill_id": skill_id,
                     "result": result
@@ -135,13 +192,31 @@ class RoleExecutor:
             use_llm=use_llm
         )
         
+        # 显示角色完成（沉浸式）
+        if immersive_display:
+            summary = f"[{role.name}] 已完成任务: {requirement}"
+            immersive_display.display_role_complete(
+                role_name=role.name,
+                summary=summary,
+                skills_executed=[r["skill_id"] for r in skill_results]
+            )
+        
+        # 获取执行模式信息（如果之前没有获取）
+        if execution_mode_info is None and self.engine.role_manager.skill_library:
+            execution_mode_info = ExecutionModeAnalyzer.get_execution_mode_info(
+                role=role,
+                skill_library=self.engine.role_manager.skill_library,
+                environment="cursor"
+            )
+        
         return {
             "role_id": role_id,
             "requirement": requirement,
             "skills_executed": [r["skill_id"] for r in skill_results],
             "skill_results": skill_results,
             "response": final_response,
-            "agent_context": agent.context
+            "agent_context": agent.context,
+            "execution_mode": execution_mode_info
         }
     
     def _build_context(
@@ -179,11 +254,9 @@ class RoleExecutor:
             if tech_stack:
                 context["tech_stack"] = tech_stack
         
-        # 添加当前阶段（如果有）
-        if self.engine.executor and self.engine.executor.state:
-            current_stage = self.engine.executor.state.current_stage
-            if current_stage:
-                context["current_stage"] = current_stage
+        # 注意：独立执行模式不添加工作流阶段信息
+        # 这样可以确保角色执行不受工作流状态影响
+        # 如果需要工作流阶段信息，应该在 workflow 模式下通过 stage_id 传递
         
         # 添加历史技能执行记录
         if self.execution_tracker:
@@ -284,7 +357,7 @@ class RoleExecutor:
                 return self._format_simple_response(skill_results)
         else:
             # 简单汇总响应
-            return self._format_simple_response(skill_results)
+            return self._format_simple_response(skill_results, role=role)
     
     def _build_response_prompt(
         self,
@@ -313,9 +386,10 @@ class RoleExecutor:
         
         return "\n".join(prompt_parts)
     
-    def _format_simple_response(self, skill_results: List[Dict[str, Any]]) -> str:
+    def _format_simple_response(self, skill_results: List[Dict[str, Any]], role: Optional[Role] = None) -> str:
         """格式化简单响应（不使用LLM）"""
-        response_parts = ["技能执行结果汇总：\n"]
+        role_prefix = f"[{role.name}] " if role else ""
+        response_parts = [f"{role_prefix}技能执行结果汇总：\n"] if role else ["技能执行结果汇总：\n"]
         
         for i, result in enumerate(skill_results, 1):
             response_parts.append(f"{i}. 技能: {result['skill_id']}")

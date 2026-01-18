@@ -7,6 +7,7 @@
 import sys
 import json
 import yaml
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set, Callable, Tuple
 try:
@@ -22,6 +23,8 @@ try:
         RoleExecutor
     )
     from .core.llm_client_loader import LLMClientLoader
+    from .core.execution_mode_analyzer import ExecutionModeAnalyzer
+    from .core.tool_mapper import ToolMapper
     _agents_available = True
 except (ImportError, ValueError):
     # Fallback: try from .engine (forwarding module)
@@ -37,6 +40,8 @@ except (ImportError, ValueError):
             RoleExecutor
         )
         from .core.llm_client_loader import LLMClientLoader
+        from .core.execution_mode_analyzer import ExecutionModeAnalyzer
+        from .core.tool_mapper import ToolMapper
         _agents_available = True
     except (ImportError, ValueError):
         # Fallback for direct execution during development
@@ -324,13 +329,11 @@ def cmd_init(args):
         if len(context.specs) > 5:
             print(f"   ... 还有 {len(context.specs) - 5} 个")
     
-    # 3. Generate .cursorrules
-    generate_cursorrules(workspace)
-    print(f"✅ 已生成/更新 .cursorrules 文件，增强 AI 角色感知")
-    
-    # 3.5. Generate autopilot.md for Cursor IDE integration
-    generate_autopilot_rules(workspace)
-    print(f"✅ 已生成/更新 .cursor/rules/autopilot.md 文件，支持 @team 自动触发")
+    # 3. Generate .cursorrules (only in Cursor IDE, merges autopilot.md content)
+    if generate_cursorrules(workspace):
+        print(f"✅ 已生成/更新 .cursorrules 文件，增强 AI 角色感知（包含自动执行规则）")
+    else:
+        print(f"ℹ️  未检测到 Cursor IDE 环境，跳过 .cursorrules 生成")
     
     # 4. Generate initial TEAM_CONTEXT.md if workflow files exist
     workflow_file = workflow_dir / "workflow_schema.yaml"
@@ -666,8 +669,50 @@ Add any additional notes or constraints here.
     print("   请编辑此文件以描述您的项目需求")
 
 
+def is_cursor_ide() -> bool:
+    """
+    检测是否在 Cursor IDE 环境中
+    
+    Returns:
+        bool: 如果在 Cursor IDE 中返回 True，否则返回 False
+    """
+    # 方法1: 检查环境变量（Cursor 可能会设置）
+    if os.environ.get('CURSOR_APP') or os.environ.get('CURSOR'):
+        return True
+    
+    # 方法2: 检查父进程名称（如果可能）
+    try:
+        import psutil
+        current_process = psutil.Process()
+        parent = current_process.parent()
+        if parent:
+            parent_name = parent.name().lower()
+            if 'cursor' in parent_name:
+                return True
+    except ImportError:
+        # psutil 未安装，忽略
+        pass
+    except (AttributeError, psutil.NoSuchProcess, psutil.AccessDenied):
+        # psutil 可用但无法访问父进程，忽略
+        pass
+    
+    # 方法3: 检查是否在 Cursor 的终端中（通过 TERM_PROGRAM 等环境变量）
+    term_program = os.environ.get('TERM_PROGRAM', '').lower()
+    if 'cursor' in term_program:
+        return True
+    
+    return False
+
+
 def generate_cursorrules(workspace: Path, engine=None):
-    """Generate .cursorrules file for AI awareness with dynamic context support"""
+    """Generate .cursorrules file for AI awareness with dynamic context support
+    
+    Only generates if running in Cursor IDE environment.
+    Merges autopilot.md content into .cursorrules to avoid duplication.
+    """
+    # 检查是否在 Cursor IDE 环境中
+    if not is_cursor_ide():
+        return False
     
     # 检查当前团队
     team_manager = TeamManager(workspace)
@@ -697,62 +742,20 @@ def generate_cursorrules(workspace: Path, engine=None):
             roles = list(engine.role_manager.roles.keys())
             roles_list = f"\nAvailable roles (use @role_name to invoke): {', '.join(roles)}"
             
-            # 工具映射：通用工具 -> Cursor 工具
-            def map_to_cursor_tools(generic_tools):
-                """将通用工具映射到 Cursor 特定工具"""
-                tool_mapping = {
-                    'file_write': 'write',
-                    'file_modify': 'search_replace',
-                    'file_read': 'read_file',
-                    'code_search': 'codebase_search',
-                    'command_execute': 'run_terminal_cmd',
-                }
-                return [tool_mapping.get(tool, tool) for tool in generic_tools]
-            
-            # 从技能定义中读取执行模式（使用通用字段）
+            # 使用 ExecutionModeAnalyzer 分析角色执行模式
             for role_id, role in engine.role_manager.roles.items():
-                execution_modes = set()
-                generic_tools = set()
-                execution_capabilities = []
-                
-                # 检查角色的所有技能
-                if role.required_skills and engine.role_manager.skill_library:
-                    for skill_req in role.required_skills:
-                        skill_id = skill_req.skill_id if hasattr(skill_req, 'skill_id') else skill_req.get('skill_id') if isinstance(skill_req, dict) else None
-                        if skill_id and skill_id in engine.role_manager.skill_library:
-                            skill = engine.role_manager.skill_library[skill_id]
-                            if skill.metadata:
-                                # 使用通用字段 execution_mode（向后兼容 cursor_execution_mode）
-                                mode = skill.metadata.get('execution_mode') or skill.metadata.get('cursor_execution_mode', 'analysis')
-                                execution_modes.add(mode)
-                                
-                                # 使用通用字段 execution_tools（向后兼容 cursor_tools）
-                                tools = skill.metadata.get('execution_tools') or skill.metadata.get('cursor_tools', [])
-                                if tools:
-                                    generic_tools.update(tools)
-                                
-                                capabilities = skill.metadata.get('execution_capabilities', [])
-                                if capabilities:
-                                    execution_capabilities.extend(capabilities)
-                
-                # 映射通用工具到 Cursor 工具
-                cursor_tools = map_to_cursor_tools(generic_tools) if generic_tools else []
-                
-                # 确定主要执行模式（优先 implementation > validation > analysis）
-                primary_mode = 'analysis'  # 默认
-                if 'implementation' in execution_modes:
-                    primary_mode = 'implementation'
-                elif 'validation' in execution_modes:
-                    primary_mode = 'validation'
-                elif execution_modes:
-                    primary_mode = list(execution_modes)[0]
-                
-                role_execution_modes[role_id] = {
-                    'mode': primary_mode,
-                    'tools': list(cursor_tools) if cursor_tools else None,
-                    'generic_tools': list(generic_tools) if generic_tools else None,
-                    'capabilities': execution_capabilities if execution_capabilities else None
-                }
+                if engine.role_manager.skill_library:
+                    mode_info = ExecutionModeAnalyzer.get_execution_mode_info(
+                        role=role,
+                        skill_library=engine.role_manager.skill_library,
+                        environment="cursor"
+                    )
+                    role_execution_modes[role_id] = {
+                        'mode': mode_info['mode'],
+                        'tools': mode_info['tools'] if mode_info['tools'] else None,
+                        'generic_tools': mode_info['generic_tools'] if mode_info['generic_tools'] else None,
+                        'capabilities': mode_info['capabilities'] if mode_info['capabilities'] else None
+                    }
         else:
             # 尝试从配置文件读取
             roles_file = workspace / ".workflow" / "role_schema.yaml"
@@ -846,7 +849,7 @@ def generate_cursorrules(workspace: Path, engine=None):
                     role_execution_rules += f"   - Capabilities: {', '.join(set(all_capabilities))}\n"
                 role_execution_rules += "\n"
         
-        role_execution_rules += "   **Important**: Execution mode and tools are defined in skill metadata using generic fields (`execution_mode`, `execution_tools`), not Cursor-specific. These are automatically mapped to Cursor tools when generating rules.\n"
+        role_execution_rules += "   **Note**: Execution mode is automatically determined from skill metadata. Tools are automatically mapped to Cursor-specific tools.\n"
     else:
         # 回退到默认规则
         role_execution_rules = "\n1. **Role Invocation via @mention**:\n"
@@ -863,13 +866,6 @@ To ensure project stability and follow best practices, adhere to these rules:
 ## 🎭 Role-Based Execution (Cursor IDE Integration)
 
 **CRITICAL: When user mentions @role_name, automatically use that role's skills**
-
-**Execution modes are defined in skill metadata using generic fields (not Cursor-specific). Each skill defines:**
-- `execution_mode`: "analysis", "implementation", or "validation" (generic, works across all environments)
-- `execution_tools`: List of generic tools (e.g., ["file_write", "file_modify", "file_read", "code_search", "command_execute"])
-- `execution_capabilities`: List of capabilities (e.g., ["write_code", "write_tests"])
-
-**Tool Mapping**: Generic tools are automatically mapped to environment-specific tools (e.g., `file_write` → `write` in Cursor, `file_modify` → `search_replace` in Cursor)
 
 {role_execution_rules}
 
@@ -889,18 +885,11 @@ To ensure project stability and follow best practices, adhere to these rules:
    - Do not perform implementation tasks while in the `requirements` or `architecture` stages.
    - If the current stage does not match the task, advise the user to run `workflow start <stage> <role>`.
 4. **Quality Gates**: Ensure all quality gates and required outputs defined in the workflow schema are satisfied before attempting to complete a stage.
-5. **Skill Compliance**: 
-   - **CRITICAL**: Execution mode is determined by skills, not roles
-   - Check each skill's `metadata.execution_mode` (generic field) to determine how to execute
-   - Use tools defined in skill's `metadata.execution_tools` (generic, mapped to environment-specific tools)
-   - Apply capabilities from skill's `metadata.execution_capabilities`
-   - Skills define what you can do using generic, environment-agnostic definitions
-6. **Skill-Based Execution**:
-   - **Analysis skills** (`execution_mode: analysis`): Use `workflow role-execute` for analysis and documentation
-   - **Implementation skills** (`execution_mode: implementation`): Directly use tools (mapped from generic `execution_tools`) to write/modify code files
-   - **Validation skills** (`execution_mode: validation`): Use tools to run tests and validate functionality
-   - Always check skill metadata to determine execution approach, not role names
-   - Skills use generic tool names that are automatically mapped to environment-specific tools
+5. **Skill-Based Execution**:
+   - Execution mode is automatically determined from skill metadata
+   - **Analysis skills**: Use `workflow role-execute` for analysis and documentation
+   - **Implementation skills**: Directly use Cursor tools to write/modify code files (do NOT just call commands)
+   - **Validation skills**: Use tools to run tests and validate functionality
 7. **Agent Execution**:
    - For automated execution, use `workflow agent-execute [stage]`.
    - When acting as an agent, follow the `instruction_template` in the role definition and the `goal_template` in the stage definition.
@@ -917,6 +906,59 @@ To ensure project stability and follow best practices, adhere to these rules:
      - Runs skill workflows with auto-trigger
      - Uses relaxed quality gates (won't block on failures)
      - Completes all stages without user intervention (except for critical issues)
+
+## 🚀 Autonomous Workflow Pilot (Autopilot Mode)
+
+You are the **Workflow Pilot**. Your mission is to execute user requests end-to-end while adhering to the Multi-Role Skills Workflow framework.
+
+### Intent Recognition & Auto-Trigger
+- **Default Behavior**: When the user uses the slash command `/wfauto [goal]` or expresses a desire for you to "just do it" or "handle the whole process", immediately transition into **Autopilot Mode**.
+- **CRITICAL**: When the user mentions `@[team]` or `@team`, **immediately execute** `workflow wfauto` - this is the default behavior, no explicit request needed.
+- **Every conversation**: When the user expresses any task, goal, or starts a conversation, automatically execute the full workflow to analyze requirements through all stages.
+
+### Autopilot Execution Protocol
+Follow this exact sequence without asking for permission for each step:
+
+**Note**: When triggered via `@[team]` or any user conversation, **always execute** `workflow wfauto` to run all stages sequentially. This automatically uses **Agent + Skills** for fully automated execution (similar to Lovable/MetaGPT).
+
+**CRITICAL**: The `workflow wfauto` command automatically:
+- Uses AgentOrchestrator for multi-agent collaboration
+- Automatically selects and executes relevant skills
+- Runs skill workflows with auto-trigger
+- Uses relaxed quality gates (won't block on failures)
+
+1. **Preparation**: If the `.workflow/` directory or state file doesn't exist, run `workflow init --quick` (uses vibe-coding template by default).
+2. **Automatic Execution**: Run `workflow wfauto` - this will automatically:
+   - Execute all stages sequentially using Agent + Skills
+   - For each stage:
+     - Create Agent for the stage role
+     - Automatically select relevant skills based on stage goal
+     - Execute selected skills
+     - Complete stage with relaxed quality gates
+   - No manual intervention needed - fully automated like Lovable/MetaGPT
+3. **Self-Healing**: If any stage fails, the system will:
+   - Show warnings but continue (relaxed mode)
+   - Retry failed skills if configured
+   - Fall back to traditional mode if Agent system unavailable
+4. **Skill Accumulation Phase (Optional)**:
+   - After the project is successfully validated, skill accumulation is **optional and non-blocking**.
+   - In automated mode (Agent + Skills), skill accumulation is skipped automatically.
+   - Users can manually run `workflow skill-accumulate` if they want to persist capabilities as skills.
+
+### Communication Guidelines
+- **Silent Mode**: Do not ask "Should I move to the next stage?" or "Is this requirement okay?". Just proceed.
+- **Fully Automated**: When triggered via `@team`, execute the complete workflow automatically without asking for confirmation at each step.
+- **Progress Updates**: Provide brief, one-line updates after completing each major stage (e.g., "✅ Requirements finalized. Moving to Architecture...").
+- **Exception Awakening**: ONLY stop and ask the user if:
+  - You are stuck in a self-healing loop for more than 3 attempts.
+  - There is a critical contradiction in the requirements.
+  - **Critical external dependencies**: API keys, environment-specific credentials, or other external resources that cannot be automatically configured.
+
+### Constraint Awareness
+- Always respect the `allowed_actions` and `forbidden_actions` in `.workflow/role_schema.yaml`.
+- Use the tools provided in the environment (Python, Ruff, Pytest, etc.) to verify your work.
+
+**Start your execution now by running the first necessary command.**
 """
     
     # Dynamic context anchor
@@ -938,79 +980,7 @@ Current project status can be viewed at any time by running `workflow status`.
     content = static_rules + dynamic_anchor + footer
     cursorrules_path = workspace / ".cursorrules"
     cursorrules_path.write_text(content, encoding='utf-8')
-
-
-def generate_autopilot_rules(workspace: Path):
-    """Generate .cursor/rules/autopilot.md for Cursor IDE integration"""
-    
-    autopilot_content = """---
-description: Autonomous Workflow Pilot (Autopilot) for handling /wfauto and end-to-end task execution
-globs: ["**/*"]
----
-
-# Autonomous Workflow Pilot (/wfauto)
-
-You are the **Workflow Pilot**. Your mission is to execute user requests end-to-end while adhering to the Multi-Role Skills Workflow framework.
-
-## 1. Intent Recognition & Auto-Trigger
-- **Default Behavior**: Every LLM conversation or user request automatically triggers the full workflow execution.
-- When the user uses the slash command `/wfauto [goal]` or expresses a desire for you to "just do it" or "handle the whole process".
-- **CRITICAL**: When the user mentions `@[team]` or `@team`, **immediately execute** `workflow wfauto` - this is the default behavior, no explicit request needed.
-- **Every conversation**: When the user expresses any task, goal, or starts a conversation, automatically execute the full workflow to analyze requirements through all stages.
-- You must immediately transition into **Autopilot Mode**.
-
-## 2. Autopilot Execution Protocol
-Follow this exact sequence without asking for permission for each step:
-
-**Note**: When triggered via `@[team]` or any user conversation, **always execute** `workflow wfauto` to run all stages sequentially. This automatically uses **Agent + Skills** for fully automated execution (similar to Lovable/MetaGPT).
-
-**CRITICAL**: The new `workflow wfauto` command automatically:
-- Uses AgentOrchestrator for multi-agent collaboration
-- Automatically selects and executes relevant skills
-- Runs skill workflows with auto-trigger
-- Uses relaxed quality gates (won't block on failures)
-
-1.  **Preparation**: If the `.workflow/` directory or state file doesn't exist, run `workflow init --quick` (uses vibe-coding template by default).
-2.  **Automatic Execution**: Run `workflow wfauto` - this will automatically:
-    - Execute all stages sequentially using Agent + Skills
-    - For each stage:
-      - Create Agent for the stage role
-      - Automatically select relevant skills based on stage goal
-      - Execute selected skills
-      - Complete stage with relaxed quality gates
-    - No manual intervention needed - fully automated like Lovable/MetaGPT
-3.  **Self-Healing**: If any stage fails, the system will:
-    - Show warnings but continue (relaxed mode)
-    - Retry failed skills if configured
-    - Fall back to traditional mode if Agent system unavailable
-4.  **Skill Accumulation Phase (Optional)**:
-    - After the project is successfully validated, skill accumulation is **optional and non-blocking**.
-    - In automated mode (Agent + Skills), skill accumulation is skipped automatically.
-    - Users can manually run `workflow skill-accumulate` if they want to persist capabilities as skills.
-
-## 3. Communication Guidelines
-- **Silent Mode**: Do not ask "Should I move to the next stage?" or "Is this requirement okay?". Just proceed.
-- **Fully Automated**: When triggered via `@team`, execute the complete workflow automatically without asking for confirmation at each step.
-- **Progress Updates**: Provide brief, one-line updates after completing each major stage (e.g., "✅ Requirements finalized. Moving to Architecture...").
-- **Exception Awakening**: ONLY stop and ask the user if:
-    - You are stuck in a self-healing loop for more than 3 attempts.
-    - There is a critical contradiction in the requirements.
-    - **Critical external dependencies**: API keys, environment-specific credentials, or other external resources that cannot be automatically configured.
-
-## 4. Constraint Awareness
-- Always respect the `allowed_actions` and `forbidden_actions` in `.workflow/role_schema.yaml`.
-- Use the tools provided in the environment (Python, Ruff, Pytest, etc.) to verify your work.
-
-**Start your execution now by running the first necessary command.**
-"""
-    
-    # Create .cursor/rules directory if it doesn't exist
-    cursor_rules_dir = workspace / ".cursor" / "rules"
-    cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Write autopilot.md
-    autopilot_path = cursor_rules_dir / "autopilot.md"
-    autopilot_path.write_text(autopilot_content, encoding='utf-8')
+    return True
 
 
 def cmd_start(args):
@@ -2066,11 +2036,12 @@ workflow wfauto
     usage_file.write_text(usage_content, encoding='utf-8')
     print(f"  ✅ 已生成使用说明: {usage_file.name}")
     
-    # 生成 Cursor 配置文件
-    from work_by_roles.cli import generate_cursorrules, generate_autopilot_rules
-    generate_cursorrules(workspace)
-    generate_autopilot_rules(workspace)
-    print(f"  ✅ 已生成 Cursor IDE 配置文件")
+    # 生成 Cursor 配置文件（仅当在 Cursor IDE 中时）
+    from work_by_roles.cli import generate_cursorrules
+    if generate_cursorrules(workspace):
+        print(f"  ✅ 已生成 Cursor IDE 配置文件（.cursorrules，包含自动执行规则）")
+    else:
+        print(f"  ℹ️  未检测到 Cursor IDE 环境，跳过配置文件生成")
     
     # 显示完成信息
     print("\n" + "=" * 60)
@@ -2103,6 +2074,21 @@ def cmd_role_execute(args):
         engine, _, _ = _init_engine(args)
         workspace = Path(args.workspace or ".")
         
+        # 获取角色信息（在执行前）
+        role = engine.role_manager.get_role(args.role_id)
+        if not role:
+            print(f"❌ 角色 '{args.role_id}' 未找到", file=sys.stderr)
+            sys.exit(1)
+        
+        # 获取执行模式信息
+        execution_mode_info = None
+        if engine.role_manager.skill_library:
+            execution_mode_info = ExecutionModeAnalyzer.get_execution_mode_info(
+                role=role,
+                skill_library=engine.role_manager.skill_library,
+                environment="cursor"
+            )
+        
         # 加载 LLM 客户端
         llm_client = _load_llm_client(workspace)
         
@@ -2122,7 +2108,8 @@ def cmd_role_execute(args):
                 "  llm:\n"
                 "    provider: openai\n"
                 "    api_key: your-api-key\n"
-                "    model: gpt-4"
+                "    model: gpt-4\n"
+                "    base_url: https://api.openai.com/v1  # 可选，用于自定义端点"
             )
             print(error_msg, file=sys.stderr)
             raise WorkflowError("LLM client not configured but --use-llm flag is set")
@@ -2136,56 +2123,98 @@ def cmd_role_execute(args):
                 print(f"❌ 输入数据JSON格式错误: {e}", file=sys.stderr)
                 sys.exit(1)
         
+        # 创建沉浸式显示（如果支持）
+        immersive_display = None
+        try:
+            from .core.immersive_workflow_display import ImmersiveWorkflowDisplay
+            immersive_display = ImmersiveWorkflowDisplay(workspace, use_streaming=True)
+        except Exception:
+            # 如果沉浸式显示不可用，继续使用普通模式
+            pass
+        
+        # 显示醒目的角色信息横幅（普通模式）
+        if not immersive_display:
+            print("\n" + "=" * 70)
+            print("🎭 角色执行模式".center(70))
+            print("=" * 70)
+            print(f"\n👤 角色: {role.name} ({args.role_id})")
+            print(f"📝 描述: {role.description}")
+            
+            if execution_mode_info:
+                mode_icons = {
+                    'analysis': '📊',
+                    'implementation': '💻',
+                    'validation': '✅'
+                }
+                mode_names = {
+                    'analysis': '分析模式',
+                    'implementation': '实现模式',
+                    'validation': '验证模式'
+                }
+                icon = mode_icons.get(execution_mode_info['mode'], '🔧')
+                mode_name = mode_names.get(execution_mode_info['mode'], execution_mode_info['mode'])
+                print(f"{icon} 执行模式: {mode_name}")
+                
+                if execution_mode_info.get('tools'):
+                    print(f"🛠️  可用工具: {', '.join(execution_mode_info['tools'][:5])}")
+                    if len(execution_mode_info['tools']) > 5:
+                        print(f"   ... 还有 {len(execution_mode_info['tools']) - 5} 个工具")
+            
+            print(f"\n📋 任务需求: {args.requirement}")
+            print(f"🤖 LLM模式: {'启用' if args.use_llm else '禁用（轻量模式）'}")
+            if inputs:
+                print(f"📥 输入数据: {len(inputs)} 项")
+            
+            print("\n" + "-" * 70)
+            print("🚀 开始执行...")
+            print("-" * 70 + "\n")
+        
         # 创建RoleExecutor
         role_executor = RoleExecutor(engine, llm_client=llm_client)
         
-        print(f"\n🎭 角色执行模式")
-        print("=" * 60)
-        print(f"角色: {args.role_id}")
-        print(f"需求: {args.requirement}")
-        print(f"使用LLM: {'是' if args.use_llm else '否（轻量模式）'}")
-        if inputs:
-            print(f"输入数据: {len(inputs)} 项")
-        print()
-        
-        # 执行角色
+        # 执行角色（传入沉浸式显示）
         result = role_executor.execute_role(
             role_id=args.role_id,
             requirement=args.requirement,
             inputs=inputs,
-            use_llm=args.use_llm
+            use_llm=args.use_llm,
+            immersive_display=immersive_display
         )
         
-        # 显示结果
-        print("📊 执行结果:")
-        print("=" * 60)
-        print(f"\n✅ 执行的技能: {', '.join(result['skills_executed'])}")
-        
-        # 显示技能执行结果
-        print("\n🔧 技能执行详情:")
-        for skill_result in result['skill_results']:
-            skill_id = skill_result['skill_id']
-            if 'result' in skill_result:
-                if skill_result['result'].get('success'):
-                    print(f"  ✅ {skill_id}: 执行成功")
-                else:
-                    print(f"  ❌ {skill_id}: 执行失败")
-                    if skill_result['result'].get('error'):
-                        print(f"     错误: {skill_result['result']['error']}")
-            elif 'error' in skill_result:
-                print(f"  ❌ {skill_id}: 错误 - {skill_result['error']}")
-        
-        # 显示最终响应
-        print("\n📝 最终响应:")
-        print("-" * 60)
-        print(result['response'])
-        print("-" * 60)
-        
-        # 如果使用LLM，显示提示
-        if args.use_llm:
-            print("\n💡 提示: 已使用LLM生成响应")
-        else:
-            print("\n💡 提示: 当前为轻量模式，使用 --use-llm 启用LLM生成更详细的响应")
+        # 显示结果（如果使用沉浸式显示，大部分信息已经在流式输出中显示）
+        if not immersive_display:
+            print("\n" + "=" * 70)
+            print(f"📊 {role.name} 执行结果".center(70))
+            print("=" * 70)
+            print(f"\n✅ 执行的技能: {', '.join(result['skills_executed'])}")
+            
+            # 显示技能执行结果（带角色标识）
+            print(f"\n🔧 {role.name} 的技能执行详情:")
+            for skill_result in result['skill_results']:
+                skill_id = skill_result['skill_id']
+                if 'result' in skill_result:
+                    if skill_result['result'].get('success'):
+                        print(f"  ✅ [{role.name}] {skill_id}: 执行成功")
+                    else:
+                        print(f"  ❌ [{role.name}] {skill_id}: 执行失败")
+                        if skill_result['result'].get('error'):
+                            print(f"     错误: {skill_result['result']['error']}")
+                elif 'error' in skill_result:
+                    print(f"  ❌ [{role.name}] {skill_id}: 错误 - {skill_result['error']}")
+            
+            # 显示最终响应（以角色身份呈现）
+            print(f"\n💬 {role.name} 的响应:")
+            print("-" * 70)
+            # 添加角色标识前缀
+            response_with_role = f"[{role.name}] {result['response']}"
+            print(response_with_role)
+            print("-" * 70)
+            
+            # 如果使用LLM，显示提示
+            if args.use_llm:
+                print(f"\n💡 提示: {role.name} 已使用LLM生成响应")
+            else:
+                print(f"\n💡 提示: 当前为轻量模式，使用 --use-llm 让 {role.name} 生成更详细的响应")
         
         return result
         
@@ -2227,7 +2256,8 @@ def cmd_agent_execute(args):
                 "  llm:\n"
                 "    provider: openai\n"
                 "    api_key: your-api-key\n"
-                "    model: gpt-4"
+                "    model: gpt-4\n"
+                "    base_url: https://api.openai.com/v1  # 可选，用于自定义端点"
             )
             print(error_msg, file=sys.stderr)
             raise WorkflowError("LLM client not configured but --use-llm flag is set")
@@ -2417,7 +2447,8 @@ def cmd_team_collaborate(args):
                 "  llm:\n"
                 "    provider: openai\n"
                 "    api_key: your-api-key\n"
-                "    model: gpt-4"
+                "    model: gpt-4\n"
+                "    base_url: https://api.openai.com/v1  # 可选，用于自定义端点"
             )
             print(error_msg, file=sys.stderr)
             raise WorkflowError("LLM client not configured but --use-llm flag is set")
@@ -2512,7 +2543,8 @@ def cmd_decompose_task(args):
                 "  llm:\n"
                 "    provider: openai\n"
                 "    api_key: your-api-key\n"
-                "    model: gpt-4"
+                "    model: gpt-4\n"
+                "    base_url: https://api.openai.com/v1  # 可选，用于自定义端点"
             )
             print(error_msg, file=sys.stderr)
             raise WorkflowError("LLM client not configured but --use-llm flag is set")
@@ -3386,7 +3418,8 @@ def cmd_wfauto(args):
                 "  llm:\n"
                 "    provider: openai\n"
                 "    api_key: your-api-key\n"
-                "    model: gpt-4"
+                "    model: gpt-4\n"
+                "    base_url: https://api.openai.com/v1  # 可选，用于自定义端点"
             )
             print(error_msg, file=sys.stderr)
             raise WorkflowError("LLM client not configured but --use-llm flag is set")

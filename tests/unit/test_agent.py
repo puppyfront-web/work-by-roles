@@ -77,7 +77,7 @@ class TestAgent:
         assert output_path.read_text() == "Test content"
     
     def test_agent_produce_output_document(self, workflow_engine, sample_role, temp_workspace):
-        """Test producing document output (should go to temp directory)."""
+        """Test producing document output (should go to outputs directory)."""
         agent = Agent(sample_role, workflow_engine)
         agent.prepare("Test goal")
         
@@ -85,8 +85,10 @@ class TestAgent:
         
         assert "test_doc.md" in agent.context.outputs
         output_path = Path(agent.context.outputs["test_doc.md"])
-        assert ".workflow/temp" in str(output_path)
+        # Documents should go to .workflow/outputs/{workflow_id}/{stage_id}/
+        assert ".workflow/outputs" in str(output_path)
         assert output_path.exists()
+        assert output_path.read_text() == "Document content"
     
     def test_agent_get_context_summary(self, workflow_engine, sample_role, sample_workflow_config):
         """Test getting context summary."""
