@@ -15,6 +15,11 @@ levels:
   1: Runs manual checks and reports results
   2: Automates gate execution and reporting
   3: Designs reusable validation suites and metrics
+skill_type: "procedural"
+side_effects:
+  - "none"
+deterministic: true
+testable: true
 ---
 # Quality Assurance & Validation
 

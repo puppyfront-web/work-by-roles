@@ -7,7 +7,7 @@ Following SOLID principles - modules are organized by responsibility.
 from .exceptions import ValidationError, WorkflowError, SecurityError
 
 # Enums
-from .enums import StageStatus, SkillErrorType, SkillWorkflowStepStatus
+from .enums import StageStatus, SkillErrorType, SkillWorkflowStepStatus, IntentType
 
 # Models
 from .models import (
@@ -42,6 +42,9 @@ from .team_manager import TeamManager
 from .quality_gates import QualityGateSystem
 from .workflow_engine import WorkflowEngine
 from .intent_router import IntentRouter
+from .intent_agent import IntentAgent
+from .bug_analysis_agent import BugAnalysisAgent
+from .intent_handler import IntentHandler, handle_user_input
 from .skill_workflow_executor import SkillWorkflowExecutor
 from .agent_orchestrator import AgentOrchestrator
 from .role_executor import RoleExecutor
@@ -67,6 +70,7 @@ __all__ = [
     'StageStatus',
     'SkillErrorType',
     'SkillWorkflowStepStatus',
+    'IntentType',
     # Models
     'Skill',
     'SkillExecution',
@@ -114,6 +118,10 @@ __all__ = [
     'QualityGateSystem',
     'WorkflowEngine',
     'IntentRouter',
+    'IntentAgent',
+    'BugAnalysisAgent',
+    'IntentHandler',
+    'handle_user_input',
     'Agent',
     'SkillInvoker',
     'PlaceholderSkillInvoker',

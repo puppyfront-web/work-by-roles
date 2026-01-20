@@ -15,6 +15,11 @@ levels:
   1: Writes unit tests for core logic
   2: Covers edge cases and negative paths
   3: Designs executable specifications and fixtures
+skill_type: "procedural"
+side_effects:
+  - "file_write"
+deterministic: false
+testable: true
 ---
 # Test Driven Development
 

@@ -15,6 +15,12 @@ levels:
   1: Defines core components and interactions
   2: Covers resiliency, extensibility, and validation flows
   3: Optimizes for scale, evolution, and governance
+
+skill_type: "cognitive"
+side_effects:
+  - "file_write"
+deterministic: false
+testable: true
 ---
 # System Architecture
 

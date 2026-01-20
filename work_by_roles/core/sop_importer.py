@@ -262,16 +262,40 @@ class SOPImporter:
                 yaml.dump(role_schema, f, default_flow_style=False, allow_unicode=True)
             generated_files["roles"] = role_file
         
-        # Generate skill_library.yaml
-        skill_file = output_dir / "skill_library.yaml"
-        if not skill_file.exists() or overwrite:
-            skill_schema = {
-                "schema_version": "1.0",
-                "skills": configs["skills"]
-            }
-            with skill_file.open('w', encoding='utf-8') as f:
-                yaml.dump(skill_schema, f, default_flow_style=False, allow_unicode=True)
-            generated_files["skills"] = skill_file
+        # Skills are now defined in Skill.md files (Anthropic format)
+        # Generate skills directory structure with Skill.md files
+        skills_dir = output_dir / "skills"
+        if not skills_dir.exists() or overwrite:
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            for skill in configs.get("skills", []):
+                skill_id = skill.get("id", "unknown")
+                skill_dir = skills_dir / skill_id
+                skill_dir.mkdir(exist_ok=True)
+                
+                # Generate Skill.md file
+                skill_md = skill_dir / "Skill.md"
+                frontmatter = {
+                    "name": skill.get("name", skill_id),
+                    "description": skill.get("description", ""),
+                    "id": skill_id,
+                    "category": skill.get("category", "general"),
+                    "dimensions": skill.get("dimensions", []),
+                    "levels": skill.get("levels", {}),
+                    "tools": skill.get("tools", []),
+                    "constraints": skill.get("constraints", []),
+                    "skill_type": skill.get("skill_type"),
+                    "side_effects": skill.get("side_effects", []),
+                    "deterministic": skill.get("deterministic", False),
+                    "testable": skill.get("testable", True),
+                }
+                
+                # Write Skill.md with YAML frontmatter
+                import yaml
+                frontmatter_yaml = yaml.dump(frontmatter, default_flow_style=False, allow_unicode=True)
+                content = f"---\n{frontmatter_yaml}---\n# {skill.get('name', skill_id)}\n\n{skill.get('description', '')}\n"
+                skill_md.write_text(content, encoding='utf-8')
+            
+            generated_files["skills"] = skills_dir
         
         # Generate workflow_schema.yaml
         workflow_file = output_dir / "workflow_schema.yaml"

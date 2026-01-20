@@ -242,3 +242,16 @@ This is a test skill for testing purposes.
         "workflow_schema": workflow_schema
     }
 
+
+# Import enhanced fixtures for automated testing
+from tests.fixtures.test_project_fixtures import (
+    clean_project,
+    fresh_project,
+    project_with_files,
+    project_with_template,
+    command_tester,
+    command_tester_clean,
+    ProjectTestHelper,
+    CommandTester
+)
+

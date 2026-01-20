@@ -118,6 +118,11 @@ class ConfigLoader:
             'input_schema': frontmatter_data.get('input_schema'),
             'output_schema': frontmatter_data.get('output_schema'),
             'error_handling': frontmatter_data.get('error_handling'),
+            # Add manifest fields
+            'skill_type': frontmatter_data.get('skill_type'),
+            'side_effects': frontmatter_data.get('side_effects', []),
+            'deterministic': frontmatter_data.get('deterministic', False),
+            'testable': frontmatter_data.get('testable', True),
             'metadata': {
                 'anthropic_format': True,
                 'markdown_content': markdown_content,
@@ -169,7 +174,10 @@ class ConfigLoader:
             if skill_file.is_dir():
                 skill_data = self._load_skill_directory(skill_file)
             else:
-                skill_data = self._load_cached(skill_file)
+                raise ValidationError(
+                    f"Skill library must be a directory with Skill.md files. "
+                    f"Found file: {skill_file}. Please use directory structure."
+                )
             if 'schema_version' not in skill_data:
                 errors.append(f"Missing schema_version in skill library {skill_file}")
             if 'skills' not in skill_data:

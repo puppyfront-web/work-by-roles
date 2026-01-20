@@ -404,18 +404,39 @@ class RoleManager:
     
     def _parse_role(self, role_data: Dict[str, Any]) -> Role:
         """Parse role from schema data"""
-        required_fields = ['id', 'name', 'description', 'skills', 'domain', 'responsibility']
+        # Required fields: id, name, description
+        # Optional fields: domain (defaults to 'general'), responsibility (defaults to description)
+        required_fields = ['id', 'name', 'description']
         for field in required_fields:
             if field not in role_data:
                 raise ValidationError(f"Missing required field '{field}' in role definition")
         
-        # 解析技能列表（新格式：直接引用技能ID）
+        # 解析技能列表
+        # 支持两种格式：
+        # 1. 'skills': 直接技能ID列表 (新格式)
+        # 2. 'required_skills': 技能要求列表，包含skill_id (旧格式，兼容)
         skills: List[str] = []
         if 'skills' in role_data:
             if isinstance(role_data['skills'], list):
-                skills = role_data['skills']
+                # 检查是否是技能ID列表还是技能要求对象列表
+                if len(role_data['skills']) > 0 and isinstance(role_data['skills'][0], dict):
+                    # 是技能要求对象列表，提取skill_id
+                    skills = [req.get('skill_id') for req in role_data['skills'] if req.get('skill_id')]
+                else:
+                    # 是技能ID列表
+                    skills = role_data['skills']
             else:
-                raise ValidationError(f"Field 'skills' must be a list of skill IDs")
+                raise ValidationError(f"Field 'skills' must be a list of skill IDs or skill requirements")
+        elif 'required_skills' in role_data:
+            # 兼容旧格式：从required_skills提取skill_id
+            required_skills = role_data['required_skills']
+            if isinstance(required_skills, list):
+                skills = [req.get('skill_id') if isinstance(req, dict) else req 
+                         for req in required_skills if (isinstance(req, dict) and req.get('skill_id')) or (isinstance(req, str))]
+        
+        # 如果既没有skills也没有required_skills，默认为空列表（某些角色可能不需要技能）
+        if 'skills' not in role_data and 'required_skills' not in role_data:
+            skills = []
         
         # 验证技能是否存在
         if skills and self.skill_library is not None:
@@ -428,9 +449,9 @@ class RoleManager:
                         context={"role_id": role_data['id']}
                     )
         
-        # 解析领域和职责
-        domain = role_data.get('domain', '')
-        responsibility = role_data.get('responsibility', '')
+        # 解析领域和职责（可选字段，提供默认值）
+        domain = role_data.get('domain', 'general')
+        responsibility = role_data.get('responsibility', role_data.get('description', ''))
         
         # Resolve variables in description and validation rules
         description = VariableResolver.resolve(role_data['description'], self.context)

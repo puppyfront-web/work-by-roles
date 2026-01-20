@@ -38,7 +38,7 @@ def copy_template_files(target: Path, template_name: str):
     temp_dir = workflow_dir / "temp"
     temp_dir.mkdir(exist_ok=True)
     
-    required_files = ["role_schema.yaml", "workflow_schema.yaml", "skill_library.yaml"]
+    required_files = ["role_schema.yaml", "workflow_schema.yaml"]
     for filename in required_files:
         src = template_dir / filename
         if src.exists():
@@ -115,7 +115,7 @@ To ensure project stability and follow best practices, adhere to these rules:
    - Do not perform implementation tasks while in the `requirements` or `architecture` stages.
    - If the current stage does not match the task, advise the user to run `python .workflow/workflow_cli.py start <stage> <role>`.
 4. **Quality Gates**: Ensure all quality gates and required outputs defined in `workflow_schema.yaml` are satisfied before attempting to complete a stage.
-5. **Skill Compliance**: Refer to `skill_library.yaml` for dimensions and tools associated with each skill required by your current role.
+5. **Skill Compliance**: Refer to Skill.md files in skills/ directory for dimensions and tools associated with each skill required by your current role.
 6. **Team Context**: When user mentions `@[team]` or `@team`, read `.workflow/TEAM_CONTEXT.md` for current team state and enforce role constraints.
    - When user uses `@[team]` with workflow automation requests (e.g., "run full workflow", "execute all stages", "wfauto"), execute `workflow wfauto` to automatically run all workflow stages sequentially.
 

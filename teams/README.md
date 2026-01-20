@@ -11,7 +11,9 @@ team-name/
 ├── README.md              # 团队配置说明文档
 ├── workflow_schema.yaml   # 工作流定义
 ├── role_schema.yaml       # 角色定义
-└── skill_library.yaml    # 技能库定义
+└── skills/                # 技能库目录（包含 Skill.md 文件）
+    ├── skill-name/
+    │   └── Skill.md       # 技能定义（Anthropic 格式）
 ```
 
 ## 使用方法
@@ -47,9 +49,10 @@ workflow team templates
 ### 4. 贡献新的团队配置
 
 1. 在 `teams/` 目录下创建新的子目录
-2. 添加完整的配置文件（workflow_schema.yaml, role_schema.yaml, skill_library.yaml）
-3. 添加 README.md 说明该配置的用途和特点
-4. 提交 Pull Request
+2. 添加完整的配置文件（workflow_schema.yaml, role_schema.yaml, skills/ 目录）
+3. 在 skills/ 目录下为每个技能创建 Skill.md 文件（Anthropic 格式）
+4. 添加 README.md 说明该配置的用途和特点
+5. 提交 Pull Request
 
 ## 配置案例说明
 

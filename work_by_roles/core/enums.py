@@ -32,3 +32,11 @@ class SkillWorkflowStepStatus(Enum):
     FAILED = "failed"
     SKIPPED = "skipped"
 
+
+class IntentType(Enum):
+    """User intent types"""
+    FEATURE_REQUEST = "feature_request"  # 需求实现
+    BUG_FIX = "bug_fix"                   # Bug修复
+    QUERY = "query"                       # 查询/询问
+    UNKNOWN = "unknown"                   # 未知意图
+

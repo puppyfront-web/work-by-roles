@@ -1283,12 +1283,25 @@ def cmd_list_roles(args):
             print(f"  允许的动作: {len(role.constraints.get('allowed_actions', []))} 个")
             print(f"  禁止的动作: {len(role.constraints.get('forbidden_actions', []))} 个")
             print(f"  所需技能:")
-            for req in role.required_skills:
-                skill = engine.role_manager.skill_library.get(req.skill_id) if engine.role_manager.skill_library else None
-                if skill:
-                    print(f"    - {skill.name} (等级≥{req.min_level})")
-                else:
-                    print(f"    - {req.skill_id}")
+            # Role模型使用skills字段（技能ID列表），不是required_skills
+            if hasattr(role, 'required_skills') and role.required_skills:
+                # 兼容旧格式
+                for req in role.required_skills:
+                    skill = engine.role_manager.skill_library.get(req.skill_id) if engine.role_manager.skill_library else None
+                    if skill:
+                        print(f"    - {skill.name} (等级≥{req.min_level})")
+                    else:
+                        print(f"    - {req.skill_id}")
+            elif hasattr(role, 'skills') and role.skills:
+                # 新格式：直接使用技能ID列表
+                for skill_id in role.skills:
+                    skill = engine.role_manager.skill_library.get(skill_id) if engine.role_manager.skill_library else None
+                    if skill:
+                        print(f"    - {skill.name}")
+                    else:
+                        print(f"    - {skill_id}")
+            else:
+                print("    - 无")
             
     except Exception as e:
         print(f"❌ 错误: {e}", file=sys.stderr)
@@ -1867,9 +1880,16 @@ def cmd_add_stage(args):
 
 
 def cmd_migrate_skills(args):
-    """Migrate skill_library.yaml to Anthropic Skill.md format"""
+    """Migrate skill_library.yaml to Anthropic Skill.md format
+    
+    Note: This command is deprecated. The system now uses Skill.md files exclusively.
+    skill_library.yaml files are no longer supported.
+    """
     import subprocess
     from pathlib import Path
+    
+    print("⚠️  Warning: skill_library.yaml is deprecated. The system now uses Skill.md files exclusively.", file=sys.stderr)
+    print("   This migration tool is provided for legacy support only.\n", file=sys.stderr)
     
     yaml_file = Path(args.yaml_file)
     output_dir = Path(args.output) if args.output else Path("skills")

@@ -211,7 +211,16 @@ class Agent:
         if stage.outputs:
             prompt.append("REQUIRED OUTPUTS:")
             for output in stage.outputs:
-                prompt.append(f"- {output.name} ({output.type})")
+                output_path = self._get_output_path(output.name, output.type, stage.id)
+                relative_path = output_path.relative_to(self.engine.workspace_path)
+                prompt.append(f"- {output.name} ({output.type}) -> {relative_path}")
+            prompt.append("")
+            prompt.append("CRITICAL: File Output Instructions:")
+            prompt.append("- For document/report outputs, use agent.produce_output(...)")
+            prompt.append("- Do NOT write files directly with tools")
+            prompt.append("- document/report files go to .workflow/outputs/{workflow_id}/{stage_id}/")
+            prompt.append("- code/test files go to workspace root")
+            prompt.append("- Example: agent.produce_output('STAGE1_REQUIREMENTS.md', content, 'document', 'requirements')")
             prompt.append("")
             
         # 6. Role-Specific Instructions

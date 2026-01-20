@@ -187,14 +187,14 @@ class Workflow:
         
         # 加载配置
         workflow_dir = workspace / ".workflow"
-        skill_file = workflow_dir / "skill_library.yaml"
+        skill_file = workflow_dir / "skills"  # Directory with Skill.md files
         roles_file = workflow_dir / "role_schema.yaml"
         workflow_file = workflow_dir / "workflow_schema.yaml"
         
-        if not all(f.exists() for f in [skill_file, roles_file, workflow_file]):
+        if not skill_file.is_dir() or not all(f.exists() for f in [roles_file, workflow_file]):
             raise RuntimeError(
-                f"配置文件缺失。请确保以下文件存在:\n"
-                f"  - {skill_file}\n"
+                f"配置文件缺失。请确保以下文件/目录存在:\n"
+                f"  - {skill_file} (目录，包含 Skill.md 文件)\n"
                 f"  - {roles_file}\n"
                 f"  - {workflow_file}"
             )

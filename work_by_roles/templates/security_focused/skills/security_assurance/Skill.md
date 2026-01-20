@@ -16,6 +16,12 @@ levels:
   1: Performs basic vulnerability scans
   2: Conducts threat modelling and security code reviews
   3: Designs secure architectures and leads response efforts
+
+skill_type: "procedural"
+side_effects:
+  - "none"
+deterministic: true
+testable: true
 ---
 # Security Assurance
 

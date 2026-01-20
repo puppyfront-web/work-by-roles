@@ -492,21 +492,40 @@ class WorkflowEngine:
         # Load workflow (workflow_data is already the full schema dict)
         self._load_workflow_from_data(workflow_data)
 
-    def load_skill_library(self, skill_file: Path) -> None:
-        """Load skill library definitions - Anthropic format only"""
+    def load_skill_library(self, skill_file: Path, shared_skills_dir: Optional[Path] = None) -> None:
+        """
+        Load skill library definitions - Anthropic format only
+        
+        Args:
+            skill_file: Path to team-specific skill directory
+            shared_skills_dir: Optional path to shared skills directory (loaded first)
+        """
+        loader = ConfigLoader(self.workspace_path)
+        
+        # Load shared skills first if provided
+        if shared_skills_dir and shared_skills_dir.exists() and shared_skills_dir.is_dir():
+            try:
+                shared_schema_data = loader._load_skill_directory(shared_skills_dir)
+                self.role_manager.load_skill_library(shared_schema_data, merge_with_existing=False)
+            except Exception as e:
+                warnings.warn(f"Failed to load shared skills from {shared_skills_dir}: {e}")
+        
+        # Load team-specific skills (will override shared skills if duplicates)
         if not skill_file.exists():
+            if shared_skills_dir and shared_skills_dir.exists():
+                # If shared skills loaded, continue without team skills
+                return
             raise ValidationError(f"Skill file/directory not found: {skill_file}")
         
         # Only support directory structure with Skill.md files
         if skill_file.is_dir():
-            loader = ConfigLoader(self.workspace_path)
             schema_data = loader._load_skill_directory(skill_file)
+            self.role_manager.load_skill_library(schema_data, merge_with_existing=True)
         else:
             raise ValidationError(
                 f"Skills must be in directory format with Skill.md files. "
                 f"Found file: {skill_file}. Please migrate to directory structure."
             )
-        self.role_manager.load_skill_library(schema_data)
     
     def load_roles(self, roles_file: Path) -> None:
         """Load role definitions (backward compatible)"""
@@ -2148,7 +2167,16 @@ class Agent:
         if stage.outputs:
             prompt.append("REQUIRED OUTPUTS:")
             for output in stage.outputs:
-                prompt.append(f"- {output.name} ({output.type})")
+                output_path = self._get_output_path(output.name, output.type, stage.id)
+                relative_path = output_path.relative_to(self.engine.workspace_path)
+                prompt.append(f"- {output.name} ({output.type}) -> {relative_path}")
+            prompt.append("")
+            prompt.append("CRITICAL: File Output Instructions:")
+            prompt.append("- For document/report outputs, use agent.produce_output(...)")
+            prompt.append("- Do NOT write files directly with tools")
+            prompt.append("- document/report files go to .workflow/outputs/{workflow_id}/{stage_id}/")
+            prompt.append("- code/test files go to workspace root")
+            prompt.append("- Example: agent.produce_output('STAGE1_REQUIREMENTS.md', content, 'document', 'requirements')")
             prompt.append("")
             
         # 6. Role-Specific Instructions

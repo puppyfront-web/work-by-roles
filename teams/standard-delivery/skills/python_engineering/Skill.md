@@ -18,6 +18,11 @@ levels:
   1: Writes typed functions and basic tests
   2: Designs modules with dataclasses and robust errors
   3: Delivers frameworks with strong contracts and tooling
+skill_type: "procedural"
+side_effects:
+  - "file_write"
+deterministic: false
+testable: true
 metadata:
   execution_mode: "implementation"
   execution_tools:

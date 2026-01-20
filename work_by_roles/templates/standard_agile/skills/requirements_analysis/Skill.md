@@ -16,6 +16,12 @@ levels:
   1: Understands basic templates and can capture user needs
   2: Can model flows, risks, and non-functional needs
   3: Leads complex discovery, reconciles conflicting stakeholders
+
+skill_type: "cognitive"
+side_effects:
+  - "file_write"
+deterministic: false
+testable: true
 ---
 # Requirements Analysis
 

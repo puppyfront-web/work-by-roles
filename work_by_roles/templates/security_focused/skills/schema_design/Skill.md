@@ -16,6 +16,12 @@ levels:
   1: Designs simple schemas with required fields
   2: Adds validation, versioning, and compatibility rules
   3: Designs evolvable DSLs with backward compatibility
+
+skill_type: "hybrid"
+side_effects:
+  - "file_write"
+deterministic: false
+testable: true
 ---
 # Schema and DSL Design
 
