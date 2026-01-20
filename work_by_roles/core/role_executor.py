@@ -109,15 +109,35 @@ class RoleExecutor:
                 execution_mode_info=execution_mode_info
             )
         
-        # 2. 创建Agent
+        # 2. Apply decision policy (P1 optimization)
+        decision_result = self._apply_decision_policy(role, requirement)
+        if decision_result.get('action') == 'reject':
+            return {
+                "success": False,
+                "error": decision_result.get('reason', 'Task rejected by role decision policy'),
+                "decision": decision_result
+            }
+        elif decision_result.get('action') == 'ask_clarification':
+            return {
+                "success": False,
+                "error": "Task requires clarification",
+                "clarification_needed": True,
+                "questions": decision_result.get('questions', []),
+                "decision": decision_result
+            }
+        
+        # 3. 创建Agent
         agent = Agent(role, self.engine, self.skill_selector)
         agent.prepare(requirement, inputs or {})
         
-        # 3. 构建完整上下文
+        # 4. 构建完整上下文
         full_context = self._build_context(role, requirement, agent.context, inputs or {})
         
-        # 4. 根据需求选择合适的技能
+        # 5. 根据需求选择合适的技能（应用 Role Contract）
         selected_skills = self._select_skills_for_requirement(role, requirement, full_context)
+        
+        # Filter skills based on Role Contract (can_skills/cannot_skills)
+        selected_skills = self._filter_skills_by_contract(role, selected_skills)
         
         # 显示技能选择结果（沉浸式）
         if immersive_display and selected_skills:
@@ -457,5 +477,92 @@ class RoleExecutor:
             # 输出文件生成失败不应该阻止角色执行完成
             import warnings
             warnings.warn(f"Failed to generate output files for role {role_id}: {e}")
+    
+    def _apply_decision_policy(self, role: Role, requirement: str) -> Dict[str, Any]:
+        """
+        Apply role decision policy (P1 optimization).
+        
+        Args:
+            role: Role instance
+            requirement: Task requirement
+        
+        Returns:
+            Decision result dict with 'action' and optional 'reason'/'questions'
+        """
+        policy = role.decision_policy
+        
+        # Check if task is ambiguous or out of scope
+        # This is a simple implementation - can be enhanced with LLM
+        task_lower = requirement.lower()
+        role_desc_lower = role.description.lower()
+        resp_lower = role.responsibility.lower()
+        
+        # Simple heuristic: check if requirement matches role domain/responsibility
+        matches_domain = any(keyword in task_lower for keyword in role.domain.lower().split())
+        matches_responsibility = any(keyword in resp_lower for keyword in task_lower.split()[:5])
+        
+        is_out_of_scope = not matches_domain and not matches_responsibility
+        
+        # Apply policy
+        if is_out_of_scope:
+            policy_action = policy.get('on_out_of_scope', 'reject')
+            if policy_action == 'reject':
+                return {
+                    "action": "reject",
+                    "reason": f"Task is out of scope for role '{role.name}' (domain: {role.domain})"
+                }
+            elif policy_action == 'ask_clarification':
+                return {
+                    "action": "ask_clarification",
+                    "questions": [
+                        f"Is this task related to {role.domain}?",
+                        f"Can you clarify how this relates to {role.responsibility}?"
+                    ]
+                }
+        
+        # Check for ambiguous tasks
+        if len(requirement.split()) < 5:  # Very short requirements might be ambiguous
+            policy_action = policy.get('on_ambiguous_task', 'ask_clarification')
+            if policy_action == 'ask_clarification':
+                return {
+                    "action": "ask_clarification",
+                    "questions": [
+                        "Can you provide more details about the task?",
+                        "What specific outcome are you looking for?"
+                    ]
+                }
+        
+        return {"action": "accept"}
+    
+    def _filter_skills_by_contract(self, role: Role, skills: List[str]) -> List[str]:
+        """
+        Filter skills based on Role Contract (can_skills/cannot_skills).
+        
+        Args:
+            role: Role instance
+            skills: List of skill IDs to filter
+        
+        Returns:
+            Filtered list of skill IDs
+        """
+        filtered = []
+        
+        for skill_id in skills:
+            # Check cannot_skills (explicitly forbidden)
+            if skill_id in role.cannot_skills:
+                continue
+            
+            # Check can_skills (if specified, only those are allowed)
+            if role.can_skills:
+                if skill_id not in role.can_skills:
+                    continue
+            
+            # Check standard skills list (if can_skills not specified)
+            elif skill_id not in role.skills:
+                continue
+            
+            filtered.append(skill_id)
+        
+        return filtered
 
 

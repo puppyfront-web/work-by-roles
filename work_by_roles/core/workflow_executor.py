@@ -3,21 +3,28 @@ Workflow executor for executing workflow stages.
 Following Single Responsibility Principle - handles workflow stage execution only.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Any, TYPE_CHECKING
 
 from .exceptions import ValidationError, WorkflowError
 from .enums import StageStatus
 from .models import Workflow, Stage, ExecutionState
 from .role_manager import RoleManager
 
+if TYPE_CHECKING:
+    from .workflow_events import EventLogger, WorkflowEvent
+else:
+    # Import for runtime use
+    from .workflow_events import WorkflowEvent
+
 
 class WorkflowExecutor:
     """Executes workflow stages"""
     
-    def __init__(self, workflow: Workflow, role_manager: RoleManager):
+    def __init__(self, workflow: Workflow, role_manager: RoleManager, event_logger: Optional['EventLogger'] = None):
         self.workflow = workflow
         self.role_manager = role_manager
         self.state = ExecutionState()
+        self.event_logger = event_logger
         self._validate_workflow()
     
     def _validate_workflow(self) -> None:
@@ -113,6 +120,15 @@ class WorkflowExecutor:
         self.state.current_stage = stage_id
         self.state.current_role = role_id
         self.state.stage_status[stage_id] = StageStatus.IN_PROGRESS
+        
+        # Log stage transition event
+        if self.event_logger:
+            self.event_logger.log_stage_transition(
+                workflow_id=self.workflow.id,
+                stage_id=stage_id,
+                role_id=role_id,
+                status="in_progress"
+            )
     
     def complete_stage(self, stage_id: str) -> None:
         """Mark stage as completed"""
@@ -121,6 +137,15 @@ class WorkflowExecutor:
         
         self.state.stage_status[stage_id] = StageStatus.COMPLETED
         self.state.completed_stages.add(stage_id)
+        
+        # Log stage completion event
+        if self.event_logger:
+            self.event_logger.log_stage_transition(
+                workflow_id=self.workflow.id,
+                stage_id=stage_id,
+                role_id=self.state.current_role or "",
+                status="completed"
+            )
         
         # Clear current stage if it's the one being completed
         if self.state.current_stage == stage_id:
@@ -144,4 +169,66 @@ class WorkflowExecutor:
     def reset_state(self) -> None:
         """Reset execution state to initial state (all stages reset to PENDING)"""
         self.state = ExecutionState()
+    
+    def replay_from_events(self, events: List['WorkflowEvent']) -> None:
+        """
+        Replay workflow from event log (P1 optimization).
+        
+        Args:
+            events: List of WorkflowEvent objects to replay
+        """
+        from .workflow_events import WorkflowEvent
+        
+        # Reset state
+        self.reset_state()
+        
+        # Replay events in order
+        for event in sorted(events, key=lambda e: e.timestamp):
+            if event.stage:
+                if event.status == "in_progress":
+                    if event.stage not in self.state.stage_status:
+                        self.state.current_stage = event.stage
+                        self.state.current_role = event.role
+                        self.state.stage_status[event.stage] = StageStatus.IN_PROGRESS
+                elif event.status == "completed":
+                    self.state.stage_status[event.stage] = StageStatus.COMPLETED
+                    self.state.completed_stages.add(event.stage)
+                    if self.state.current_stage == event.stage:
+                        self.state.current_stage = None
+                        self.state.current_role = None
+    
+    def dry_run(self, stage_id: str) -> Dict[str, Any]:
+        """
+        Dry-run a stage without actually executing skills (P1 optimization).
+        
+        Args:
+            stage_id: Stage ID to dry-run
+        
+        Returns:
+            Dry-run result dictionary
+        """
+        stage = self._get_stage_by_id(stage_id)
+        if not stage:
+            raise WorkflowError(f"Stage '{stage_id}' not found")
+        
+        # Check if transition is allowed
+        can_transition, errors = self.can_transition_to(stage_id)
+        
+        result = {
+            "stage_id": stage_id,
+            "stage_name": stage.name,
+            "can_transition": can_transition,
+            "errors": errors,
+            "prerequisites_met": all(
+                prereq in self.state.completed_stages 
+                for prereq in stage.prerequisites
+            ),
+            "current_state": {
+                "current_stage": self.state.current_stage,
+                "completed_stages": list(self.state.completed_stages),
+                "stage_status": {k: v.value for k, v in self.state.stage_status.items()}
+            }
+        }
+        
+        return result
 

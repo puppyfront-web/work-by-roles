@@ -35,6 +35,11 @@ class Skill:
     constraints: List[str] = field(default_factory=list)
     error_handling: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
+    # Skill Manifest fields (P0 optimization)
+    skill_type: Optional[str] = None  # "cognitive" | "procedural" | "hybrid"
+    side_effects: List[str] = field(default_factory=list)  # ["file_write", "api_call", "none"]
+    deterministic: bool = False  # Whether the skill is idempotent
+    testable: bool = True  # Whether the skill can be tested
 
 
 @dataclass
@@ -280,6 +285,10 @@ class Role:
     constraints: Dict[str, List[str]] = field(default_factory=dict)
     validation_rules: List[str] = field(default_factory=list)
     instruction_template: str = ""  # Role-specific base prompt for Agent
+    # Role Contract fields (P1 optimization)
+    can_skills: List[str] = field(default_factory=list)  # Explicitly allowed skills
+    cannot_skills: List[str] = field(default_factory=list)  # Explicitly forbidden skills
+    decision_policy: Dict[str, str] = field(default_factory=dict)  # Decision policies (on_ambiguous_task, on_out_of_scope, on_quality_issue)
     
     def can_handle_task(self, task_description: str, role_manager: 'RoleManager') -> bool:
         """

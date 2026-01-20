@@ -153,6 +153,19 @@ class RoleManager:
             if 'metadata' in skill_data:
                 metadata = skill_data['metadata']
 
+            # Parse Skill Manifest fields (P0 optimization)
+            skill_type = skill_data.get('skill_type')  # "cognitive" | "procedural" | "hybrid"
+            if skill_type and skill_type not in ['cognitive', 'procedural', 'hybrid']:
+                warnings.warn(f"Invalid skill_type '{skill_type}' for skill '{skill_id}'. Must be one of: cognitive, procedural, hybrid")
+                skill_type = None
+            
+            side_effects = skill_data.get('side_effects', [])
+            if not isinstance(side_effects, list):
+                side_effects = []
+            
+            deterministic = skill_data.get('deterministic', False)
+            testable = skill_data.get('testable', True)
+
             skill = Skill(
                 id=skill_id,
                 name=skill_data['name'],
@@ -166,6 +179,10 @@ class RoleManager:
                 output_schema=output_schema,
                 error_handling=error_handling,
                 metadata=metadata,
+                skill_type=skill_type,
+                side_effects=side_effects,
+                deterministic=deterministic,
+                testable=testable,
             )
             library[skill_id] = skill
 
@@ -426,6 +443,25 @@ class RoleManager:
         constraints = role_data.get('constraints', {})
         if not isinstance(constraints, dict):
             constraints = {}
+        
+        # Parse Role Contract fields (P1 optimization)
+        can_skills = role_data.get('can_skills', [])
+        if not isinstance(can_skills, list):
+            can_skills = []
+        
+        cannot_skills = role_data.get('cannot_skills', [])
+        if not isinstance(cannot_skills, list):
+            cannot_skills = []
+        
+        decision_policy = role_data.get('decision_policy', {})
+        if not isinstance(decision_policy, dict):
+            decision_policy = {}
+        
+        # Validate decision_policy keys
+        valid_policy_keys = ['on_ambiguous_task', 'on_out_of_scope', 'on_quality_issue']
+        for key in decision_policy:
+            if key not in valid_policy_keys:
+                warnings.warn(f"Unknown decision_policy key '{key}' for role '{role_data['id']}'. Valid keys: {valid_policy_keys}")
 
         return Role(
             id=role_data['id'],
@@ -437,7 +473,10 @@ class RoleManager:
             extends=role_data.get('extends'),
             constraints=constraints,
             validation_rules=validation_rules,
-            instruction_template=role_data.get('instruction_template', "")
+            instruction_template=role_data.get('instruction_template', ""),
+            can_skills=can_skills,
+            cannot_skills=cannot_skills,
+            decision_policy=decision_policy
         )
 
     def _resolve_skill_requirements(self, requirements: List[SkillRequirement], role_id: str) -> List[SkillRequirement]:
@@ -523,7 +562,15 @@ class RoleManager:
         allowed = role.constraints.get('allowed_actions', [])
         forbidden = role.constraints.get('forbidden_actions', [])
         
-        # Check direct role
+        # Check Role Contract can/cannot skills (P1 optimization)
+        # If action is a skill ID, check can_skills and cannot_skills
+        if action in role.cannot_skills:
+            return False
+        if role.can_skills and action not in role.can_skills:
+            # If can_skills is specified and non-empty, only those skills are allowed
+            return False
+        
+        # Check direct role constraints
         if action in forbidden:
             return False
         if action in allowed:
@@ -534,10 +581,54 @@ class RoleManager:
         for parent_id in inherited_roles:
             parent_role = self.roles.get(parent_id)
             if parent_role:
+                # Check parent's cannot_skills
+                if action in parent_role.cannot_skills:
+                    return False
+                # Check parent's can_skills
+                if parent_role.can_skills and action not in parent_role.can_skills:
+                    return False
+                # Check parent's constraints
                 if action in parent_role.constraints.get('forbidden_actions', []):
                     return False
                 if action in parent_role.constraints.get('allowed_actions', []):
                     return True
         
         return False
+    
+    def validate_skill_for_role(self, role_id: str, skill_id: str) -> bool:
+        """
+        Validate if a skill can be used by a role (P1 optimization).
+        
+        This method checks the Role Contract (can_skills/cannot_skills)
+        in addition to the standard skill list.
+        """
+        if role_id not in self.roles:
+            return False
+        
+        role = self.roles[role_id]
+        
+        # Check cannot_skills first (explicitly forbidden)
+        if skill_id in role.cannot_skills:
+            return False
+        
+        # Check can_skills (if specified, only those skills are allowed)
+        if role.can_skills:
+            if skill_id not in role.can_skills:
+                return False
+        
+        # Check standard skills list (if can_skills not specified)
+        elif skill_id not in role.skills:
+            return False
+        
+        # Check inherited roles
+        inherited_roles = self.role_hierarchy.get(role_id, set())
+        for parent_id in inherited_roles:
+            parent_role = self.roles.get(parent_id)
+            if parent_role:
+                if skill_id in parent_role.cannot_skills:
+                    return False
+                if parent_role.can_skills and skill_id not in parent_role.can_skills:
+                    return False
+        
+        return True
 

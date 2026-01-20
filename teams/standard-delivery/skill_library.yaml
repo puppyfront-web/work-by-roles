@@ -6,6 +6,11 @@ skills:
   - id: "requirements_analysis"
     name: "Requirements Analysis"
     description: "Ability to elicit, structure, and validate requirements"
+    skill_type: "cognitive"
+    side_effects:
+      - "file_write"
+    deterministic: false
+    testable: true
     dimensions:
       - "elicitation"
       - "scope_alignment"
@@ -24,6 +29,11 @@ skills:
   - id: "schema_design"
     name: "Schema and DSL Design"
     description: "Design structured schemas and DSLs with validation rules"
+    skill_type: "hybrid"
+    side_effects:
+      - "file_write"
+    deterministic: false
+    testable: true
     dimensions:
       - "structure_modelling"
       - "validation_rules"

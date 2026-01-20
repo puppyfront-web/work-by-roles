@@ -2859,18 +2859,254 @@ def cmd_benchmark_skill(args):
             print("⚠️ 测试用例文件为空", file=sys.stderr)
             sys.exit(1)
         
-        results = benchmark.benchmark_skill(args.skill_id, test_cases)
-        
-        if args.report:
-            report = benchmark.generate_report(results)
-            print(report)
-        else:
-            print(f"\n基准测试结果: {args.skill_id}")
+        # Check if multi-model comparison requested (P2 optimization)
+        if args.models:
+            from work_by_roles.core.skill_benchmark import SkillBenchmark
+            benchmark = SkillBenchmark(engine, orchestrator)
+            results = benchmark.benchmark_with_models(args.skill_id, args.models, test_cases)
+            print(f"\n多模型基准测试结果: {args.skill_id}")
             print("=" * 60)
-            print(f"总测试数: {results['total_tests']}")
-            print(f"成功测试数: {results['successful_tests']}")
-            print(f"成功率: {results['success_rate']:.2%}")
-            print(f"平均执行时间: {results['avg_execution_time']:.2f}s")
+            for model_name, model_results in results['models'].items():
+                if 'error' in model_results:
+                    print(f"{model_name}: ❌ {model_results['error']}")
+                else:
+                    print(f"{model_name}:")
+                    print(f"  成功率: {model_results['success_rate']:.2%}")
+                    print(f"  平均执行时间: {model_results['avg_execution_time']:.2f}s")
+            if results['best_model']:
+                print(f"\n最佳模型: {results['best_model']}")
+        else:
+            results = benchmark.benchmark_skill(args.skill_id, test_cases)
+            
+            if args.report:
+                report = benchmark.generate_report(results)
+                print(report)
+            else:
+                print(f"\n基准测试结果: {args.skill_id}")
+                print("=" * 60)
+                print(f"总测试数: {results['total_tests']}")
+                print(f"成功测试数: {results['successful_tests']}")
+                print(f"成功率: {results['success_rate']:.2%}")
+                print(f"平均执行时间: {results['avg_execution_time']:.2f}s")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def cmd_skill_test(args):
+    """Test a skill with input and expected output/schema"""
+    try:
+        engine, _, _ = _init_engine(args)
+        
+        if not hasattr(engine, 'create_orchestrator'):
+            from work_by_roles.core.agent_orchestrator import AgentOrchestrator
+            from work_by_roles.core.skill_benchmark import SkillBenchmark
+            orchestrator = AgentOrchestrator(engine)
+        else:
+            orchestrator = engine.create_orchestrator()
+            from work_by_roles.core.skill_benchmark import SkillBenchmark
+        
+        benchmark = SkillBenchmark(engine, orchestrator)
+        
+        # Load input data
+        input_data = {}
+        if args.input:
+            input_file = Path(args.input)
+            if input_file.exists():
+                import json
+                import yaml
+                with input_file.open('r', encoding='utf-8') as f:
+                    if input_file.suffix in ['.yaml', '.yml']:
+                        input_data = yaml.safe_load(f) or {}
+                    else:
+                        input_data = json.load(f)
+            else:
+                print(f"⚠️ 输入文件不存在: {input_file}", file=sys.stderr)
+        
+        # Load expected output if provided
+        expected_output = None
+        if args.expect:
+            expect_file = Path(args.expect)
+            if expect_file.exists():
+                import json
+                import yaml
+                with expect_file.open('r', encoding='utf-8') as f:
+                    if expect_file.suffix in ['.yaml', '.yml']:
+                        expected_output = yaml.safe_load(f)
+                    else:
+                        expected_output = json.load(f)
+            else:
+                print(f"⚠️ 期望输出文件不存在: {expect_file}", file=sys.stderr)
+        
+        # Load expected schema if provided
+        expected_schema = None
+        if args.schema:
+            schema_file = Path(args.schema)
+            if schema_file.exists():
+                import json
+                import yaml
+                with schema_file.open('r', encoding='utf-8') as f:
+                    if schema_file.suffix in ['.yaml', '.yml']:
+                        expected_schema = yaml.safe_load(f)
+                    else:
+                        expected_schema = json.load(f)
+            else:
+                print(f"⚠️ Schema 文件不存在: {schema_file}", file=sys.stderr)
+        
+        # Determine snapshot file path
+        snapshot_file = None
+        if args.snapshot:
+            snapshot_file = Path(args.snapshot)
+        
+        # Run test
+        result = benchmark.test_skill(
+            args.skill_id,
+            input_data,
+            expected_output,
+            expected_schema,
+            snapshot_file
+        )
+        
+        # Print results
+        print(f"\n技能测试结果: {args.skill_id}")
+        print("=" * 60)
+        print(f"执行成功: {'✅' if result['success'] else '❌'}")
+        print(f"执行时间: {result['execution_time']:.2f}s")
+        
+        if 'error' in result:
+            print(f"错误: {result['error']}")
+        
+        validation = result.get('validation', {})
+        if validation:
+            print(f"\n验证结果:")
+            print(f"  整体有效: {'✅' if validation['valid'] else '❌'}")
+            if 'snapshot_match' in validation:
+                print(f"  Snapshot 匹配: {'✅' if validation['snapshot_match'] else '❌'}")
+            if 'schema_valid' in validation:
+                print(f"  Schema 验证: {'✅' if validation['schema_valid'] else '❌'}")
+            
+            if validation.get('differences'):
+                print(f"\n差异:")
+                for diff in validation['differences']:
+                    print(f"  - {diff}")
+            
+            if validation.get('schema_errors'):
+                print(f"\nSchema 错误:")
+                for error in validation['schema_errors']:
+                    print(f"  - {error}")
+        
+        if result.get('snapshot_saved'):
+            print(f"\n✅ Snapshot 已保存到: {snapshot_file}")
+        
+        if not result['success']:
+            sys.exit(1)
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def cmd_replay_workflow(args):
+    """Replay workflow from event log"""
+    try:
+        engine, _, _ = _init_engine(args)
+        
+        if not engine.executor:
+            print("❌ 工作流未初始化", file=sys.stderr)
+            sys.exit(1)
+        
+        # Load event log
+        event_log_file = Path(args.event_log)
+        if not event_log_file.exists():
+            print(f"❌ 事件日志文件不存在: {event_log_file}", file=sys.stderr)
+            sys.exit(1)
+        
+        from work_by_roles.core.workflow_events import WorkflowEvent
+        import json
+        import yaml
+        
+        with event_log_file.open('r', encoding='utf-8') as f:
+            if event_log_file.suffix in ['.yaml', '.yml']:
+                events_data = yaml.safe_load(f)
+            else:
+                events_data = json.load(f)
+        
+        events = [WorkflowEvent.from_dict(e) for e in events_data]
+        
+        # Replay events
+        engine.executor.replay_from_events(events)
+        
+        print(f"✅ 已回放 {len(events)} 个事件")
+        print(f"当前阶段: {engine.executor.state.current_stage}")
+        print(f"已完成阶段: {', '.join(engine.executor.state.completed_stages)}")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def cmd_dry_run_stage(args):
+    """Dry-run a stage without executing skills"""
+    try:
+        engine, _, _ = _init_engine(args)
+        
+        if not engine.executor:
+            print("❌ 工作流未初始化", file=sys.stderr)
+            sys.exit(1)
+        
+        result = engine.executor.dry_run(args.stage_id)
+        
+        print(f"\n阶段干运行结果: {result['stage_name']}")
+        print("=" * 60)
+        print(f"可以转换: {'✅' if result['can_transition'] else '❌'}")
+        print(f"前提条件满足: {'✅' if result['prerequisites_met'] else '❌'}")
+        
+        if result['errors']:
+            print(f"\n错误:")
+            for error in result['errors']:
+                print(f"  - {error}")
+        
+        print(f"\n当前状态:")
+        print(f"  当前阶段: {result['current_state']['current_stage'] or 'None'}")
+        print(f"  已完成阶段: {', '.join(result['current_state']['completed_stages']) or 'None'}")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def cmd_import_sop(args):
+    """Import SOP document and generate configurations"""
+    try:
+        from work_by_roles.core.sop_importer import SOPImporter
+        
+        sop_file = Path(args.sop_file)
+        if not sop_file.exists():
+            print(f"❌ SOP 文件不存在: {sop_file}", file=sys.stderr)
+            sys.exit(1)
+        
+        output_dir = Path(args.output) if args.output else Path.cwd() / ".workflow"
+        
+        importer = SOPImporter()
+        generated_files = importer.generate_config_files(
+            sop_file,
+            output_dir,
+            overwrite=args.overwrite
+        )
+        
+        print(f"\n✅ SOP 导入完成")
+        print("=" * 60)
+        for config_type, file_path in generated_files.items():
+            print(f"  {config_type}: {file_path}")
         
     except Exception as e:
         print(f"❌ 错误: {e}", file=sys.stderr)
@@ -3968,7 +4204,42 @@ def main():
     benchmark_skill_parser.add_argument("skill_id", help="技能 ID")
     benchmark_skill_parser.add_argument("--test-cases", required=True, help="测试用例 YAML 文件路径")
     benchmark_skill_parser.add_argument("--report", action="store_true", help="生成详细报告")
+    benchmark_skill_parser.add_argument("--models", nargs="+", help="多模型对比（P2优化）")
     benchmark_skill_parser.set_defaults(func=cmd_benchmark_skill)
+    
+    # import-sop 命令 (P2 optimization)
+    import_sop_parser = subparsers.add_parser(
+        "import-sop", help="从 SOP 文档导入并生成 roles/skills/workflow 配置"
+    )
+    import_sop_parser.add_argument("sop_file", help="SOP 文档路径 (Markdown)")
+    import_sop_parser.add_argument("--output", "-o", help="输出目录（默认: .workflow/）")
+    import_sop_parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的配置文件")
+    import_sop_parser.set_defaults(func=cmd_import_sop)
+    
+    # skill-test 命令 (P0 optimization)
+    skill_test_parser = subparsers.add_parser(
+        "skill-test", help="测试单个技能（支持 snapshot 对比和 schema 校验）"
+    )
+    skill_test_parser.add_argument("skill_id", help="技能 ID")
+    skill_test_parser.add_argument("--input", "-i", help="输入数据文件路径 (JSON/YAML)")
+    skill_test_parser.add_argument("--expect", "-e", help="期望输出文件路径 (JSON/YAML，用于 snapshot 对比)")
+    skill_test_parser.add_argument("--schema", "-s", help="期望 Schema 文件路径 (JSON/YAML，用于 schema 校验)")
+    skill_test_parser.add_argument("--snapshot", help="Snapshot 文件路径（如果提供，会保存/加载 snapshot）")
+    skill_test_parser.set_defaults(func=cmd_skill_test)
+    
+    # workflow replay 命令 (P1 optimization)
+    replay_parser = subparsers.add_parser(
+        "replay", help="从事件日志回放工作流"
+    )
+    replay_parser.add_argument("event_log", help="事件日志文件路径 (JSON/YAML)")
+    replay_parser.set_defaults(func=cmd_replay_workflow)
+    
+    # workflow dry-run 命令 (P1 optimization)
+    dry_run_parser = subparsers.add_parser(
+        "dry-run", help="干运行阶段（模拟执行，不实际调用技能）"
+    )
+    dry_run_parser.add_argument("stage_id", help="阶段 ID")
+    dry_run_parser.set_defaults(func=cmd_dry_run_stage)
 
     # list-stages 命令
     list_stages_parser = subparsers.add_parser("list-stages", help="列出所有阶段")

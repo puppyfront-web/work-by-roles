@@ -1,5 +1,24 @@
 schema_version: "1.0"
 roles:
+  # Built-in Clarifier Role (P1 optimization)
+  - id: "clarifier"
+    name: "Clarifier"
+    description: "Clarifies ambiguous tasks and helps route them to the right role"
+    domain: "general"
+    responsibility: "Task clarification and routing"
+    skills: []
+    can_skills:
+      - "requirements_analysis"
+    decision_policy:
+      on_ambiguous_task: "ask_clarification"
+      on_out_of_scope: "ask_clarification"
+    constraints:
+      allowed_actions:
+        - "ask_questions"
+        - "clarify_requirements"
+      forbidden_actions:
+        - "execute_tasks"
+  
   - id: "product_analyst"
     name: "Product Analyst"
     description: "Defines requirements and scope"

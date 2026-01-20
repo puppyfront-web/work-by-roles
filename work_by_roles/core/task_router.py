@@ -69,19 +69,40 @@ class TaskRouter:
             task.status = "accepted"
             task.assigned_role = target_role_id
         else:
-            # 角色拒绝任务，不做任何动作，只反馈
-            suggested_role = self._suggest_alternative_role(task, role)
-            assignment = TaskAssignment(
-                task_id=task.id,
-                assigned_role=target_role_id,
-                status="rejected",
-                feedback=feedback or "Task not suitable for this role",
-                suggested_role=suggested_role
-            )
+            # 角色拒绝任务，尝试澄清或建议替代角色
+            # Check if multiple roles rejected (P1 optimization: Clarifier Role)
+            rejected_count = sum(1 for a in self.task_history if a.task_id == task.id and a.status == "rejected")
+            
+            if rejected_count >= 2:
+                # Multiple roles rejected, trigger clarifier
+                clarifier_result = self._trigger_clarifier(task)
+                if clarifier_result:
+                    assignment = clarifier_result
+                else:
+                    # Fallback to suggestion
+                    suggested_role = self._suggest_alternative_role(task, role)
+                    assignment = TaskAssignment(
+                        task_id=task.id,
+                        assigned_role=target_role_id,
+                        status="rejected",
+                        feedback=feedback or "Task not suitable for this role",
+                        suggested_role=suggested_role
+                    )
+            else:
+                # Single rejection, suggest alternative
+                suggested_role = self._suggest_alternative_role(task, role)
+                assignment = TaskAssignment(
+                    task_id=task.id,
+                    assigned_role=target_role_id,
+                    status="rejected",
+                    feedback=feedback or "Task not suitable for this role",
+                    suggested_role=suggested_role
+                )
+            
             task.status = "rejected"
             task.rejection_reason = feedback
-            if suggested_role:
-                task.reassigned_to = suggested_role
+            if assignment.suggested_role:
+                task.reassigned_to = assignment.suggested_role
         
         self.task_history.append(assignment)
         return assignment
@@ -177,4 +198,37 @@ class TaskRouter:
         
         rejected = sum(1 for a in role_assignments if a.status == "rejected")
         return rejected / len(role_assignments)
+    
+    def _trigger_clarifier(self, task: Task) -> Optional[TaskAssignment]:
+        """
+        Trigger clarifier role when multiple roles reject a task (P1 optimization).
+        
+        Args:
+            task: Task that was rejected
+        
+        Returns:
+            TaskAssignment from clarifier, or None if clarifier not available
+        """
+        # Check if clarifier role exists
+        clarifier_role = self.role_manager.get_role("clarifier")
+        if not clarifier_role:
+            return None
+        
+        # Clarifier analyzes the task and asks clarifying questions
+        # This is a simplified implementation - can be enhanced with LLM
+        questions = [
+            f"Can you clarify what '{task.description}' means?",
+            "What is the expected outcome?",
+            "What domain does this task belong to?"
+        ]
+        
+        # Create a clarification task assignment
+        assignment = TaskAssignment(
+            task_id=task.id,
+            assigned_role="clarifier",
+            status="accepted",
+            feedback=f"Clarifier role activated. Questions: {'; '.join(questions)}"
+        )
+        
+        return assignment
 

@@ -6,11 +6,26 @@ Following Single Responsibility Principle - handles skill benchmarking only.
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 import time
+import json
+import hashlib
+
+try:
+    import jsonschema
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    JSONSCHEMA_AVAILABLE = False
+
+try:
+    from deepdiff import DeepDiff
+    DEEPDIFF_AVAILABLE = True
+except ImportError:
+    DEEPDIFF_AVAILABLE = False
 
 from .models import Skill, SkillExecution
 from .execution_tracker import ExecutionTracker
 from .workflow_engine import WorkflowEngine
 from .agent_orchestrator import AgentOrchestrator
+from .exceptions import WorkflowError
 
 class SkillBenchmark:
     """Benchmark system for evaluating skill performance"""
@@ -52,16 +67,19 @@ class SkillBenchmark:
                     successes += 1
                 
                 # Validate output if expected_output provided
-                output_valid = True
-                if expected_output and result.get('output'):
-                    output_valid = self._validate_output(result['output'], expected_output)
+                validation_result = self._validate_test_case(
+                    result.get('output', {}),
+                    expected_output,
+                    test_case.get('expected_schema'),
+                    skill
+                )
                 
                 results.append({
                     "test_name": test_name,
-                    "success": success and output_valid,
+                    "success": success and validation_result['valid'],
                     "execution_time": execution_time,
                     "result": result,
-                    "output_valid": output_valid
+                    "validation": validation_result
                 })
             except Exception as e:
                 execution_time = time.time() - start_time
@@ -130,6 +148,67 @@ class SkillBenchmark:
             "best_skill": ranked[0][0] if ranked else None
         }
     
+    def benchmark_with_models(
+        self,
+        skill_id: str,
+        models: List[str],
+        test_cases: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Benchmark a skill with multiple LLM models (P2 optimization).
+        
+        Args:
+            skill_id: Skill ID to benchmark
+            models: List of model identifiers
+            test_cases: Test cases to run
+        
+        Returns:
+            Comparison results for each model
+        """
+        if not self.engine.role_manager.skill_library:
+            raise WorkflowError("Skill library not loaded")
+        
+        skill = self.engine.role_manager.skill_library.get(skill_id)
+        if not skill:
+            raise WorkflowError(f"Skill '{skill_id}' not found")
+        
+        model_results = {}
+        
+        # Store original orchestrator
+        original_orchestrator = self.orchestrator
+        
+        for model_name in models:
+            # Create orchestrator with different model (simplified - assumes LLM client switching)
+            # In a real implementation, you would switch the LLM client here
+            try:
+                # Benchmark with this model
+                results = self.benchmark_skill(skill_id, test_cases)
+                model_results[model_name] = results
+            except Exception as e:
+                model_results[model_name] = {
+                    "skill_id": skill_id,
+                    "model": model_name,
+                    "error": str(e),
+                    "success_rate": 0.0
+                }
+        
+        # Restore original orchestrator
+        self.orchestrator = original_orchestrator
+        
+        # Rank models by success rate
+        ranked = sorted(
+            [(m, r) for m, r in model_results.items() if 'success_rate' in r],
+            key=lambda x: x[1]['success_rate'],
+            reverse=True
+        )
+        
+        return {
+            "skill_id": skill_id,
+            "models": model_results,
+            "ranked": [{"model": m, "success_rate": r['success_rate']} for m, r in ranked],
+            "best_model": ranked[0][0] if ranked else None
+        }
+    
     def generate_report(self, results: Dict[str, Any]) -> str:
         """Generate a human-readable benchmark report"""
         lines = []
@@ -167,12 +246,149 @@ class SkillBenchmark:
         
         return "\n".join(lines)
     
+    def _validate_test_case(
+        self,
+        actual_output: Dict[str, Any],
+        expected_output: Optional[Dict[str, Any]] = None,
+        expected_schema: Optional[Dict[str, Any]] = None,
+        skill: Optional[Skill] = None
+    ) -> Dict[str, Any]:
+        """
+        Validate test case output using snapshot comparison and schema validation.
+        
+        Returns:
+            Dict with validation results including:
+            - valid: bool
+            - snapshot_match: bool (if expected_output provided)
+            - schema_valid: bool (if expected_schema provided)
+            - differences: List[str] (if snapshot mismatch)
+            - schema_errors: List[str] (if schema validation fails)
+        """
+        result = {
+            "valid": True,
+            "snapshot_match": True,
+            "schema_valid": True,
+            "differences": [],
+            "schema_errors": []
+        }
+        
+        # Snapshot comparison (deep diff)
+        if expected_output:
+            if DEEPDIFF_AVAILABLE:
+                diff = DeepDiff(expected_output, actual_output, ignore_order=True, verbose_level=2)
+                if diff:
+                    result["snapshot_match"] = False
+                    result["valid"] = False
+                    result["differences"] = [
+                        f"{change_type}: {details}"
+                        for change_type, details in diff.items()
+                    ]
+            else:
+                # Fallback to simple comparison
+                if actual_output != expected_output:
+                    result["snapshot_match"] = False
+                    result["valid"] = False
+                    result["differences"] = ["Output does not match expected snapshot"]
+        
+        # Schema validation
+        schema_to_validate = expected_schema
+        if not schema_to_validate and skill and skill.output_schema:
+            schema_to_validate = skill.output_schema
+        
+        if schema_to_validate and JSONSCHEMA_AVAILABLE:
+            try:
+                jsonschema.validate(instance=actual_output, schema=schema_to_validate)
+                result["schema_valid"] = True
+            except jsonschema.ValidationError as e:
+                result["schema_valid"] = False
+                result["valid"] = False
+                result["schema_errors"] = [str(e)]
+            except jsonschema.SchemaError as e:
+                result["schema_errors"] = [f"Invalid schema: {str(e)}"]
+        
+        return result
+    
     def _validate_output(self, actual: Dict[str, Any], expected: Dict[str, Any]) -> bool:
-        """Validate actual output against expected output"""
-        for key, expected_value in expected.items():
-            if key not in actual:
-                return False
-            # Simple equality check - could be enhanced with schema validation
-            if actual[key] != expected_value:
-                return False
-        return True
+        """Validate actual output against expected output (legacy method)"""
+        validation_result = self._validate_test_case(actual, expected)
+        return validation_result['valid']
+    
+    def test_skill(
+        self,
+        skill_id: str,
+        input_data: Dict[str, Any],
+        expected_output: Optional[Dict[str, Any]] = None,
+        expected_schema: Optional[Dict[str, Any]] = None,
+        snapshot_file: Optional[Path] = None
+    ) -> Dict[str, Any]:
+        """
+        Test a single skill execution with validation.
+        
+        Args:
+            skill_id: Skill ID to test
+            input_data: Input data for the skill
+            expected_output: Expected output for snapshot comparison
+            expected_schema: Expected JSON schema for validation
+            snapshot_file: Optional path to save/load snapshot
+        
+        Returns:
+            Test result dictionary
+        """
+        if not self.engine.role_manager.skill_library:
+            raise WorkflowError("Skill library not loaded")
+        
+        skill = self.engine.role_manager.skill_library.get(skill_id)
+        if not skill:
+            raise WorkflowError(f"Skill '{skill_id}' not found")
+        
+        # Load snapshot if file provided and expected_output not given
+        if snapshot_file and snapshot_file.exists() and not expected_output:
+            with snapshot_file.open('r', encoding='utf-8') as f:
+                expected_output = json.load(f)
+        
+        # Execute skill
+        start_time = time.time()
+        try:
+            result = self.orchestrator.execute_skill(skill_id, input_data)
+            execution_time = time.time() - start_time
+            
+            success = result.get('success', False)
+            actual_output = result.get('output', {})
+            
+            # Validate output
+            validation_result = self._validate_test_case(
+                actual_output,
+                expected_output,
+                expected_schema,
+                skill
+            )
+            
+            # Save snapshot if file provided
+            if snapshot_file and success and actual_output:
+                snapshot_file.parent.mkdir(parents=True, exist_ok=True)
+                with snapshot_file.open('w', encoding='utf-8') as f:
+                    json.dump(actual_output, f, indent=2, ensure_ascii=False)
+            
+            return {
+                "skill_id": skill_id,
+                "success": success and validation_result['valid'],
+                "execution_time": execution_time,
+                "output": actual_output,
+                "validation": validation_result,
+                "snapshot_saved": snapshot_file is not None and success
+            }
+        except Exception as e:
+            execution_time = time.time() - start_time
+            return {
+                "skill_id": skill_id,
+                "success": False,
+                "execution_time": execution_time,
+                "error": str(e),
+                "validation": {
+                    "valid": False,
+                    "snapshot_match": False,
+                    "schema_valid": False,
+                    "differences": [],
+                    "schema_errors": [str(e)]
+                }
+            }

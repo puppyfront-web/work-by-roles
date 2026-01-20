@@ -3,7 +3,7 @@ Skill workflow executor for orchestrating multiple skills.
 Following Single Responsibility Principle - handles skill workflow execution only.
 """
 
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 from datetime import datetime
 import time
 
@@ -17,6 +17,9 @@ from .skill_selector import SkillSelector
 from .condition_evaluator import ConditionEvaluator
 from .workflow_engine import WorkflowEngine
 from .skill_invoker import SkillInvoker, PlaceholderSkillInvoker
+
+if TYPE_CHECKING:
+    from .workflow_events import EventLogger
 
 class SkillWorkflowExecutor:
     """
@@ -35,7 +38,8 @@ class SkillWorkflowExecutor:
         engine: 'WorkflowEngine',
         skill_invoker: Optional[SkillInvoker] = None,
         execution_tracker: Optional[ExecutionTracker] = None,
-        max_parallel: int = 2
+        max_parallel: int = 2,
+        event_logger: Optional['EventLogger'] = None
     ):
         """
         Initialize workflow executor.
@@ -45,11 +49,13 @@ class SkillWorkflowExecutor:
             skill_invoker: Skill invoker to use (defaults to PlaceholderSkillInvoker)
             execution_tracker: Optional execution tracker
             max_parallel: Maximum parallel step executions
+            event_logger: Optional event logger for workflow events
         """
         self.engine = engine
         self.skill_invoker = skill_invoker or PlaceholderSkillInvoker()
         self.execution_tracker = execution_tracker or ExecutionTracker()
         self.max_parallel = max_parallel
+        self.event_logger = event_logger
         
         # Execution state
         self._step_outputs: Dict[str, Dict[str, Any]] = {}
@@ -474,6 +480,20 @@ class SkillWorkflowExecutor:
                             retry_count=attempt
                         )
                         self.execution_tracker.record_execution(execution)
+                        
+                        # Log workflow event
+                        if self.event_logger:
+                            workflow_id = self._current_execution.workflow_id if self._current_execution else "unknown"
+                            self.event_logger.log_skill_execution(
+                                workflow_id=workflow_id,
+                                skill_id=executed_skill_id,
+                                input_data=resolved_inputs,
+                                output_data=step.result,
+                                status="success",
+                                stage_id=stage_id,
+                                role_id=role_id,
+                                execution_time=time.time() - start_time
+                            )
                         return
                     else:
                         last_error = result.get("error", "Unknown error")
@@ -489,9 +509,39 @@ class SkillWorkflowExecutor:
             step.status = SkillWorkflowStepStatus.FAILED
             step.error = last_error
             
+            # Log failed event
+            if self.event_logger:
+                executed_skill_id = step.selected_skill_id if step.dynamic_skill else step.skill_id
+                workflow_id = self._current_execution.workflow_id if self._current_execution else "unknown"
+                self.event_logger.log_skill_execution(
+                    workflow_id=workflow_id,
+                    skill_id=executed_skill_id,
+                    input_data=resolved_inputs,
+                    status="failed",
+                    stage_id=stage_id,
+                    role_id=role_id,
+                    error=last_error,
+                    execution_time=time.time() - start_time
+                )
+            
         except Exception as e:
             step.status = SkillWorkflowStepStatus.FAILED
             step.error = str(e)
+            
+            # Log exception event
+            if self.event_logger:
+                executed_skill_id = step.selected_skill_id if step.dynamic_skill else step.skill_id
+                workflow_id = self._current_execution.workflow_id if self._current_execution else "unknown"
+                self.event_logger.log_skill_execution(
+                    workflow_id=workflow_id,
+                    skill_id=executed_skill_id,
+                    input_data={},
+                    status="failed",
+                    stage_id=stage_id,
+                    role_id=role_id,
+                    error=str(e),
+                    execution_time=time.time() - start_time
+                )
         
         step.execution_time = time.time() - start_time
     
