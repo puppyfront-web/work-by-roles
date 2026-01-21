@@ -515,6 +515,179 @@ workflow start <stage> <role>
         print(f"✅ 已生成初始团队上下文: {team_context_file}")
 
 
+def _extract_dimensions_from_workflow(
+    completed_stages: List[Dict[str, Any]],
+    workspace: Path
+) -> List[str]:
+    """
+    从工作流输出中动态提取dimensions。
+    
+    根据完成的阶段、角色和生成的文件类型来推断skill的维度。
+    """
+    dimensions = []
+    
+    # 根据角色推断维度
+    role_dimension_map = {
+        'product_analyst': ['requirements_analysis', 'scope_management'],
+        'system_architect': ['architecture_design', 'component_design'],
+        'core_framework_engineer': ['implementation', 'code_quality'],
+        'qa_reviewer': ['testing', 'quality_assurance'],
+        'devops_engineer': ['deployment', 'infrastructure'],
+        'security_engineer': ['security_analysis', 'security_design'],
+        'performance_engineer': ['performance_analysis', 'optimization'],
+        'technical_writer': ['documentation', 'technical_writing'],
+        'frontend_engineer': ['frontend_implementation', 'ui_design'],
+        'backend_engineer': ['backend_implementation', 'api_design'],
+        'full_stack_engineer': ['full_stack_implementation'],
+    }
+    
+    for stage in completed_stages:
+        role = stage.get('role', '')
+        if role in role_dimension_map:
+            dimensions.extend(role_dimension_map[role])
+    
+    # 根据生成的文件类型推断维度
+    workflow_dir = workspace / ".workflow"
+    if workflow_dir.exists():
+        # 检查requirements文档
+        if (workflow_dir / "STAGE1_REQUIREMENTS.md").exists():
+            if 'requirements_analysis' not in dimensions:
+                dimensions.append('requirements_analysis')
+        
+        # 检查architecture文档
+        if (workflow_dir / "STAGE2_ARCHITECTURE.md").exists():
+            if 'architecture_design' not in dimensions:
+                dimensions.append('architecture_design')
+        
+        # 检查测试文件
+        test_files = list(workspace.rglob("test_*.py")) + list(workspace.rglob("*_test.py"))
+        if test_files:
+            if 'testing' not in dimensions:
+                dimensions.append('testing')
+    
+    # 去重并返回
+    return list(set(dimensions))
+
+
+def _extract_tools_from_project(workspace: Path) -> List[str]:
+    """
+    从项目配置中提取使用的工具。
+    
+    检查配置文件、依赖文件等来识别项目使用的工具。
+    """
+    tools = []
+    
+    # 检查pyproject.toml
+    pyproject = workspace / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            import tomli
+            with open(pyproject, 'rb') as f:
+                data = tomli.load(f)
+                
+            # 检查dependencies和dev-dependencies
+            deps = []
+            if 'project' in data and 'dependencies' in data['project']:
+                deps.extend(data['project']['dependencies'])
+            if 'project' in data and 'optional-dependencies' in data['project']:
+                for opt_deps in data['project']['optional-dependencies'].values():
+                    deps.extend(opt_deps)
+            
+            # 映射依赖到工具
+            tool_mapping = {
+                'pytest': 'pytest',
+                'ruff': 'ruff',
+                'mypy': 'mypy',
+                'black': 'black',
+                'flake8': 'flake8',
+                'pylint': 'pylint',
+                'coverage': 'coverage',
+            }
+            
+            for dep in deps:
+                dep_name = dep.split('>=')[0].split('==')[0].split('~=')[0].strip()
+                if dep_name in tool_mapping:
+                    tools.append(tool_mapping[dep_name])
+        except Exception:
+            # 如果解析失败，尝试简单匹配
+            try:
+                content = pyproject.read_text()
+                if 'pytest' in content:
+                    tools.append('pytest')
+                if 'ruff' in content:
+                    tools.append('ruff')
+                if 'mypy' in content:
+                    tools.append('mypy')
+            except Exception:
+                pass
+    
+    # 检查配置文件
+    config_files = {
+        'ruff.toml': 'ruff',
+        'ruff.toml': 'ruff',
+        '.ruff.toml': 'ruff',
+        'pytest.ini': 'pytest',
+        'pytest.cfg': 'pytest',
+        'setup.cfg': None,  # 需要解析
+        'mypy.ini': 'mypy',
+        '.mypy.ini': 'mypy',
+    }
+    
+    for config_file, tool_name in config_files.items():
+        if (workspace / config_file).exists():
+            if tool_name and tool_name not in tools:
+                tools.append(tool_name)
+    
+    # 检查是否有Python文件（默认工具）
+    python_files = list(workspace.rglob("*.py"))
+    if python_files and 'python' not in tools:
+        tools.append('python')
+    
+    return tools
+
+
+def _extract_constraints_from_project(workspace: Path) -> List[str]:
+    """
+    从项目配置和代码中提取约束条件。
+    
+    检查代码风格、类型注解使用情况等来推断约束。
+    """
+    constraints = []
+    
+    # 检查是否有类型注解（通过检查Python文件）
+    python_files = list(workspace.rglob("*.py"))
+    if python_files:
+        # 采样检查前10个文件
+        sample_files = python_files[:10]
+        has_type_hints = False
+        
+        for py_file in sample_files:
+            try:
+                content = py_file.read_text()
+                # 检查常见的类型注解模式
+                if any(pattern in content for pattern in ['->', ': str', ': int', ': List', ': Dict', 'Optional', 'Union']):
+                    has_type_hints = True
+                    break
+            except Exception:
+                continue
+        
+        if has_type_hints:
+            constraints.append('must_use_type_hints')
+    
+    # 检查是否有测试文件
+    test_files = list(workspace.rglob("test_*.py")) + list(workspace.rglob("*_test.py"))
+    if test_files:
+        constraints.append('must_cover_tests')
+    
+    # 检查是否有linter配置
+    linter_configs = ['ruff.toml', '.ruff.toml', 'pylintrc', '.pylintrc', 'setup.cfg']
+    has_linter = any((workspace / config).exists() for config in linter_configs)
+    if has_linter:
+        constraints.append('must_pass_linter')
+    
+    return constraints
+
+
 def _prompt_skill_accumulation(engine: WorkflowEngine, workspace: Path):
     """
     提示用户进行技能沉淀（Skill Accumulation）
@@ -562,12 +735,6 @@ def _prompt_skill_accumulation(engine: WorkflowEngine, workspace: Path):
         
         print(f"   ✅ 发现 {len(existing_skills)} 个现有技能")
         
-        # Analyze project outputs to suggest skill
-        # This is a simplified version - in practice, you might want to analyze:
-        # - Generated files
-        # - Implemented features
-        # - Used tools and patterns
-        
         # Get completed stages info
         completed_stages = []
         if engine.executor and engine.workflow:
@@ -584,6 +751,16 @@ def _prompt_skill_accumulation(engine: WorkflowEngine, workspace: Path):
         for stage_info in completed_stages:
             print(f"   - {stage_info['name']} ({stage_info['id']}) - 角色: {stage_info['role']}")
         
+        # Dynamically extract skill information from project
+        print("\n🔍 正在分析项目以提取技能信息...")
+        dimensions = _extract_dimensions_from_workflow(completed_stages, workspace)
+        tools = _extract_tools_from_project(workspace)
+        constraints = _extract_constraints_from_project(workspace)
+        
+        print(f"   ✅ 提取到维度: {', '.join(dimensions) if dimensions else '(无)'}")
+        print(f"   ✅ 提取到工具: {', '.join(tools) if tools else '(无)'}")
+        print(f"   ✅ 提取到约束: {', '.join(constraints) if constraints else '(无)'}")
+        
         # Prompt for skill details
         print("\n📝 请输入技能信息:")
         skill_id = input("   技能 ID (如: user_auth_implementation): ").strip()
@@ -594,6 +771,43 @@ def _prompt_skill_accumulation(engine: WorkflowEngine, workspace: Path):
         skill_name = input("   技能名称 (如: User Authentication Implementation): ").strip() or skill_id.replace("_", " ").title()
         skill_description = input("   技能描述: ").strip() or f"Implementation skill for {skill_name}"
         
+        # Allow user to customize dimensions
+        if dimensions:
+            print(f"\n💡 建议的维度: {', '.join(dimensions)}")
+            custom_dims = input("   维度 (回车使用建议，或输入自定义，用逗号分隔): ").strip()
+            if custom_dims:
+                dimensions = [d.strip() for d in custom_dims.split(',') if d.strip()]
+        else:
+            custom_dims = input("   维度 (用逗号分隔): ").strip()
+            if custom_dims:
+                dimensions = [d.strip() for d in custom_dims.split(',') if d.strip()]
+            else:
+                dimensions = ['general']  # Default fallback
+        
+        # Allow user to customize tools
+        if tools:
+            print(f"\n💡 建议的工具: {', '.join(tools)}")
+            custom_tools = input("   工具 (回车使用建议，或输入自定义，用逗号分隔): ").strip()
+            if custom_tools:
+                tools = [t.strip() for t in custom_tools.split(',') if t.strip()]
+        else:
+            custom_tools = input("   工具 (用逗号分隔): ").strip()
+            if custom_tools:
+                tools = [t.strip() for t in custom_tools.split(',') if t.strip()]
+        
+        # Allow user to customize constraints
+        if constraints:
+            print(f"\n💡 建议的约束: {', '.join(constraints)}")
+            custom_constraints = input("   约束 (回车使用建议，或输入自定义，用逗号分隔): ").strip()
+            if custom_constraints:
+                constraints = [c.strip() for c in custom_constraints.split(',') if c.strip()]
+        else:
+            custom_constraints = input("   约束 (用逗号分隔，可选): ").strip()
+            if custom_constraints:
+                constraints = [c.strip() for c in custom_constraints.split(',') if c.strip()]
+            else:
+                constraints = []
+        
         # Check for duplicates
         if skill_id in existing_skills:
             print(f"\n⚠️  技能 '{skill_id}' 已存在")
@@ -602,13 +816,13 @@ def _prompt_skill_accumulation(engine: WorkflowEngine, workspace: Path):
                 print("   已取消")
                 return
         
-        # Generate skill YAML
+        # Generate skill YAML with dynamic values
         skill_data = {
             'id': skill_id,
             'name': skill_name,
             'description': skill_description,
-            'dimensions': ['implementation', 'quality', 'testing'],
-            'tools': ['python', 'pytest', 'ruff', 'mypy'],
+            'dimensions': dimensions,
+            'tools': tools if tools else [],
             'levels': {
                 1: {
                     'name': 'Basic',
@@ -623,11 +837,7 @@ def _prompt_skill_accumulation(engine: WorkflowEngine, workspace: Path):
                     'description': 'Production-ready implementation with full test coverage and documentation'
                 }
             },
-            'constraints': [
-                'must_use_type_hints',
-                'must_cover_tests',
-                'must_pass_linter'
-            ],
+            'constraints': constraints,
             'metadata': {
                 'created_from_workflow': True,
                 'workflow_id': engine.workflow.id if engine.workflow else None,

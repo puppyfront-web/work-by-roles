@@ -143,6 +143,104 @@ llm:
 
 **注意**: 如果使用 `--use-llm` 但未配置 LLM 客户端，系统会抛出错误并提示配置方法。
 
+## MCP (Model Context Protocol) 集成
+
+项目支持在工作流执行时调用外部 MCP 服务器，使角色和流程可以集成外部服务和资源。
+
+### 快速开始
+
+#### 1. 在技能定义中添加 MCP 配置
+
+在技能的 `Skill.md` 文件中添加 MCP 元数据：
+
+```yaml
+---
+name: fetch_browser_data
+description: 从浏览器MCP服务器获取页面数据
+id: fetch_browser_data
+metadata:
+  mcp:
+    action: fetch_resource  # list_resources | fetch_resource | call_tool
+    server: cursor-browser-extension  # MCP服务器标识
+    resource_uri: "mcp://cursor-browser-extension/page/content"
+input_schema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: 要获取的页面URL
+output_schema:
+  type: object
+  properties:
+    content:
+      type: string
+      description: 页面内容
+---
+```
+
+#### 2. 支持的 MCP 操作
+
+- **`list_resources`**: 列出 MCP 服务器上的可用资源
+- **`fetch_resource`**: 获取指定的资源（需要 `resource_uri`）
+- **`call_tool`**: 调用 MCP 工具（需要 `tool` 名称）
+
+#### 3. 使用示例
+
+```python
+from work_by_roles.core.agent_orchestrator import AgentOrchestrator
+from work_by_roles.core.mcp_skill_invoker import MCPSkillInvokerFactory
+
+# 创建 MCP invoker（如果使用 MCP SDK）
+mcp_invoker = MCPSkillInvokerFactory.create(mcp_client=your_mcp_client)
+
+# 执行技能（如果技能有 MCP 配置，会自动使用 MCP 调用）
+orchestrator = AgentOrchestrator(engine)
+result = orchestrator.execute_skill(
+    skill_id="fetch_browser_data",
+    input_data={"url": "https://example.com"},
+    stage_id="data_collection",
+    role_id="data_analyst"
+)
+```
+
+### MCP 配置示例
+
+#### 获取浏览器资源
+```yaml
+metadata:
+  mcp:
+    action: fetch_resource
+    server: cursor-browser-extension
+    resource_uri: "mcp://cursor-browser-extension/page/content"
+```
+
+#### 调用 MCP 工具
+```yaml
+metadata:
+  mcp:
+    action: call_tool
+    server: cursor-browser-extension
+    tool: navigate_to_page
+```
+
+#### 列出可用资源
+```yaml
+metadata:
+  mcp:
+    action: list_resources
+    server: cursor-browser-extension
+```
+
+### 架构说明
+
+项目通过可扩展的 `SkillInvoker` 系统支持 MCP：
+
+```
+Workflow Stage → Role Execution → Skill Selection → SkillInvoker.invoke() → MCPSkillInvoker → External MCP Server
+```
+
+📖 **[查看详细 MCP 集成指南](docs/MCP_INTEGRATION.md)** - 包含完整配置、使用场景和最佳实践
+
 ## Python API
 
 ```python
@@ -161,6 +259,7 @@ workflow.complete()
 - 🔗 [角色与技能关系指南](ROLES_AND_SKILLS.md) - 理解角色和技能的关系及配置方法
 - 📚 [完整使用指南](docs/USAGE_GUIDE.md) - 包含IDE集成、测试、快速参考
 - 🎭 [Role Executor 指南](docs/ROLE_EXECUTOR_GUIDE.md) - 简化模式使用指南（推荐用于 IDE）
+- 🔌 [MCP 集成指南](docs/MCP_INTEGRATION.md) - MCP (Model Context Protocol) 集成详细文档
 - 🧠 [API文档](docs/API.md) - 详细API参考
 - ⭐ [技能指南](docs/SKILLS_GUIDE.md) - 自定义技能（高级功能）
 
