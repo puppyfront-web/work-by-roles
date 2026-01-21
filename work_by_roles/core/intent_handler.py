@@ -1,14 +1,139 @@
 """
 Unified Intent Handler - Entry point for user input processing.
 This module provides a unified interface for handling user intents without relying on Cursor configuration files.
+
+Enhanced with session management for multi-turn conversations.
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
+from pathlib import Path
+import json
+from datetime import datetime
+
 from .workflow_engine import WorkflowEngine
 from .intent_agent import IntentAgent
 from .bug_analysis_agent import BugAnalysisAgent
 from .enums import IntentType
 from .agent_orchestrator import AgentOrchestrator
+from .dialog_manager import DialogManager, DialogState
+
+
+class SessionStore:
+    """
+    Manages session persistence for multi-turn conversations.
+    
+    Sessions can be stored in memory or persisted to disk.
+    """
+    
+    def __init__(self, persist_dir: Optional[Path] = None):
+        """
+        Initialize session store.
+        
+        Args:
+            persist_dir: Optional directory for persisting sessions
+        """
+        self.sessions: Dict[str, DialogManager] = {}
+        self.persist_dir = persist_dir
+        
+        if persist_dir:
+            persist_dir.mkdir(parents=True, exist_ok=True)
+    
+    def get(self, session_id: str) -> Optional[DialogManager]:
+        """Get a session by ID"""
+        # Check in-memory cache first
+        if session_id in self.sessions:
+            return self.sessions[session_id]
+        
+        # Try to load from disk
+        if self.persist_dir:
+            session_file = self.persist_dir / f"{session_id}.json"
+            if session_file.exists():
+                try:
+                    data = json.loads(session_file.read_text(encoding='utf-8'))
+                    dialog_manager = DialogManager.from_dict(data)
+                    self.sessions[session_id] = dialog_manager
+                    return dialog_manager
+                except Exception:
+                    pass
+        
+        return None
+    
+    def save(self, dialog_manager: DialogManager):
+        """Save a session"""
+        session_id = dialog_manager.session_id
+        self.sessions[session_id] = dialog_manager
+        
+        # Persist to disk if configured
+        if self.persist_dir:
+            session_file = self.persist_dir / f"{session_id}.json"
+            try:
+                session_file.write_text(
+                    json.dumps(dialog_manager.to_dict(), ensure_ascii=False, indent=2),
+                    encoding='utf-8'
+                )
+            except Exception:
+                pass
+    
+    def delete(self, session_id: str):
+        """Delete a session"""
+        if session_id in self.sessions:
+            del self.sessions[session_id]
+        
+        if self.persist_dir:
+            session_file = self.persist_dir / f"{session_id}.json"
+            if session_file.exists():
+                try:
+                    session_file.unlink()
+                except Exception:
+                    pass
+    
+    def list_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """List all sessions"""
+        sessions = []
+        
+        # Get from in-memory cache
+        for sid, dm in self.sessions.items():
+            sessions.append({
+                "session_id": sid,
+                "state": dm.state.value,
+                "created_at": dm.created_at.isoformat(),
+                "last_activity": dm.last_activity.isoformat(),
+                "turns": len(dm.history)
+            })
+        
+        # Get from disk if configured
+        if self.persist_dir:
+            for session_file in self.persist_dir.glob("session_*.json"):
+                sid = session_file.stem
+                if sid not in self.sessions:
+                    try:
+                        data = json.loads(session_file.read_text(encoding='utf-8'))
+                        sessions.append({
+                            "session_id": sid,
+                            "state": data.get("state", "unknown"),
+                            "created_at": data.get("created_at", ""),
+                            "last_activity": data.get("last_activity", ""),
+                            "turns": len(data.get("history", []))
+                        })
+                    except Exception:
+                        pass
+        
+        # Sort by last activity
+        sessions.sort(key=lambda x: x.get("last_activity", ""), reverse=True)
+        return sessions[:limit]
+    
+    def cleanup_old_sessions(self, max_age_hours: int = 24):
+        """Remove sessions older than max_age_hours"""
+        now = datetime.now()
+        to_delete = []
+        
+        for sid, dm in list(self.sessions.items()):
+            age = (now - dm.last_activity).total_seconds() / 3600
+            if age > max_age_hours:
+                to_delete.append(sid)
+        
+        for sid in to_delete:
+            self.delete(sid)
 
 
 class IntentHandler:
@@ -17,24 +142,39 @@ class IntentHandler:
     
     这是系统的统一入口，不再依赖`.cursorrules`等配置文件。
     所有用户输入都通过这个类进行处理。
+    
+    Enhanced with session management for multi-turn conversations.
     """
     
-    def __init__(self, engine: 'WorkflowEngine', llm_client: Optional[Any] = None):
+    def __init__(
+        self, 
+        engine: 'WorkflowEngine', 
+        llm_client: Optional[Any] = None,
+        persist_sessions: bool = False
+    ):
         """
         初始化IntentHandler
         
         Args:
             engine: WorkflowEngine实例
             llm_client: 可选的LLM客户端
+            persist_sessions: 是否持久化会话到磁盘
         """
         self.engine = engine
+        self.llm_client = llm_client
         self.intent_agent = IntentAgent(engine, llm_client)
         self.bug_agent = BugAnalysisAgent(engine, llm_client)
         self.orchestrator = AgentOrchestrator(engine, llm_client) if engine else None
+        
+        # Session management
+        persist_dir = None
+        if persist_sessions and engine:
+            persist_dir = engine.workspace_path / ".workflow" / "sessions"
+        self.session_store = SessionStore(persist_dir)
     
     def handle(self, user_input: str, use_llm: Optional[bool] = None) -> Dict[str, Any]:
         """
-        处理用户输入的统一入口
+        处理用户输入的统一入口（单轮对话）
         
         Args:
             user_input: 用户输入的自然语言描述
@@ -57,6 +197,256 @@ class IntentHandler:
             "routing": routing_result,
             "execution": execution_result
         }
+    
+    # ========================================================================
+    # Session-based Multi-turn Dialog Methods
+    # ========================================================================
+    
+    def handle_with_session(
+        self, 
+        user_input: str, 
+        session_id: Optional[str] = None,
+        use_llm: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """
+        处理用户输入（支持多轮对话）
+        
+        This method supports multi-turn conversations with session state management.
+        Suitable for non-technical users who may need clarification.
+        
+        Args:
+            user_input: 用户输入
+            session_id: 可选的会话ID，不提供则创建新会话
+            use_llm: 是否使用LLM
+            
+        Returns:
+            {
+                "session_id": str,
+                "intent": Dict,
+                "needs_clarification": bool,
+                "clarification_questions": List[Dict],
+                "ready_to_execute": bool,
+                "routing": Dict (if ready),
+                "execution": Dict (if ready and auto_execute)
+            }
+        """
+        # Get or create session
+        dialog_manager = None
+        if session_id:
+            dialog_manager = self.session_store.get(session_id)
+        
+        if dialog_manager:
+            # Continue existing session
+            self.intent_agent.dialog_manager = dialog_manager
+        
+        # Use interactive recognition
+        result = self.intent_agent.interactive_recognize(user_input, session_id, use_llm)
+        
+        # Save session
+        if self.intent_agent.dialog_manager:
+            self.session_store.save(self.intent_agent.dialog_manager)
+        
+        # If ready to execute, add routing info
+        if result.get("ready_to_execute"):
+            routing_result = self.intent_agent.route(result["intent"])
+            result["routing"] = routing_result
+        
+        return result
+    
+    def clarify(
+        self, 
+        session_id: str, 
+        answers: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """
+        提供对澄清问题的回答
+        
+        Args:
+            session_id: 会话ID
+            answers: 问题ID到答案的映射
+            
+        Returns:
+            更新后的处理结果
+        """
+        # Get session
+        dialog_manager = self.session_store.get(session_id)
+        if not dialog_manager:
+            return {
+                "error": f"Session not found: {session_id}",
+                "session_id": session_id
+            }
+        
+        # Restore to intent agent
+        self.intent_agent.dialog_manager = dialog_manager
+        
+        # Provide clarification
+        result = self.intent_agent.provide_clarification(session_id, answers)
+        
+        # Save updated session
+        self.session_store.save(self.intent_agent.dialog_manager)
+        
+        # If ready to execute, add routing info
+        if result.get("ready_to_execute"):
+            routing_result = self.intent_agent.route(result["intent"])
+            result["routing"] = routing_result
+        
+        return result
+    
+    def confirm_session(self, session_id: str) -> Dict[str, Any]:
+        """
+        确认会话并准备执行
+        
+        Args:
+            session_id: 会话ID
+            
+        Returns:
+            最终的意图和路由信息
+        """
+        # Get session
+        dialog_manager = self.session_store.get(session_id)
+        if not dialog_manager:
+            return {
+                "error": f"Session not found: {session_id}",
+                "session_id": session_id
+            }
+        
+        # Restore to intent agent
+        self.intent_agent.dialog_manager = dialog_manager
+        
+        # Confirm and get final result
+        result = self.intent_agent.confirm_and_execute(session_id)
+        
+        # Save updated session
+        self.session_store.save(self.intent_agent.dialog_manager)
+        
+        return result
+    
+    def execute_session(
+        self, 
+        session_id: str, 
+        auto_execute: bool = False
+    ) -> Dict[str, Any]:
+        """
+        执行已确认的会话
+        
+        Args:
+            session_id: 会话ID
+            auto_execute: 是否自动执行工作流
+            
+        Returns:
+            执行结果
+        """
+        # Get session
+        dialog_manager = self.session_store.get(session_id)
+        if not dialog_manager:
+            return {
+                "error": f"Session not found: {session_id}",
+                "session_id": session_id
+            }
+        
+        if dialog_manager.state != DialogState.CONFIRMED:
+            return {
+                "error": f"Session not confirmed. Current state: {dialog_manager.state.value}",
+                "session_id": session_id
+            }
+        
+        # Get final intent and routing
+        final_goal = dialog_manager.get_final_goal()
+        intent_result = self.intent_agent.recognize_intent(final_goal)
+        routing_result = self.intent_agent.route(intent_result)
+        
+        result = {
+            "session_id": session_id,
+            "final_goal": final_goal,
+            "intent": intent_result,
+            "routing": routing_result,
+            "context": dialog_manager.context.to_dict()
+        }
+        
+        if auto_execute:
+            # Execute the routing
+            execution_result = self._execute_routing(final_goal, intent_result, routing_result)
+            result["execution"] = execution_result
+            
+            # Update session state
+            dialog_manager.mark_executing()
+            self.session_store.save(dialog_manager)
+        
+        return result
+    
+    def get_session_status(self, session_id: str) -> Dict[str, Any]:
+        """
+        获取会话状态
+        
+        Args:
+            session_id: 会话ID
+            
+        Returns:
+            会话状态信息
+        """
+        dialog_manager = self.session_store.get(session_id)
+        if not dialog_manager:
+            return {
+                "error": f"Session not found: {session_id}",
+                "session_id": session_id
+            }
+        
+        return {
+            "session_id": session_id,
+            "state": dialog_manager.state.value,
+            "turns": len(dialog_manager.history),
+            "pending_questions": len(dialog_manager.get_pending_questions()),
+            "clarification_round": dialog_manager.clarification_round,
+            "confidence": dialog_manager.context.confidence_score,
+            "original_goal": dialog_manager.context.original_goal,
+            "refined_goal": dialog_manager.context.refined_goal,
+            "ready_to_execute": dialog_manager.is_ready_to_execute(),
+            "created_at": dialog_manager.created_at.isoformat(),
+            "last_activity": dialog_manager.last_activity.isoformat()
+        }
+    
+    def list_sessions(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        列出所有会话
+        
+        Args:
+            limit: 最大返回数量
+            
+        Returns:
+            会话列表
+        """
+        return self.session_store.list_sessions(limit)
+    
+    def close_session(self, session_id: str) -> Dict[str, Any]:
+        """
+        关闭并清理会话
+        
+        Args:
+            session_id: 会话ID
+            
+        Returns:
+            操作结果
+        """
+        dialog_manager = self.session_store.get(session_id)
+        if dialog_manager:
+            dialog_manager.mark_cancelled()
+        
+        self.session_store.delete(session_id)
+        self.intent_agent.clear_session(session_id)
+        
+        return {
+            "session_id": session_id,
+            "closed": True
+        }
+    
+    def cleanup_sessions(self, max_age_hours: int = 24):
+        """
+        清理过期会话
+        
+        Args:
+            max_age_hours: 会话最大保留时间（小时）
+        """
+        self.session_store.cleanup_old_sessions(max_age_hours)
     
     def _execute_routing(
         self, 

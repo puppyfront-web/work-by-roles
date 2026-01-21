@@ -1,0 +1,90 @@
+# DevOps Pipeline Team Template
+id: devops_pipeline
+name: DevOps流水线团队
+description: 专注于CI/CD和自动化的DevOps团队
+industry: devops
+workflow_pattern: kanban
+
+roles:
+  - id: devops_engineer
+    name: DevOps Engineer
+    description: DevOps工程师，负责CI/CD流水线和基础设施
+    domain: devops
+    responsibility: 构建和维护CI/CD流水线，管理基础设施即代码
+    skills:
+      - python_engineering
+      - system_design
+    constraints:
+      allowed_actions:
+        - configure_pipeline
+        - deploy_infrastructure
+        - monitor_systems
+      forbidden_actions:
+        - skip_security_checks
+        - deploy_without_tests
+
+  - id: sre_engineer
+    name: SRE Engineer
+    description: 站点可靠性工程师，负责系统可靠性和监控
+    domain: sre
+    responsibility: 确保系统可靠性，实施监控和告警，管理事件响应
+    skills:
+      - system_design
+      - quality_assurance
+    constraints:
+      allowed_actions:
+        - setup_monitoring
+        - respond_incidents
+        - define_slos
+      forbidden_actions:
+        - ignore_alerts
+        - skip_postmortem
+
+  - id: security_engineer
+    name: Security Engineer
+    description: 安全工程师，负责安全扫描和合规
+    domain: security
+    responsibility: 实施安全扫描，确保合规，管理漏洞
+    skills:
+      - quality_assurance
+    constraints:
+      allowed_actions:
+        - security_scan
+        - vulnerability_assessment
+        - compliance_check
+      forbidden_actions:
+        - bypass_security
+        - ignore_vulnerabilities
+
+skills:
+  - system_design
+  - python_engineering
+  - quality_assurance
+
+stages:
+  - id: code_commit
+    name: 代码提交
+    role: devops_engineer
+    order: 1
+  - id: build
+    name: 构建
+    role: devops_engineer
+    order: 2
+  - id: security_scan
+    name: 安全扫描
+    role: security_engineer
+    order: 3
+  - id: deploy_staging
+    name: 部署到测试环境
+    role: devops_engineer
+    order: 4
+  - id: deploy_production
+    name: 部署到生产环境
+    role: sre_engineer
+    order: 5
+
+tags:
+  - devops
+  - cicd
+  - automation
+  - infrastructure

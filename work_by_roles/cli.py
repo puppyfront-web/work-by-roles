@@ -25,6 +25,13 @@ try:
     from .core.llm_client_loader import LLMClientLoader
     from .core.execution_mode_analyzer import ExecutionModeAnalyzer
     from .core.tool_mapper import ToolMapper
+    from .core.dialog_manager import DialogManager, DialogState
+    from .core.intent_handler import IntentHandler, handle_user_input
+    from .core.team_template_library import TeamTemplateLibrary
+    from .core.sop_importer import SOPImporter, SOPAnalysis
+    from .core.skill_version_manager import SkillVersionManager
+    from .core.skill_learning_system import SkillLearningSystem
+    from .core.skill_composition_engine import SkillCompositionEngine
     _agents_available = True
 except (ImportError, ValueError):
     # Fallback: try from .engine (forwarding module)
@@ -138,7 +145,7 @@ def _init_engine(args) -> Tuple[WorkflowEngine, Path, Path]:
     else:
         # 检查是否有当前活动团队
         current_team = team_manager.get_current_team()
-        if current_team and not (args.workflow or args.roles or args.skills):
+        if current_team and not (getattr(args, 'workflow', None) or getattr(args, 'roles', None) or getattr(args, 'skills', None)):
             # 使用当前团队配置（如果没有显式指定命令行参数）
             team_config = team_manager.get_team_config(current_team)
             skill_file = team_config["skills"]
@@ -148,11 +155,11 @@ def _init_engine(args) -> Tuple[WorkflowEngine, Path, Path]:
             state_file = team_config["state"]
         else:
             # 使用命令行参数或默认配置
-            skill_file = Path(args.skills) if args.skills else workflow_dir / "skills"
-            roles_file = Path(args.roles) if args.roles else workflow_dir / "role_schema.yaml"
-            workflow_file = Path(args.workflow) if args.workflow else workflow_dir / "workflow_schema.yaml"
-            context_file = Path(args.context) if args.context else workflow_dir / "project_context.yaml"
-            state_file = Path(args.state) if args.state else workflow_dir / "state.yaml"
+            skill_file = Path(getattr(args, 'skills', None)) if getattr(args, 'skills', None) else workflow_dir / "skills"
+            roles_file = Path(getattr(args, 'roles', None)) if getattr(args, 'roles', None) else workflow_dir / "role_schema.yaml"
+            workflow_file = Path(getattr(args, 'workflow', None)) if getattr(args, 'workflow', None) else workflow_dir / "workflow_schema.yaml"
+            context_file = Path(getattr(args, 'context', None)) if getattr(args, 'context', None) else workflow_dir / "project_context.yaml"
+            state_file = Path(getattr(args, 'state', None)) if getattr(args, 'state', None) else workflow_dir / "state.yaml"
     
     # Check if auto-restore is disabled
     auto_restore = not getattr(args, 'no_restore_state', False)
@@ -3108,6 +3115,7 @@ def cmd_import_sop(args):
     """Import SOP document and generate configurations"""
     try:
         from work_by_roles.core.sop_importer import SOPImporter
+        from work_by_roles.core.team_template_library import TeamTemplateLibrary
         
         sop_file = Path(args.sop_file)
         if not sop_file.exists():
@@ -3116,15 +3124,34 @@ def cmd_import_sop(args):
         
         output_dir = Path(args.output) if args.output else Path.cwd() / ".workflow"
         
-        importer = SOPImporter()
+        # Use enhanced import with template library
+        library = TeamTemplateLibrary()
+        importer = SOPImporter(template_library=library)
         generated_files = importer.generate_config_files(
             sop_file,
             output_dir,
-            overwrite=args.overwrite
+            overwrite=args.overwrite,
+            use_enhanced=True  # Use new skills -> roles -> workflow flow
+        )
+        
+        # Show analysis summary
+        config, analysis = importer.import_sop_enhanced(
+            sop_file,
+            use_llm=False,
+            auto_match_template=False
         )
         
         print(f"\n✅ SOP 导入完成")
         print("=" * 60)
+        print(f"📊 提取统计:")
+        print(f"  技能数量: {len(analysis.skills)}")
+        print(f"  角色数量: {len(analysis.roles)}")
+        print(f"  工作流阶段数: {len(analysis.workflow_stages)}")
+        print(f"  文档类型: {analysis.document_type}")
+        print(f"  行业: {analysis.industry}")
+        print(f"  置信度: {analysis.confidence_score:.2f}")
+        print("=" * 60)
+        print(f"📁 生成的文件:")
         for config_type, file_path in generated_files.items():
             print(f"  {config_type}: {file_path}")
         
@@ -3983,6 +4010,17 @@ def cmd_wfauto(args):
                         # 记录阶段失败，但不立即退出，继续检查其他阶段
                         failed_stages.append(stage.id)
         
+        # Final cleanup: Move any documents incorrectly written to workspace root
+        if engine.workflow and orchestrator:
+            try:
+                # Cleanup documents for all completed stages
+                for stage in engine.workflow.stages:
+                    if engine.executor and stage.id in engine.executor.get_completed_stages():
+                        orchestrator._cleanup_root_documents(stage)
+            except Exception as e:
+                import warnings
+                warnings.warn(f"Failed to cleanup root documents: {e}")
+        
         # Check execution results
         if engine.executor and engine.workflow:
             completed = engine.executor.get_completed_stages()
@@ -4102,6 +4140,285 @@ def cmd_intent(args):
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
+def cmd_chat(args):
+    """交互式对话命令"""
+    try:
+        engine, _, _ = _init_engine(args)
+        llm_client = _load_llm_client(engine.workspace_path)
+        
+        handler = IntentHandler(engine, llm_client, persist_sessions=True)
+        session_id = getattr(args, 'session', None)
+        
+        print("\n" + "=" * 60)
+        print("💬 Work-by-Roles 交互式助手")
+        print("=" * 60)
+        
+        if session_id:
+            print(f"继续会话: {session_id}")
+            status = handler.get_session_status(session_id)
+            if "error" in status:
+                print(f"❌ 找不到会话: {session_id}")
+                session_id = None
+            else:
+                print(f"当前状态: {status['state']}")
+                print(f"原始目标: {status['original_goal']}")
+        
+        while True:
+            if not session_id:
+                user_input = input("\n👤 您: ")
+                if user_input.lower() in ['exit', 'quit', 'exit()', 'quit()', '退出']:
+                    break
+                
+                result = handler.handle_with_session(user_input, use_llm=True)
+                session_id = result["session_id"]
+                
+                # 问题2修复：立即显示澄清问题（如果有）
+                if result.get("needs_clarification") and result.get("clarification_questions"):
+                    print(f"\n🤖 助手: 为了更好地执行任务，我需要澄清一些细节:")
+                    for i, q in enumerate(result["clarification_questions"], 1):
+                        print(f"   {i}. {q.get('question', '')}")
+                    # 继续到下一轮循环处理澄清问题
+                    continue
+            else:
+                status = handler.get_session_status(session_id)
+                if status["pending_questions"] > 0:
+                    # 获取待回答的问题
+                    dialog_manager = handler.session_store.get(session_id)
+                    questions = dialog_manager.get_pending_questions()
+                    
+                    answers = {}
+                    print(f"\n🤖 助手: 为了更好地执行任务，我需要澄清一些细节 ({status['clarification_round']}/{DialogManager.MAX_CLARIFICATION_ROUNDS}):")
+                    for q in questions:
+                        ans = input(f"   ❓ {q.question}\n   > ")
+                        answers[q.id] = ans
+                    
+                    result = handler.clarify(session_id, answers)
+                else:
+                    # 已经准备好了或达到了最大澄清轮数
+                    if status["ready_to_execute"]:
+                        print(f"\n🤖 助手: 需求已明确。")
+                        print(f"   目标: {status['refined_goal'] or status['original_goal']}")
+                        
+                        confirm = input("\n是否开始执行? (y/n): ")
+                        if confirm.lower() == 'y':
+                            print("🚀 启动工作流...")
+                            res = handler.confirm_session(session_id)
+                            # 自动执行
+                            exec_res = handler.execute_session(session_id, auto_execute=True)
+                            
+                            # 问题3修复：真正执行工作流，而不是立即退出
+                            if exec_res.get("execution") and exec_res["execution"].get("action") == "execute_workflow":
+                                # 调用 wfauto 真正执行工作流
+                                final_goal = exec_res.get("final_goal") or status.get('refined_goal') or status.get('original_goal') or ""
+                                print(f"\n🎯 执行目标: {final_goal}")
+                                
+                                # 创建 wfauto 参数（包含所有必需属性）
+                                import argparse
+                                wfauto_args = argparse.Namespace(
+                                    workspace=getattr(args, 'workspace', None),
+                                    intent=final_goal,
+                                    use_agent=True,
+                                    use_llm=True,
+                                    no_agent=False,
+                                    parallel=False,
+                                    keep_state=False,
+                                    # 从原始 args 复制可能存在的属性
+                                    skills=getattr(args, 'skills', None),
+                                    roles=getattr(args, 'roles', None),
+                                    workflow=getattr(args, 'workflow', None),
+                                    context=getattr(args, 'context', None),
+                                    state=getattr(args, 'state', None),
+                                    team=getattr(args, 'team', None),
+                                    no_restore_state=getattr(args, 'no_restore_state', False),
+                                    no_auto_save=getattr(args, 'no_auto_save', False)
+                                )
+                                try:
+                                    cmd_wfauto(wfauto_args)
+                                except Exception as e:
+                                    print(f"❌ 工作流执行失败: {e}", file=sys.stderr)
+                                    import traceback
+                                    traceback.print_exc()
+                            else:
+                                print(f"✅ 工作流已启动: {exec_res.get('routing', {}).get('description', '执行中...')}")
+                            break
+                        else:
+                            print("✋ 操作已取消。")
+                            break
+                    else:
+                        # 虽然没有待回答的问题，但置信度依然不够或达到最大轮数
+                        print("\n🤖 助手: 虽然还有些不确定，但我们可以先开始尝试。")
+                        confirm = input("是否开始执行? (y/n): ")
+                        if confirm.lower() == 'y':
+                            handler.confirm_session(session_id)
+                            exec_res = handler.execute_session(session_id, auto_execute=True)
+                            
+                            # 问题3修复：真正执行工作流，而不是立即退出
+                            if exec_res.get("execution") and exec_res["execution"].get("action") == "execute_workflow":
+                                # 调用 wfauto 真正执行工作流
+                                final_goal = exec_res.get("final_goal", "")
+                                print(f"\n🎯 执行目标: {final_goal}")
+                                
+                                # 创建 wfauto 参数（包含所有必需属性）
+                                import argparse
+                                wfauto_args = argparse.Namespace(
+                                    workspace=getattr(args, 'workspace', None),
+                                    intent=final_goal,
+                                    use_agent=True,
+                                    use_llm=True,
+                                    no_agent=False,
+                                    parallel=False,
+                                    keep_state=False,
+                                    # 从原始 args 复制可能存在的属性
+                                    skills=getattr(args, 'skills', None),
+                                    roles=getattr(args, 'roles', None),
+                                    workflow=getattr(args, 'workflow', None),
+                                    context=getattr(args, 'context', None),
+                                    state=getattr(args, 'state', None),
+                                    team=getattr(args, 'team', None),
+                                    no_restore_state=getattr(args, 'no_restore_state', False),
+                                    no_auto_save=getattr(args, 'no_auto_save', False)
+                                )
+                                try:
+                                    cmd_wfauto(wfauto_args)
+                                except Exception as e:
+                                    print(f"❌ 工作流执行失败: {e}", file=sys.stderr)
+                                    import traceback
+                                    traceback.print_exc()
+                            else:
+                                print(f"✅ 工作流已启动: {exec_res.get('routing', {}).get('description', '执行中...')}")
+                            break
+                        else:
+                            break
+                            
+    except KeyboardInterrupt:
+        print("\n👋 再见!")
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+
+
+def cmd_template_list(args):
+    """列出团队模板"""
+    library = TeamTemplateLibrary()
+    templates = library.list_all()
+    
+    print("\n" + "=" * 60)
+    print(f"{'ID':20} {'名称':20} {'行业':10} {'模式'}")
+    print("-" * 60)
+    for t in templates:
+        print(f"{t.id:20} {t.name:20} {t.industry:10} {t.workflow_pattern}")
+    print("=" * 60)
+
+
+def cmd_template_show(args):
+    """显示模板详情"""
+    library = TeamTemplateLibrary()
+    template = library.get_by_id(args.template_id)
+    
+    if not template:
+        print(f"❌ 找不到模板: {args.template_id}")
+        return
+        
+    print("\n" + "=" * 60)
+    print(f"模板: {template.name} ({template.id})")
+    print(f"描述: {template.description}")
+    print(f"行业: {template.industry}")
+    print(f"模式: {template.workflow_pattern}")
+    
+    print("\n角色:")
+    for r in template.roles:
+        print(f"  - {r.name} ({r.id}): {r.description}")
+        
+    print("\n阶段:")
+    for s in template.stages:
+        print(f"  {s.order}. {s.name} (角色: {s.role})")
+    print("=" * 60)
+
+
+def cmd_skill_version(args):
+    """显示技能版本信息"""
+    try:
+        engine, _, _ = _init_engine(args)
+        manager = SkillVersionManager(engine.role_manager.skill_library)
+        
+        skill = engine.role_manager.skill_library.get(args.skill_id)
+        if not skill:
+            print(f"❌ 找不到技能: {args.skill_id}")
+            return
+            
+        print("\n" + "=" * 60)
+        print(f"技能: {skill.name} ({skill.id})")
+        print(f"版本: {skill.version}")
+        if skill.deprecated:
+            print("⚠️  状态: 已弃用")
+            if skill.replacement_skill_id:
+                print(f"建议替代: {skill.replacement_skill_id}")
+        else:
+            print("✅ 状态: 正常")
+            
+        if skill.dependencies:
+            print("\n依赖:")
+            for dep in skill.dependencies:
+                print(f"  - {dep.skill_id} ({dep.version_constraint})")
+                
+        if skill.changelog:
+            print("\n变更日志:")
+            for entry in skill.changelog[-5:]: # 显示最后5条
+                print(f"  - {entry}")
+        print("=" * 60)
+    except Exception as e:
+        print(f"❌ 错误: {e}")
+
+
+def cmd_skill_learning(args):
+    """技能学习系统命令"""
+    try:
+        engine, _, _ = _init_engine(args)
+        # 获取执行跟踪器（通常在 orchestrator 中）
+        orchestrator = AgentOrchestrator(engine)
+        learning_system = SkillLearningSystem(orchestrator.execution_tracker)
+        
+        if args.skill_id:
+            metrics = learning_system.get_skill_metrics(args.skill_id)
+            print("\n" + "=" * 60)
+            print(f"技能分析: {args.skill_id}")
+            print(f"执行次数: {metrics.total_executions}")
+            print(f"成功率: {metrics.success_rate:.1%}")
+            print(f"平均耗时: {metrics.avg_execution_time:.1f}s")
+            print(f"可靠性评分: {metrics.reliability_score:.2f}")
+            print(f"趋势: {metrics.trend}")
+            
+            if metrics.error_distribution:
+                print("\n错误分布:")
+                for err, count in metrics.error_distribution.items():
+                    print(f"  - {err}: {count}")
+                    
+            # 改进建议
+            skill = engine.role_manager.skill_library.get(args.skill_id)
+            if skill:
+                suggestions = learning_system.suggest_improvements(skill)
+                if suggestions:
+                    print("\n💡 改进建议:")
+                    for s in suggestions:
+                        print(f"  - [{s.type}] {s.description}")
+                        print(f"    原因: {s.reasoning}")
+            print("=" * 60)
+        else:
+            # 列出所有技能的概览
+            print("\n" + "=" * 60)
+            print(f"{'技能ID':20} {'执行次数':10} {'成功率':10} {'可靠性'}")
+            print("-" * 60)
+            for sid in engine.role_manager.skill_library:
+                m = learning_system.get_skill_metrics(sid)
+                if m.total_executions > 0:
+                    print(f"{sid:20} {m.total_executions:10} {m.success_rate:10.1%} {m.reliability_score:10.2f}")
+            print("=" * 60)
+            
+    except Exception as e:
+        print(f"❌ 错误: {e}")
 
 
 def main():
@@ -4339,6 +4656,34 @@ def main():
     intent_parser.add_argument("--use-llm", action="store_true", help="强制使用LLM")
     intent_parser.add_argument("--no-llm", action="store_true", help="强制使用规则引擎")
     intent_parser.set_defaults(func=cmd_intent)
+    
+    # chat 命令 (P0 optimization)
+    chat_parser = subparsers.add_parser("chat", help="启动交互式对话助手（支持多轮需求澄清）")
+    chat_parser.add_argument("--session", help="会话 ID (可选，继续之前的会话)")
+    chat_parser.set_defaults(func=cmd_chat)
+    
+    # template 命令组 (P0 optimization)
+    template_parser = subparsers.add_parser("template", help="管理团队配置模板")
+    template_subparsers = template_parser.add_subparsers(dest="template_command", help="模板子命令")
+    
+    template_list_parser = template_subparsers.add_parser("list", help="列出所有可用模板")
+    template_list_parser.set_defaults(func=cmd_template_list)
+    
+    template_show_parser = template_subparsers.add_parser("show", help="显示模板详情")
+    template_show_parser.add_argument("template_id", help="模板 ID")
+    template_show_parser.set_defaults(func=cmd_template_show)
+    
+    # skill 子命令扩展 (P0/P1 optimization)
+    skill_parser = subparsers.add_parser("skill", help="管理技能版本与学习系统")
+    skill_subparsers = skill_parser.add_subparsers(dest="skill_command", help="技能子命令")
+    
+    skill_version_parser = skill_subparsers.add_parser("version", help="显示技能版本与依赖")
+    skill_version_parser.add_argument("skill_id", help="技能 ID")
+    skill_version_parser.set_defaults(func=cmd_skill_version)
+    
+    skill_learning_parser = skill_subparsers.add_parser("learning", help="技能执行效果分析与改进建议")
+    skill_learning_parser.add_argument("skill_id", nargs="?", help="技能 ID (可选，默认显示概览)")
+    skill_learning_parser.set_defaults(func=cmd_skill_learning)
     
     # agent-execute 命令（类似 MetaGPT）
     if _agents_available:

@@ -28,7 +28,9 @@ class WorkflowEngine:
         quality_gates: Optional[QualityGateSystem] = None,
         state_storage: Optional[StateStorage] = None,
         auto_save_state: bool = True,
-        state_file: Optional[Path] = None
+        state_file: Optional[Path] = None,
+        generate_document_files: bool = True,
+        copy_documents_to_docs: bool = False
     ):
         """
         Initialize workflow engine.
@@ -40,6 +42,11 @@ class WorkflowEngine:
             state_storage: Optional StateStorage instance (for dependency injection)
             auto_save_state: Whether to automatically save state on stage transitions
             state_file: Path to state file (default: .workflow/state.yaml)
+            generate_document_files: Whether to generate actual document files. 
+                                   If False, documents are only kept in memory/preview.
+                                   Default: True (backward compatible)
+            copy_documents_to_docs: Whether to copy document/report files to docs/ directory
+                                  in addition to .workflow/outputs/. Default: False
         """
         self.workspace_path = Path(workspace_path)
         self.role_manager = role_manager or RoleManager()
@@ -54,6 +61,8 @@ class WorkflowEngine:
         self.state_storage = state_storage or FileStateStorage()
         self.auto_save_state = auto_save_state
         self.state_file = state_file or (self.workspace_path / ".workflow" / "state.yaml")
+        self.generate_document_files = generate_document_files
+        self.copy_documents_to_docs = copy_documents_to_docs
     
         # Checkpoint manager (lazy initialization)
         self._checkpoint_manager: Optional[Any] = None

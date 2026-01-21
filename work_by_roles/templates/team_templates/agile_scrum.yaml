@@ -1,0 +1,109 @@
+# Agile Scrum Team Template
+id: agile_scrum
+name: 敏捷Scrum团队
+description: 标准的Scrum敏捷开发团队，包含产品负责人、Scrum Master和开发团队
+industry: agile
+workflow_pattern: agile
+
+roles:
+  - id: product_owner
+    name: Product Owner
+    description: 产品负责人，负责产品愿景和需求优先级
+    domain: product
+    responsibility: 定义产品愿景，管理产品待办列表，确定需求优先级
+    skills:
+      - requirements_analysis
+    constraints:
+      allowed_actions:
+        - define_requirements
+        - prioritize_backlog
+        - accept_user_stories
+      forbidden_actions:
+        - write_code
+        - deploy_system
+
+  - id: scrum_master
+    name: Scrum Master
+    description: Scrum Master，负责流程管理和障碍清除
+    domain: process
+    responsibility: 促进Scrum流程，清除障碍，保护团队
+    skills:
+      - quality_assurance
+    constraints:
+      allowed_actions:
+        - facilitate_meetings
+        - remove_blockers
+        - coach_team
+      forbidden_actions:
+        - assign_tasks
+        - make_technical_decisions
+
+  - id: developer
+    name: Developer
+    description: 开发人员，负责实现用户故事
+    domain: fullstack
+    responsibility: 设计和实现软件功能，编写测试，维护代码质量
+    skills:
+      - python_engineering
+      - test_driven_development
+      - system_design
+    constraints:
+      allowed_actions:
+        - write_code
+        - write_tests
+        - design_architecture
+      forbidden_actions:
+        - change_requirements
+        - skip_code_review
+
+  - id: qa_engineer
+    name: QA Engineer
+    description: 质量保证工程师，负责测试和质量门控
+    domain: qa
+    responsibility: 编写测试用例，执行测试，确保质量标准
+    skills:
+      - quality_assurance
+      - test_driven_development
+    constraints:
+      allowed_actions:
+        - write_tests
+        - run_tests
+        - report_bugs
+      forbidden_actions:
+        - skip_testing
+        - approve_without_tests
+
+skills:
+  - requirements_analysis
+  - system_design
+  - python_engineering
+  - test_driven_development
+  - quality_assurance
+
+stages:
+  - id: sprint_planning
+    name: Sprint计划
+    role: product_owner
+    order: 1
+  - id: design
+    name: 设计
+    role: developer
+    order: 2
+  - id: implementation
+    name: 实现
+    role: developer
+    order: 3
+  - id: testing
+    name: 测试
+    role: qa_engineer
+    order: 4
+  - id: review
+    name: 评审
+    role: scrum_master
+    order: 5
+
+tags:
+  - agile
+  - scrum
+  - sprint
+  - team

@@ -95,14 +95,25 @@ class RoleManager:
             metadata=data.get("metadata", {"external": True})
         )
 
-    def load_skill_library(self, schema_data: Dict[str, Any]) -> None:
-        """Load skill library definitions"""
+    def load_skill_library(self, schema_data: Dict[str, Any], merge_with_existing: bool = False) -> None:
+        """
+        Load skill library definitions
+        
+        Args:
+            schema_data: Skill library schema data
+            merge_with_existing: If True, merge with existing skill library (allowing overrides).
+                               If False, replace existing skill library (default).
+        """
         if 'schema_version' not in schema_data:
             raise ValidationError("Missing schema_version in skill library")
         if 'skills' not in schema_data:
             raise ValidationError("Missing 'skills' in skill library")
 
-        library: Dict[str, Skill] = {}
+        # Initialize library: merge with existing or start fresh
+        if merge_with_existing and self.skill_library:
+            library: Dict[str, Skill] = self.skill_library.copy()
+        else:
+            library: Dict[str, Skill] = {}
         for skill_data in schema_data.get('skills', []):
             required_fields = ['id', 'name', 'description']
             for field in required_fields:
@@ -115,7 +126,11 @@ class RoleManager:
 
             skill_id = skill_data['id']
             if skill_id in library:
-                raise ValidationError(f"Duplicate skill id '{skill_id}' in skill library")
+                if merge_with_existing:
+                    # Allow override when merging (team skills override shared skills)
+                    pass
+                else:
+                    raise ValidationError(f"Duplicate skill id '{skill_id}' in skill library")
 
             # Resolve variables in description and constraints
             description = VariableResolver.resolve(skill_data['description'], self.context)

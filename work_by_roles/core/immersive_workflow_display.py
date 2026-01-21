@@ -132,7 +132,7 @@ class ImmersiveWorkflowDisplay:
         
         return content
     
-    def display_document_generated(self, document_name: str) -> str:
+    def display_document_generated(self, document_name: str, preview_only: bool = False) -> str:
         """Display document generation"""
         current_progress = self.progress_manager.current_progress
         if current_progress and current_progress.current_stage:
@@ -145,7 +145,10 @@ class ImmersiveWorkflowDisplay:
         
         lines = []
         lines.append("=" * 60)
-        lines.append(f"✅ 文档已生成: {document_name}")
+        if preview_only:
+            lines.append(f"📄 文档预览: {document_name} (仅预览，未保存到磁盘)")
+        else:
+            lines.append(f"✅ 文档已生成: {document_name}")
         lines.append("=" * 60)
         lines.append("")
         lines.append(preview)

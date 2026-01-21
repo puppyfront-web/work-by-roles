@@ -140,8 +140,66 @@ class Agent:
         if not self.context:
             raise ValueError("Agent not prepared")
         
+        # Check if document files should be generated
+        if output_type in ("document", "report") and not getattr(self.engine, 'generate_document_files', True):
+            # Store content in memory for later stages to access
+            # Use a dict format to store both content and metadata
+            self.context.outputs[name] = {
+                "content": content,
+                "type": output_type,
+                "preview_only": True,
+                "stage_id": stage_id
+            }
+            print(f"📄 Document preview generated: {name} (stored in memory, not saved to disk)")
+            return
+        
+        # Auto-detect output_type from filename if not explicitly provided or is "code"
+        if output_type == "code" and stage_id:
+            # Check if this matches a stage output definition
+            if self.engine.workflow:
+                for stage in self.engine.workflow.stages:
+                    if stage.id == stage_id and stage.outputs:
+                        for output in stage.outputs:
+                            if output.name == name:
+                                output_type = output.type
+                                break
+                        if output_type != "code":
+                            break
+        
+        # Fallback: infer from filename patterns
+        if output_type == "code":
+            name_lower = name.lower()
+            if name_lower.startswith("stage") and name_lower.endswith((".md", ".txt")):
+                output_type = "document"
+            elif name_lower.endswith((".md", ".txt", ".rst")):
+                output_type = "document"
+            elif name_lower.endswith((".json", ".xml", ".yaml", ".yml")):
+                output_type = "report"
+        
         # Get output path using unified path calculation
         path = self._get_output_path(name, output_type, stage_id)
+        
+        # Safety check: Ensure documents/reports don't end up in workspace root
+        if output_type in ("document", "report"):
+            # Check if path is in workspace root (not in a subdirectory)
+            if path.parent == self.engine.workspace_path:
+                # This is wrong - documents should not be in root
+                # Recalculate with explicit stage_id if not provided
+                if stage_id is None:
+                    if self.engine.executor and self.engine.executor.state:
+                        stage_id = self.engine.executor.state.current_stage
+                    if stage_id is None:
+                        stage_id = "default"
+                # Recalculate correct path
+                workflow_id = "default"
+                if self.engine.workflow:
+                    workflow_id = self.engine.workflow.id
+                path = self.engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / name
+                import warnings
+                warnings.warn(
+                    f"Document {name} was going to be saved to workspace root. "
+                    f"Redirected to: {path.relative_to(self.engine.workspace_path)}"
+                )
         
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding='utf-8')
@@ -216,11 +274,17 @@ class Agent:
                 prompt.append(f"- {output.name} ({output.type}) -> {relative_path}")
             prompt.append("")
             prompt.append("CRITICAL: File Output Instructions:")
-            prompt.append("- For document/report outputs, use agent.produce_output(...)")
-            prompt.append("- Do NOT write files directly with tools")
-            prompt.append("- document/report files go to .workflow/outputs/{workflow_id}/{stage_id}/")
-            prompt.append("- code/test files go to workspace root")
-            prompt.append("- Example: agent.produce_output('STAGE1_REQUIREMENTS.md', content, 'document', 'requirements')")
+            prompt.append("- ALWAYS use agent.produce_output(name, content, output_type, stage_id) for ALL file outputs")
+            prompt.append("- NEVER write files directly with write() or other file tools")
+            prompt.append("- NEVER write document/report files to workspace root - they will be automatically moved")
+            prompt.append("- For document/report outputs: output_type='document' or 'report'")
+            prompt.append("- For code/test outputs: output_type='code' or 'tests'")
+            prompt.append("- document/report files automatically go to .workflow/outputs/{workflow_id}/{stage_id}/")
+            prompt.append("- code/test files automatically go to workspace root")
+            prompt.append("- If you write a document file directly, it will be detected and moved automatically")
+            prompt.append("- Examples:")
+            for output in stage.outputs:
+                prompt.append(f"  * agent.produce_output('{output.name}', content, '{output.type}', '{stage.id}')")
             prompt.append("")
             
         # 6. Role-Specific Instructions

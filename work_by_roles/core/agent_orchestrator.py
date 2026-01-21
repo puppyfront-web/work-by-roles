@@ -683,6 +683,18 @@ class AgentOrchestrator:
             stage_summary=stage_summary
         )
         
+        # Share agent context with other agents (so next stages can access document contents)
+        if agent:
+            try:
+                agent.share_context(include_outputs=True)
+            except Exception as e:
+                # Don't fail if context sharing fails
+                warnings.warn(f"Failed to share agent context: {e}")
+        
+        # Cleanup: Move any documents that were incorrectly written to workspace root
+        if stage:
+            self._cleanup_root_documents(stage)
+        
         # Display stage completion if immersive mode enabled
         if immersive and self.immersive_display and stage:
             # display_stage_complete already streams output, no need to print again
@@ -773,6 +785,16 @@ class AgentOrchestrator:
                         stage_id=stage.id
                     )
                     
+                    # Optionally copy document/report files to docs/ directory
+                    if output.type in ("document", "report"):
+                        copy_to_docs = getattr(self.engine, 'copy_documents_to_docs', False)
+                        if copy_to_docs:
+                            docs_dir = self.engine.workspace_path / "docs"
+                            docs_dir.mkdir(exist_ok=True)
+                            docs_path = docs_dir / output.name
+                            docs_path.write_text(content, encoding='utf-8')
+                            print(f"📄 Document also copied to: {docs_path.relative_to(self.engine.workspace_path)}")
+                    
                     # Use immersive display if available
                     if immersive and self.immersive_display:
                         output_path = agent._get_output_path(output.name, output.type, stage.id)
@@ -796,6 +818,80 @@ class AgentOrchestrator:
                         )
                     else:
                         warnings.warn(f"Failed to produce output file {output.name}: {e}")
+    
+    def _cleanup_root_documents(self, stage: Stage) -> None:
+        """
+        Cleanup function: Move any documents incorrectly written to workspace root.
+        
+        This function checks the workspace root for document files that match stage outputs
+        and moves them to the correct location (.workflow/outputs/).
+        
+        Args:
+            stage: Current stage definition
+        """
+        if not stage.outputs:
+            return
+        
+        workflow_id = "default"
+        if self.engine.workflow:
+            workflow_id = self.engine.workflow.id
+        
+        for output in stage.outputs:
+            if output.type not in ("document", "report"):
+                continue
+            
+            # Check if file exists in workspace root (wrong location)
+            root_file = self.engine.workspace_path / output.name
+            if root_file.exists() and root_file.is_file():
+                # Calculate correct path
+                correct_path = self.engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage.id / output.name
+                
+                try:
+                    # Create directory if needed
+                    correct_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Move file to correct location
+                    if correct_path.exists():
+                        # If target exists, compare content
+                        root_content = root_file.read_text(encoding='utf-8')
+                        correct_content = correct_path.read_text(encoding='utf-8')
+                        if root_content != correct_content:
+                            # Keep the newer one
+                            root_mtime = root_file.stat().st_mtime
+                            correct_mtime = correct_path.stat().st_mtime
+                            if root_mtime > correct_mtime:
+                                correct_path.write_text(root_content, encoding='utf-8')
+                            root_file.unlink()
+                            print(f"⚠️  文档 {output.name} 已从根目录移动到正确位置: {correct_path.relative_to(self.engine.workspace_path)}")
+                        else:
+                            # Same content, just remove root file
+                            root_file.unlink()
+                            print(f"⚠️  已删除根目录中的重复文档: {output.name}")
+                    else:
+                        # Move to correct location
+                        root_file.rename(correct_path)
+                        print(f"⚠️  文档 {output.name} 已从根目录移动到正确位置: {correct_path.relative_to(self.engine.workspace_path)}")
+                except Exception as e:
+                    warnings.warn(f"Failed to move document {output.name} from root: {e}")
+        
+        # Also check for common document patterns in root
+        doc_patterns = ["STAGE*.md", "STAGE*.txt", "*REQUIREMENTS*.md", "*ARCHITECTURE*.md", "*VALIDATION*.md"]
+        for pattern in doc_patterns:
+            for root_file in self.engine.workspace_path.glob(pattern):
+                if root_file.is_file() and root_file.name not in ["README.md"]:
+                    # Try to determine stage_id from filename or use current stage
+                    stage_id = stage.id if stage else "default"
+                    
+                    # Calculate correct path
+                    correct_path = self.engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage_id / root_file.name
+                    
+                    try:
+                        correct_path.parent.mkdir(parents=True, exist_ok=True)
+                        if not correct_path.exists():
+                            root_file.rename(correct_path)
+                            print(f"⚠️  文档 {root_file.name} 已从根目录移动到正确位置: {correct_path.relative_to(self.engine.workspace_path)}")
+                    except Exception as e:
+                        warnings.warn(f"Failed to move document {root_file.name} from root: {e}")
     
     def _extract_or_generate_content(
         self,
@@ -852,12 +948,20 @@ class AgentOrchestrator:
                         if path.exists():
                             return path.read_text(encoding='utf-8')
         
-        # Priority 2: Check agent context outputs
+        # Priority 2: Check agent context outputs (including memory-stored content)
         if agent and agent.context and agent.context.outputs:
             if output.name in agent.context.outputs:
-                output_path = Path(agent.context.outputs[output.name])
-                if output_path.exists():
-                    return output_path.read_text(encoding='utf-8')
+                output_value = agent.context.outputs[output.name]
+                
+                # Check if content is stored in memory (when generate_document_files=False)
+                if isinstance(output_value, dict) and "content" in output_value:
+                    return output_value["content"]
+                
+                # Otherwise, try to read from file path
+                if isinstance(output_value, str):
+                    output_path = Path(output_value)
+                    if output_path.exists():
+                        return output_path.read_text(encoding='utf-8')
         
         # Priority 3: Generate basic template if required
         if output.required:

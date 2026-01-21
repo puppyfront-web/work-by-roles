@@ -5,7 +5,7 @@ Enumeration classes for the workflow engine.
 from enum import Enum
 
 
-class StageStatus(Enum):
+class StageStatus(str, Enum):
     """Stage execution status"""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -14,7 +14,7 @@ class StageStatus(Enum):
     FAILED = "failed"
 
 
-class SkillErrorType(Enum):
+class SkillErrorType(str, Enum):
     """Types of errors that can occur during skill execution"""
     VALIDATION_ERROR = "validation_error"  # Input validation failed
     EXECUTION_ERROR = "execution_error"    # Execution failed
@@ -23,7 +23,7 @@ class SkillErrorType(Enum):
     INSUFFICIENT_CONTEXT = "insufficient_context"  # Insufficient context
 
 
-class SkillWorkflowStepStatus(Enum):
+class SkillWorkflowStepStatus(str, Enum):
     """Status of a skill workflow step"""
     PENDING = "pending"
     READY = "ready"       # Dependencies met, ready to execute
@@ -33,7 +33,7 @@ class SkillWorkflowStepStatus(Enum):
     SKIPPED = "skipped"
 
 
-class IntentType(Enum):
+class IntentType(str, Enum):
     """User intent types"""
     FEATURE_REQUEST = "feature_request"  # 需求实现
     BUG_FIX = "bug_fix"                   # Bug修复

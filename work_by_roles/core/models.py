@@ -20,6 +20,32 @@ from .enums import SkillWorkflowStepStatus, StageStatus
 # ============================================================================
 
 @dataclass
+class SkillDependency:
+    """Dependency on another skill with version constraint"""
+    skill_id: str
+    version_constraint: str = ">=1.0.0"  # Semantic version constraint: ">=1.0.0", "^2.0", "~1.2"
+    optional: bool = False  # Whether dependency is optional
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "skill_id": self.skill_id,
+            "version_constraint": self.version_constraint,
+            "optional": self.optional
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SkillDependency':
+        if isinstance(data, str):
+            # Simple format: just skill_id
+            return cls(skill_id=data)
+        return cls(
+            skill_id=data["skill_id"],
+            version_constraint=data.get("version_constraint", ">=1.0.0"),
+            optional=data.get("optional", False)
+        )
+
+
+@dataclass
 class Skill:
     """Skill definition loaded from the skill library"""
     id: str
@@ -40,6 +66,53 @@ class Skill:
     side_effects: List[str] = field(default_factory=list)  # ["file_write", "api_call", "none"]
     deterministic: bool = False  # Whether the skill is idempotent
     testable: bool = True  # Whether the skill can be tested
+    
+    # ========================================================================
+    # Version Management Fields (P0 Enhancement)
+    # ========================================================================
+    version: str = "1.0.0"  # Semantic version (MAJOR.MINOR.PATCH)
+    dependencies: List[SkillDependency] = field(default_factory=list)  # Dependencies on other skills
+    changelog: List[str] = field(default_factory=list)  # Version history
+    deprecated: bool = False  # Whether skill is deprecated
+    replacement_skill_id: Optional[str] = None  # Replacement skill if deprecated
+    min_compatible_version: Optional[str] = None  # Minimum compatible version for upgrades
+    tags: List[str] = field(default_factory=list)  # Tags for discovery
+    
+    # Metrics fields (for learning system)
+    execution_count: int = 0
+    success_rate: float = 0.0
+    avg_execution_time: float = 0.0
+    last_executed: Optional[datetime] = None
+    
+    def get_version_tuple(self) -> tuple:
+        """Get version as tuple for comparison"""
+        try:
+            parts = self.version.split('.')
+            return tuple(int(p) for p in parts[:3])
+        except (ValueError, AttributeError):
+            return (1, 0, 0)
+    
+    def is_compatible_with(self, other_version: str) -> bool:
+        """Check if this skill is compatible with another version"""
+        try:
+            other_tuple = tuple(int(p) for p in other_version.split('.')[:3])
+            self_tuple = self.get_version_tuple()
+            # Major version must match for compatibility
+            return self_tuple[0] == other_tuple[0]
+        except (ValueError, AttributeError):
+            return True
+    
+    def to_version_dict(self) -> Dict[str, Any]:
+        """Get version-related info as dict"""
+        return {
+            "id": self.id,
+            "version": self.version,
+            "dependencies": [d.to_dict() for d in self.dependencies],
+            "changelog": self.changelog,
+            "deprecated": self.deprecated,
+            "replacement_skill_id": self.replacement_skill_id,
+            "min_compatible_version": self.min_compatible_version
+        }
 
 
 @dataclass
@@ -595,6 +668,7 @@ class ContextSummary:
     key_outputs: List[str]  # Only output file names, not content
     current_goal: str  # Current stage goal
     completed_stages: List[str]  # List of completed stage IDs
+    document_contents: Dict[str, str] = field(default_factory=dict)  # Document contents from previous stages
     current_role: Optional[str] = None
     
     def to_text(self) -> str:
@@ -604,6 +678,12 @@ class ContextSummary:
             parts.append(f"阶段摘要: {self.stage_summary}")
         if self.key_outputs:
             parts.append(f"关键输出: {', '.join(self.key_outputs)}")
+        if self.document_contents:
+            parts.append("\n前序阶段文档内容:")
+            for doc_name, content in self.document_contents.items():
+                # Truncate long documents to avoid token explosion
+                preview = content[:500] + "..." if len(content) > 500 else content
+                parts.append(f"\n{doc_name}:\n{preview}")
         if self.current_goal:
             parts.append(f"当前目标: {self.current_goal}")
         return "\n".join(parts)
@@ -615,6 +695,7 @@ class ContextSummary:
             return cls(
                 stage_summary="工作流未初始化",
                 key_outputs=[],
+                document_contents={},
                 current_goal="",
                 completed_stages=[],
                 current_role=None
@@ -636,8 +717,10 @@ class ContextSummary:
             if current_stage:
                 stage_summary += f" → {current_stage.name} (进行中)"
         
-        # Get key outputs (only file names)
+        # Get key outputs (file names and content from memory if available)
         key_outputs = []
+        document_contents = {}  # Store document contents for later stages
+        
         for stage_id in completed:
             stage = engine.executor._get_stage_by_id(stage_id)
             if stage and stage.outputs:
@@ -647,10 +730,45 @@ class ContextSummary:
                     if output.type in ("document", "report"):
                         # All document and report types go to .workflow/outputs/{workflow_id}/{stage_id}/
                         output_path = engine.workspace_path / ".workflow" / "outputs" / workflow_id / stage.id / output.name
+                        
+                        # Check if file exists
+                        if output_path.exists():
+                            key_outputs.append(output.name)
+                            # Read content for document/report types
+                            try:
+                                document_contents[output.name] = output_path.read_text(encoding='utf-8')
+                            except Exception:
+                                pass
+                        else:
+                            # Check if content is stored in memory (from previous agent context)
+                            # This happens when generate_document_files=False
+                            # Try to get from message bus if available
+                            key_outputs.append(output.name)  # Still add to list even if not on disk
+                            
+                            # Try to get content from message bus (shared contexts)
+                            if engine.executor and hasattr(engine.executor, 'orchestrator'):
+                                orchestrator = engine.executor.orchestrator
+                                if orchestrator and hasattr(orchestrator, 'message_bus'):
+                                    all_contexts = orchestrator.message_bus.get_all_contexts()
+                                    for agent_id, context_data in all_contexts.items():
+                                        if context_data.get("outputs") and output.name in context_data["outputs"]:
+                                            output_value = context_data["outputs"][output.name]
+                                            if isinstance(output_value, dict) and "content" in output_value:
+                                                document_contents[output.name] = output_value["content"]
+                                                break
+                                            elif isinstance(output_value, str) and not output_value.startswith("[preview_only"):
+                                                # Might be a file path, try to read it
+                                                try:
+                                                    path = Path(output_value)
+                                                    if path.exists():
+                                                        document_contents[output.name] = path.read_text(encoding='utf-8')
+                                                        break
+                                                except Exception:
+                                                    pass
                     else:
                         output_path = engine.workspace_path / output.name
-                    if output_path.exists():
-                        key_outputs.append(output.name)
+                        if output_path.exists():
+                            key_outputs.append(output.name)
         
         # Get current goal
         current_goal = ""
@@ -662,6 +780,7 @@ class ContextSummary:
         return cls(
             stage_summary=stage_summary,
             key_outputs=key_outputs,
+            document_contents=document_contents,
             current_goal=current_goal,
             completed_stages=list(completed),
             current_role=current

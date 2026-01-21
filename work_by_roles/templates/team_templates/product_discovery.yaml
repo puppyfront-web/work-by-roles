@@ -1,0 +1,129 @@
+# Product Discovery Team Template
+id: product_discovery
+name: 产品发现团队
+description: 专注于产品发现和用户研究的团队
+industry: product
+workflow_pattern: lean
+
+roles:
+  - id: product_manager
+    name: Product Manager
+    description: 产品经理，负责产品战略和路线图
+    domain: product
+    responsibility: 定义产品战略，管理产品路线图，协调跨职能团队
+    skills:
+      - requirements_analysis
+    constraints:
+      allowed_actions:
+        - define_strategy
+        - manage_roadmap
+        - stakeholder_communication
+      forbidden_actions:
+        - write_code
+        - make_technical_decisions
+
+  - id: ux_researcher
+    name: UX Researcher
+    description: 用户体验研究员，负责用户研究和洞察
+    domain: design
+    responsibility: 进行用户研究，分析用户行为，提供设计洞察
+    skills:
+      - requirements_analysis
+    constraints:
+      allowed_actions:
+        - conduct_research
+        - analyze_data
+        - present_insights
+      forbidden_actions:
+        - make_product_decisions
+        - skip_user_validation
+
+  - id: ux_designer
+    name: UX Designer
+    description: 用户体验设计师，负责交互设计和原型
+    domain: design
+    responsibility: 设计用户界面，创建原型，进行可用性测试
+    skills:
+      - system_design
+      - schema_design
+    constraints:
+      allowed_actions:
+        - design_interfaces
+        - create_prototypes
+        - usability_testing
+      forbidden_actions:
+        - skip_user_testing
+        - ignore_research
+
+  - id: data_analyst
+    name: Data Analyst
+    description: 数据分析师，负责数据分析和指标追踪
+    domain: analytics
+    responsibility: 分析产品数据，追踪关键指标，提供数据驱动的建议
+    skills:
+      - requirements_analysis
+      - quality_assurance
+    constraints:
+      allowed_actions:
+        - analyze_metrics
+        - create_reports
+        - data_modeling
+      forbidden_actions:
+        - manipulate_data
+        - skip_validation
+
+skills:
+  - requirements_analysis
+  - system_design
+  - schema_design
+  - quality_assurance
+
+stages:
+  - id: discovery
+    name: 发现
+    role: product_manager
+    order: 1
+    outputs:
+      - name: OPPORTUNITY_ASSESSMENT.md
+        type: document
+  - id: research
+    name: 用户研究
+    role: ux_researcher
+    order: 2
+    outputs:
+      - name: USER_RESEARCH_REPORT.md
+        type: document
+  - id: ideation
+    name: 创意设计
+    role: ux_designer
+    order: 3
+    outputs:
+      - name: DESIGN_SPECS.md
+        type: document
+  - id: validation
+    name: 验证
+    role: data_analyst
+    order: 4
+    outputs:
+      - name: VALIDATION_REPORT.md
+        type: document
+  - id: iteration
+    name: 迭代
+    role: product_manager
+    order: 5
+    outputs:
+      - name: ITERATION_PLAN.md
+        type: document
+
+tags:
+  - product
+  - discovery
+  - ux
+  - research
+
+metadata:
+  recommended_for:
+    - new_products
+    - feature_exploration
+    - market_validation
+  typical_duration: 4-8 weeks

@@ -1,0 +1,107 @@
+# Startup MVP Team Template
+id: startup_mvp
+name: 创业MVP团队
+description: 精简的创业团队，专注于快速构建MVP
+industry: startup
+workflow_pattern: lean
+
+roles:
+  - id: tech_lead
+    name: Tech Lead
+    description: 技术负责人，负责技术决策和架构
+    domain: fullstack
+    responsibility: 做出技术决策，设计系统架构，指导团队
+    skills:
+      - system_design
+      - python_engineering
+      - schema_design
+    constraints:
+      allowed_actions:
+        - design_architecture
+        - make_tech_decisions
+        - code_review
+      forbidden_actions:
+        - ignore_tech_debt
+        - skip_security
+
+  - id: fullstack_dev
+    name: Fullstack Developer
+    description: 全栈开发者，负责前后端开发
+    domain: fullstack
+    responsibility: 实现全栈功能，从数据库到用户界面
+    skills:
+      - python_engineering
+      - test_driven_development
+    constraints:
+      allowed_actions:
+        - write_code
+        - write_tests
+        - deploy
+      forbidden_actions:
+        - skip_tests
+        - bypass_review
+
+  - id: product_lead
+    name: Product Lead
+    description: 产品负责人，负责需求和优先级
+    domain: product
+    responsibility: 定义MVP范围，管理需求优先级，与用户沟通
+    skills:
+      - requirements_analysis
+    constraints:
+      allowed_actions:
+        - define_mvp
+        - prioritize_features
+        - user_interviews
+      forbidden_actions:
+        - scope_creep
+        - skip_validation
+
+skills:
+  - requirements_analysis
+  - system_design
+  - python_engineering
+  - test_driven_development
+
+stages:
+  - id: mvp_definition
+    name: MVP定义
+    role: product_lead
+    order: 1
+    outputs:
+      - name: MVP_SCOPE.md
+        type: document
+  - id: architecture
+    name: 架构设计
+    role: tech_lead
+    order: 2
+    outputs:
+      - name: ARCHITECTURE.md
+        type: document
+  - id: development
+    name: 快速开发
+    role: fullstack_dev
+    order: 3
+    outputs:
+      - name: src/
+        type: code
+  - id: launch
+    name: 发布
+    role: tech_lead
+    order: 4
+    outputs:
+      - name: RELEASE_NOTES.md
+        type: document
+
+tags:
+  - startup
+  - mvp
+  - lean
+  - fast
+
+metadata:
+  recommended_for:
+    - first_time_founders
+    - early_stage_startups
+    - hackathons
+  typical_duration: 2-4 weeks
