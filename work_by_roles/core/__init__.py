@@ -40,6 +40,7 @@ from .workflow_executor import WorkflowExecutor
 from .state_storage import StateStorage, FileStateStorage
 from .team_manager import TeamManager
 from .quality_gates import QualityGateSystem
+from .project_manager import ProjectManager
 from .workflow_engine import WorkflowEngine
 from .intent_router import IntentRouter
 from .intent_agent import IntentAgent
@@ -53,13 +54,10 @@ from .agent import Agent
 from .skill_benchmark import SkillBenchmark
 from .task_router import TaskRouter
 
-# Import remaining classes from engine.py for backward compatibility
-from .engine import (
-    SecurityError,
-    AgentContext,
-    ContextSummary,
-    normalize_path,
-)
+# Import remaining classes from separate modules
+from .exceptions import SecurityError
+from .models import AgentContext, ContextSummary
+from .schema_loader import normalize_path
 
 __all__ = [
     # Exceptions
@@ -117,6 +115,7 @@ __all__ = [
     'TeamManager',
     'QualityGateSystem',
     'WorkflowEngine',
+    'ProjectManager',
     'IntentRouter',
     'IntentAgent',
     'BugAnalysisAgent',

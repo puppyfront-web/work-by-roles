@@ -133,12 +133,28 @@ class ConfigLoader:
         
         return skill_data
     
+    def _merge_skill_libraries(
+        self,
+        base_data: Dict[str, Any],
+        override_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Merge skill libraries with override precedence."""
+        base_skills = {skill["id"]: skill for skill in base_data.get("skills", []) if "id" in skill}
+        override_skills = {skill["id"]: skill for skill in override_data.get("skills", []) if "id" in skill}
+        merged = {**base_skills, **override_skills}
+        schema_version = override_data.get("schema_version") or base_data.get("schema_version") or "1.0"
+        return {
+            "schema_version": schema_version,
+            "skills": [merged[key] for key in sorted(merged.keys())],
+        }
+
     def load_all(
         self,
         skill_file: Path,
         roles_file: Path,
         workflow_file: Path,
-        context_file: Optional[Path] = None
+        context_file: Optional[Path] = None,
+        shared_skills_dir: Optional[Path] = None
     ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any], Optional[ProjectContext]]:
         """
         Load all configurations in the correct order, handling dependencies.
@@ -171,13 +187,29 @@ class ConfigLoader:
         
         # Step 2: Load skill library - no dependencies
         try:
-            if skill_file.is_dir():
-                skill_data = self._load_skill_directory(skill_file)
+            shared_data: Optional[Dict[str, Any]] = None
+            if shared_skills_dir and shared_skills_dir.exists() and shared_skills_dir.is_dir():
+                shared_data = self._load_skill_directory(shared_skills_dir)
+
+            if skill_file.exists():
+                if skill_file.is_dir():
+                    team_data = self._load_skill_directory(skill_file)
+                else:
+                    raise ValidationError(
+                        f"Skill library must be a directory with Skill.md files. "
+                        f"Found file: {skill_file}. Please use directory structure."
+                    )
             else:
-                raise ValidationError(
-                    f"Skill library must be a directory with Skill.md files. "
-                    f"Found file: {skill_file}. Please use directory structure."
-                )
+                team_data = None
+
+            if shared_data and team_data:
+                skill_data = self._merge_skill_libraries(shared_data, team_data)
+            elif shared_data:
+                skill_data = shared_data
+            elif team_data:
+                skill_data = team_data
+            else:
+                raise ValidationError(f"Skill directory not found: {skill_file}")
             if 'schema_version' not in skill_data:
                 errors.append(f"Missing schema_version in skill library {skill_file}")
             if 'skills' not in skill_data:

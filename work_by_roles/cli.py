@@ -10,6 +10,11 @@ import yaml
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set, Callable, Tuple
+
+from .cli.init import cmd_init
+from .cli.setup import cmd_setup
+from .cli.workflow import cmd_start, cmd_complete, cmd_status, cmd_wfauto, cmd_role_execute, cmd_replay_workflow, cmd_dry_run_stage
+from .cli.inspect import cmd_analyze, cmd_list_stages, cmd_list_roles, cmd_export_graph, cmd_check_team
 try:
     # Try importing from the same package
     from .core.engine import (
@@ -20,7 +25,8 @@ try:
         ProjectScanner,
         AgentOrchestrator,
         TeamManager,
-        RoleExecutor
+        RoleExecutor,
+        ProjectManager
     )
     from .core.llm_client_loader import LLMClientLoader
     from .core.execution_mode_analyzer import ExecutionModeAnalyzer
@@ -124,6 +130,7 @@ def print_status(engine: WorkflowEngine):
 def _init_engine(args) -> Tuple[WorkflowEngine, Path, Path]:
     """Initialize engine with skill library, supporting team context"""
     workspace = Path(args.workspace or ".")
+    shared_skills_dir = _get_shared_skills_dir(workspace)
     workflow_dir = workspace / ".workflow"
     workflow_dir.mkdir(exist_ok=True)
     temp_dir = workflow_dir / "temp"
@@ -175,9 +182,9 @@ def _init_engine(args) -> Tuple[WorkflowEngine, Path, Path]:
     if context_file.exists():
         engine.load_context(context_file)
         
-    if not skill_file.exists():
+    if not skill_file.exists() and not shared_skills_dir:
         raise WorkflowError(f"Skill library not found: {skill_file}")
-    engine.load_skill_library(skill_file)
+    engine.load_skill_library(skill_file, shared_skills_dir=shared_skills_dir)
     engine.load_roles(roles_file)
     engine.load_workflow(workflow_file)
     
@@ -219,300 +226,16 @@ def _get_templates_dir() -> Path:
     return Path(__file__).parent / "templates"
 
 
-def cmd_init(args):
-    """Initialize project context with template selection"""
-    workspace = Path(args.workspace or ".")
-    print(f"🔍 正在初始化项目: {workspace.absolute()}")
+def _get_shared_skills_dir(workspace: Path) -> Optional[Path]:
+    """Get shared skills directory if present."""
+    shared_dir = workspace / "skills"
+    if shared_dir.exists() and shared_dir.is_dir():
+        return shared_dir
+    return None
 
-    # Ensure .workflow directory exists and create temp subdirectory
-    workflow_dir = workspace / ".workflow"
-    workflow_dir.mkdir(exist_ok=True)
-    temp_dir = workflow_dir / "temp"
-    temp_dir.mkdir(exist_ok=True)
 
-    # 0. 检查快速模式或指定模板
-    template_name = getattr(args, 'template', None)
-    quick_mode = getattr(args, 'quick', False)
-    
-    # 快速模式默认使用vibe-coding模板
-    if quick_mode and not template_name:
-        template_name = "vibe-coding"
-    
-    # 1. 优先检查 teams/ 目录中的模板（包括vibe-coding）
-    template_applied = False
-    
-    if template_name:
-        # 检查teams目录
-        teams_template = workspace / "teams" / template_name
-        if teams_template.exists() and teams_template.is_dir():
-            print(f"\n✅ 检测到团队模板: teams/{template_name}/")
-            print(f"   使用 {template_name} 团队配置")
-            
-            workflow_file = workflow_dir / "workflow_schema.yaml"
-            roles_file = workflow_dir / "role_schema.yaml"
-            skills_dir = workflow_dir / "skills"
-            
-            if not (workflow_file.exists() and roles_file.exists() and skills_dir.exists()):
-                import shutil
-                for f in teams_template.iterdir():
-                    if f.is_file() and f.suffix in ['.yaml', '.yml']:
-                        shutil.copy(f, workflow_dir / f.name)
-                    elif f.is_dir() and f.name == "skills":
-                        # Copy skills directory
-                        shutil.copytree(f, skills_dir, dirs_exist_ok=True)
-                print(f"✅ 已将 {template_name} 配置复制到 .workflow/ 目录")
-                template_applied = True
-            else:
-                print("   ⚠️  .workflow/ 目录已存在配置文件，跳过复制")
-    
-    # 1.5. 如果没有指定模板，优先检查 teams/standard-delivery/ 配置（项目规范）
-    if not template_applied:
-        teams_standard_delivery = workspace / "teams" / "standard-delivery"
-        
-        if teams_standard_delivery.exists() and teams_standard_delivery.is_dir():
-            print("\n✅ 检测到项目标准配置: teams/standard-delivery/")
-            print("   自动使用标准交付团队配置（符合项目规范）")
-            
-            # 检查是否已有配置文件，避免覆盖
-            workflow_file = workflow_dir / "workflow_schema.yaml"
-            roles_file = workflow_dir / "role_schema.yaml"
-            skills_dir = workflow_dir / "skills"
-            
-            if not (workflow_file.exists() and roles_file.exists() and skills_dir.exists()):
-                # 复制配置文件到 .workflow 目录
-                import shutil
-                for f in teams_standard_delivery.iterdir():
-                    if f.is_file() and f.suffix in ['.yaml', '.yml']:
-                        shutil.copy(f, workflow_dir / f.name)
-                    elif f.is_dir() and f.name == "skills":
-                        # 复制skills目录
-                        shutil.copytree(f, skills_dir, dirs_exist_ok=True)
-                print(f"✅ 已将标准配置复制到 .workflow/ 目录")
-                template_applied = True
-            else:
-                print("   ⚠️  .workflow/ 目录已存在配置文件，跳过复制")
-                print("   💡 如需重新初始化，请先删除现有配置文件")
-                template_applied = True  # 标记为已应用，避免继续执行模板选择
-    
-    # 2. 如果没有使用 teams/standard-delivery，使用原来的模板选择逻辑
-    if not template_applied:
-        templates_dir = _get_templates_dir()
-        if templates_dir.exists():
-            templates = sorted([d for d in templates_dir.iterdir() if d.is_dir()])
-            if templates:
-                print("\n请选择团队模板:")
-                for i, t in enumerate(templates, 1):
-                    # Try to get a nicer name from the directory name
-                    display_name = t.name.replace("_", " ").title()
-                    print(f"  {i}. {display_name} ({t.name})")
-                print(f"  {len(templates)+1}. 仅扫描结构 (不应用模板)")
-                
-                try:
-                    choice = input(f"\n选择编号 [1-{len(templates)+1}]: ").strip()
-                    if choice and choice.isdigit():
-                        idx = int(choice) - 1
-                        if 0 <= idx < len(templates):
-                            selected = templates[idx]
-                            print(f"✅ 已选择模板: {selected.name}")
-                            # Copy files to .workflow directory
-                            import shutil
-                            for f in selected.iterdir():
-                                if f.is_file() and f.suffix in ['.yaml', '.yml', '.md']:
-                                    shutil.copy(f, workflow_dir / f.name)
-                                elif f.is_dir() and f.name == "skills":
-                                    # Copy skills directory
-                                    skills_dir = workflow_dir / "skills"
-                                    shutil.copytree(f, skills_dir, dirs_exist_ok=True)
-                            print(f"✅ 已将模板文件复制到 .workflow/ 目录")
-                            template_applied = True
-                except (KeyboardInterrupt, EOFError):
-                    print("\n❌ 已取消选择")
-    
-    # 2. Project scanning
-    print(f"\n🔍 正在扫描项目结构...")
-    scanner = ProjectScanner(workspace)
-    context = scanner.scan()
-    
-    context_file = workflow_dir / "project_context.yaml"
-    
-    with open(context_file, 'w', encoding='utf-8') as f:
-        yaml.dump(context.to_dict(), f, default_flow_style=False, allow_unicode=True)
-        
-    print(f"✅ 项目上下文已保存到: {context_file}")
-    
-    # 2.5. Check for spec files and prompt user
-    if not context.specs:
-        print("\n⚠️  未检测到项目规范文件 (spec files)")
-        print("   规范文件有助于工作流更好地理解项目需求")
-        try:
-            generate_spec = input("是否生成初始规范文件模板? [y/N]: ").strip().lower()
-            if generate_spec in ['y', 'yes']:
-                _generate_spec_template(workspace)
-        except (KeyboardInterrupt, EOFError):
-            print("\n跳过规范文件生成")
-    else:
-        print(f"\n✅ 检测到 {len(context.specs)} 个规范文件:")
-        for spec_name, spec_path in list(context.specs.items())[:5]:  # Show first 5
-            print(f"   - {spec_name}: {spec_path}")
-        if len(context.specs) > 5:
-            print(f"   ... 还有 {len(context.specs) - 5} 个")
-    
-    # 3. Generate .cursorrules (only in Cursor IDE, merges autopilot.md content)
-    if generate_cursorrules(workspace):
-        print(f"✅ 已生成/更新 .cursorrules 文件，增强 AI 角色感知（包含自动执行规则）")
-    else:
-        print(f"ℹ️  未检测到 Cursor IDE 环境，跳过 .cursorrules 生成")
-    
-    # 4. Generate initial TEAM_CONTEXT.md if workflow files exist
-    workflow_file = workflow_dir / "workflow_schema.yaml"
-    roles_file = workflow_dir / "role_schema.yaml"
-    skills_dir = workflow_dir / "skills"
-    state_file = workflow_dir / "state.yaml"
-    
-    if workflow_file.exists() and roles_file.exists():
-        try:
-            # Initialize engine to generate TEAM_CONTEXT.md
-            engine = WorkflowEngine(
-                workspace_path=workspace,
-                auto_save_state=True  # Enable auto-save to create initial state
-            )
-            # Try to load workflow if files exist
-            try:
-                # Load skill library if exists
-                if skills_dir.exists() and skills_dir.is_dir():
-                    engine.load_skill_library(skills_dir)
-                else:
-                    print("⚠️  未找到 skills 目录，跳过技能库加载")
-                
-                engine.load_roles(roles_file)
-                engine.load_workflow(workflow_file)
-                
-                # Ensure executor is created (should be created by load_workflow)
-                if not engine.executor:
-                    raise WorkflowError("Failed to create workflow executor")
-                
-                # Always create/update state file after loading workflow
-                # This ensures workflow is "initialized" even without an active stage
-                # Note: load_workflow may have called load_state, but it won't create file if it doesn't exist
-                # So we explicitly save state here to ensure the file exists
-                try:
-                    engine.save_state(state_file)
-                    if state_file.exists():
-                        print(f"✅ 已创建/更新工作流状态文件: {state_file}")
-                    else:
-                        print(f"⚠️  警告: 状态文件创建可能失败，请检查权限: {state_file}")
-                except Exception as e:
-                    print(f"⚠️  警告: 保存状态文件时出错: {e}")
-                
-                # Auto-start first stage if no active stage exists
-                # This ensures workflow is truly "initialized" and ready to use
-                if engine.workflow and engine.workflow.stages:
-                    current_stage = engine.get_current_stage()
-                    
-                    if not current_stage:
-                        # Find first stage (lowest order)
-                        first_stage = min(engine.workflow.stages, key=lambda s: s.order)
-                        
-                        # Check if we can start the first stage
-                        can_transition, errors = engine.executor.can_transition_to(first_stage.id)
-                        if can_transition:
-                            try:
-                                engine.start_stage(first_stage.id, first_stage.role)
-                                engine.save_state(state_file)  # Save state after starting stage
-                                print(f"✅ 已自动启动第一个阶段: {first_stage.name} ({first_stage.id})")
-                                print(f"   角色: {first_stage.role}")
-                            except Exception as e:
-                                print(f"⚠️  警告: 自动启动第一个阶段失败: {e}")
-                                print(f"   请手动运行: workflow start {first_stage.id}")
-                        else:
-                            # First stage has prerequisites that aren't met (unusual but possible)
-                            print(f"💡 提示: 第一个阶段 '{first_stage.name}' 需要满足前置条件:")
-                            for error in errors:
-                                print(f"   - {error}")
-                            print(f"   请手动运行: workflow start {first_stage.id}")
-                    else:
-                        # Already has an active stage
-                        print(f"✅ 当前活动阶段: {current_stage.name} ({current_stage.id})")
-                
-                # Generate initial TEAM_CONTEXT.md (if not already generated by load_workflow)
-                # load_workflow may have called update_vibe_context if auto_save_state=True,
-                # but we call it again to ensure it's up-to-date
-                context_file = engine.update_vibe_context()
-                generate_cursorrules(engine.workspace_path, engine)
-                print(f"✅ 已生成初始团队上下文: {context_file}")
-                
-                # Show summary
-                current_stage = engine.get_current_stage()
-                if current_stage:
-                    print(f"\n✅ 初始化完成！当前活动阶段: {current_stage.name} ({current_stage.id})")
-                elif engine.workflow and engine.workflow.stages:
-                    first_stage = min(engine.workflow.stages, key=lambda s: s.order)
-                    print(f"\n✅ 初始化完成！下一步: 运行 'workflow start {first_stage.id}' 启动第一个阶段")
-            except Exception as e:
-                # If workflow files exist but can't be loaded, create a minimal TEAM_CONTEXT.md
-                team_context_file = workspace / ".workflow" / "TEAM_CONTEXT.md"
-                minimal_content = """# Team Context - Current Workflow State
 
-**Generated**: {timestamp}
-
-## Current Active Stage
-
-- **Status**: No active stage
-
-**Action Required**: Run `workflow start <stage> <role>` to begin.
-
-## Workflow Overview
-
-Workflow files detected but not yet initialized. Please run:
-```bash
-workflow start <stage> <role>
-```
-
----
-*This file is auto-generated. Do not edit manually.*
-""".format(timestamp=__import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                team_context_file.write_text(minimal_content, encoding='utf-8')
-                print(f"✅ 已生成初始团队上下文: {team_context_file}")
-                print(f"⚠️  工作流加载失败: {e}")
-        except Exception as e:
-            # If engine initialization fails, create a minimal TEAM_CONTEXT.md
-            team_context_file = workspace / ".workflow" / "TEAM_CONTEXT.md"
-            minimal_content = """# Team Context - Current Workflow State
-
-**Generated**: {timestamp}
-
-## Current Active Stage
-
-- **Status**: No active stage
-
-**Action Required**: Run `workflow start <stage> <role>` to begin.
-
----
-*This file is auto-generated. Do not edit manually.*
-""".format(timestamp=__import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            team_context_file.write_text(minimal_content, encoding='utf-8')
-            print(f"✅ 已生成初始团队上下文: {team_context_file}")
-            print(f"⚠️  引擎初始化失败: {e}")
-    else:
-        # Create minimal TEAM_CONTEXT.md even if workflow files don't exist
-        team_context_file = workspace / ".workflow" / "TEAM_CONTEXT.md"
-        minimal_content = """# Team Context - Current Workflow State
-
-**Generated**: {timestamp}
-
-## Current Active Stage
-
-- **Status**: No active stage
-
-**Action Required**: 
-1. Ensure `.workflow/workflow_schema.yaml` and `.workflow/role_schema.yaml` exist
-2. Run `workflow start <stage> <role>` to begin
-
----
-*This file is auto-generated. Do not edit manually.*
-""".format(timestamp=__import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        team_context_file.write_text(minimal_content, encoding='utf-8')
-        print(f"✅ 已生成初始团队上下文: {team_context_file}")
+# cmd_init and cmd_setup have been moved to work_by_roles/cli/
 
 
 def _extract_dimensions_from_workflow(
@@ -2130,191 +1853,8 @@ def cmd_migrate_skills(args):
         sys.exit(result.returncode)
 
 
-def cmd_setup(args):
-    """一键接入：自动设置项目，让用户可以直接使用角色"""
-    workspace = Path(args.workspace or ".")
-    print("=" * 60)
-    print("🚀 一键接入 Multi-Role Skills Workflow")
-    print("=" * 60)
-    print(f"\n目标项目: {workspace.absolute()}\n")
-    
-    # 创建 .workflow 目录和 temp 子目录
-    workflow_dir = workspace / ".workflow"
-    workflow_dir.mkdir(exist_ok=True)
-    temp_dir = workflow_dir / "temp"
-    temp_dir.mkdir(exist_ok=True)
-    
-    # 检查是否已存在配置
-    roles_file = workflow_dir / "role_schema.yaml"
-    skills_dir = workflow_dir / "skills"
-    
-    if roles_file.exists() and skills_dir.exists():
-        print("⚠️  项目已接入，配置已存在")
-        print(f"   - 角色配置: {roles_file}")
-        print(f"   - 技能目录: {skills_dir}")
-        print("\n💡 如需重新接入，请先删除 .workflow/ 目录")
-        return
-    
-    # 查找标准模板（优先使用 teams/standard-delivery）
-    template_sources = [
-        workspace / "teams" / "standard-delivery",  # 项目内团队配置
-        Path(__file__).parent.parent / "teams" / "standard-delivery",  # 框架内置
-        Path(__file__).parent / "templates" / "standard_agile",  # 内置模板
-    ]
-    
-    template_dir = None
-    for source in template_sources:
-        if source.exists() and source.is_dir():
-            template_dir = source
-            break
-    
-    if not template_dir:
-        print("❌ 错误: 未找到标准模板")
-        print("   请确保项目包含 teams/standard-delivery/ 配置")
-        sys.exit(1)
-    
-    print(f"✅ 使用模板: {template_dir.relative_to(workspace) if template_dir.is_relative_to(workspace) else template_dir}")
-    
-    # 复制角色配置
-    import shutil
-    template_roles = template_dir / "role_schema.yaml"
-    if template_roles.exists():
-        shutil.copy(template_roles, roles_file)
-        print(f"  ✅ 已复制角色配置: {roles_file.name}")
-    else:
-        print(f"  ⚠️  警告: 模板中未找到 role_schema.yaml")
-    
-    # 复制技能目录
-    template_skills = template_dir / "skills"
-    if template_skills.exists() and template_skills.is_dir():
-        if skills_dir.exists():
-            shutil.rmtree(skills_dir)
-        shutil.copytree(template_skills, skills_dir)
-        skill_count = len(list(skills_dir.rglob("Skill.md")))
-        print(f"  ✅ 已复制技能目录: {skill_count} 个技能")
-    else:
-        print(f"  ⚠️  警告: 模板中未找到 skills/ 目录")
-    
-    # 可选：复制 workflow_schema.yaml（如果存在）
-    template_workflow = template_dir / "workflow_schema.yaml"
-    workflow_file = workflow_dir / "workflow_schema.yaml"
-    if template_workflow.exists() and not workflow_file.exists():
-        shutil.copy(template_workflow, workflow_file)
-        print(f"  ✅ 已复制工作流配置（可选）: {workflow_file.name}")
-    
-    # 生成项目上下文（简化版）
-    from work_by_roles.core.engine import ProjectScanner
-    print("\n🔍 正在扫描项目结构...")
-    scanner = ProjectScanner(workspace)
-    context = scanner.scan()
-    
-    context_file = workflow_dir / "project_context.yaml"
-    with open(context_file, 'w', encoding='utf-8') as f:
-        yaml.dump(context.to_dict(), f, default_flow_style=False, allow_unicode=True)
-    print(f"  ✅ 已生成项目上下文: {context_file.name}")
-    
-    # 生成使用说明
-    usage_file = workflow_dir / "USAGE.md"
-    usage_content = """# 快速使用指南
 
-## ✅ 接入完成！
-
-项目已成功接入 Multi-Role Skills Workflow 框架。
-
-## 🚀 立即开始使用
-
-### 方式 1: 在 Cursor IDE 中使用（推荐）
-
-在 Cursor 的对话中直接使用：
-
-```
-@product_analyst 分析用户登录功能的需求
-@system_architect 设计微服务架构
-@core_framework_engineer 实现用户认证模块
-@qa_reviewer 检查代码质量和测试覆盖率
-```
-
-或者使用 `@team` 触发完整工作流：
-
-```
-@team 实现用户登录功能
-```
-
-### 方式 2: 命令行使用
-
-```bash
-# 使用产品分析师角色分析需求
-workflow role-execute product_analyst "分析用户登录功能的需求"
-
-# 使用系统架构师角色设计架构
-workflow role-execute system_architect "设计微服务架构"
-
-# 使用核心框架工程师实现功能
-workflow role-execute core_framework_engineer "实现用户认证模块"
-
-# 使用QA审查员进行质量检查
-workflow role-execute qa_reviewer "检查代码质量和测试覆盖率"
-```
-
-### 方式 3: 使用工作流（可选，适合大型项目）
-
-```bash
-# 查看可用角色
-workflow list-roles
-
-# 查看可用技能
-workflow list-skills
-
-# 启动工作流（如果配置了 workflow_schema.yaml）
-workflow wfauto
-```
-
-## 📋 可用角色
-
-运行 `workflow list-roles` 查看所有可用角色及其技能。
-
-## 🛠️ 可用技能
-
-运行 `workflow list-skills` 查看所有可用技能。
-
-## 💡 提示
-
-- **在 Cursor 中使用**: 使用 `@角色名` 或 `@team` 来让 AI 自动使用对应的角色和技能
-- **自定义技能**: 使用 `workflow generate-skill` 创建新技能
-- **自定义角色**: 编辑 `.workflow/role_schema.yaml` 添加新角色
-
-## 📚 更多信息
-
-查看项目文档了解更多功能：
-- `README.md` - 完整文档
-- `docs/CURSOR_GUIDE.md` - Cursor IDE 使用指南
-- `docs/SKILLS_GUIDE.md` - 技能使用指南
-- `docs/USAGE_GUIDE.md` - 使用指南
-"""
-    usage_file.write_text(usage_content, encoding='utf-8')
-    print(f"  ✅ 已生成使用说明: {usage_file.name}")
-    
-    # 生成 Cursor 配置文件（仅当在 Cursor IDE 中时）
-    from work_by_roles.cli import generate_cursorrules
-    if generate_cursorrules(workspace):
-        print(f"  ✅ 已生成 Cursor IDE 配置文件（.cursorrules，包含自动执行规则）")
-    else:
-        print(f"  ℹ️  未检测到 Cursor IDE 环境，跳过配置文件生成")
-    
-    # 显示完成信息
-    print("\n" + "=" * 60)
-    print("✅ 接入完成！")
-    print("=" * 60)
-    print("\n📋 下一步:")
-    print("  1. 查看可用角色: workflow list-roles")
-    print("  2. 查看可用技能: workflow list-skills")
-    print("  3. 使用角色执行任务:")
-    print("     workflow role-execute <role_id> \"<requirement>\"")
-    print("\n💡 示例:")
-    print("   workflow role-execute product_analyst \"分析用户需求\"")
-    print("   workflow role-execute system_architect \"设计系统架构\"")
-    print(f"\n📖 详细使用说明: {usage_file}")
-    print("=" * 60)
+# cmd_setup has been moved to work_by_roles/cli/
 
 
 def cmd_role_execute(args):

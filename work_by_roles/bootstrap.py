@@ -47,6 +47,13 @@ def copy_template_files(target: Path, template_name: str):
         else:
             print(f"  ⚠️  警告: {filename} 在模板中不存在")
 
+    # Copy shared skills into workspace/skills
+    template_skills = template_dir / "skills"
+    if template_skills.exists() and template_skills.is_dir():
+        skills_dir = target / "skills"
+        shutil.copytree(template_skills, skills_dir, dirs_exist_ok=True)
+        print(f"  ✅ skills -> {skills_dir}")
+
 
 def copy_core_files(target: Path):
     """复制核心引擎文件到 .workflow/"""

@@ -81,6 +81,13 @@ def detect_project_type(workspace: Path) -> str:
     return "standard_agile"
 
 
+def _get_shared_skills_dir(workspace: Path) -> Optional[Path]:
+    shared_dir = workspace / "skills"
+    if shared_dir.exists() and shared_dir.is_dir():
+        return shared_dir
+    return None
+
+
 def auto_setup_workflow(workspace: Path, template: Optional[str] = None) -> Dict[str, Any]:
     """
     自动设置工作流配置
@@ -188,18 +195,19 @@ class Workflow:
         # 加载配置
         workflow_dir = workspace / ".workflow"
         skill_file = workflow_dir / "skills"  # Directory with Skill.md files
+        shared_skills_dir = _get_shared_skills_dir(workspace)
         roles_file = workflow_dir / "role_schema.yaml"
         workflow_file = workflow_dir / "workflow_schema.yaml"
         
-        if not skill_file.is_dir() or not all(f.exists() for f in [roles_file, workflow_file]):
+        if (not skill_file.is_dir() and not shared_skills_dir) or not all(f.exists() for f in [roles_file, workflow_file]):
             raise RuntimeError(
                 f"配置文件缺失。请确保以下文件/目录存在:\n"
-                f"  - {skill_file} (目录，包含 Skill.md 文件)\n"
+                f"  - {skill_file} (目录，包含 Skill.md 文件) 或 {shared_skills_dir}\n"
                 f"  - {roles_file}\n"
                 f"  - {workflow_file}"
             )
         
-        engine.load_skill_library(skill_file)
+        engine.load_skill_library(skill_file, shared_skills_dir=shared_skills_dir)
         engine.load_roles(roles_file)
         engine.load_workflow(workflow_file)
         

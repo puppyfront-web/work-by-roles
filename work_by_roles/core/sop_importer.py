@@ -78,6 +78,32 @@ class SOPImporter:
     # Enhanced LLM-based Analysis Methods
     # ========================================================================
     
+    def _preprocess_sop_with_llm(self, content: str) -> str:
+        """Use LLM to normalize non-standard SOP content before rule-based analysis"""
+        if not self.llm_enabled:
+            return content
+            
+        prompt = f"""你是一个文档标准化专家。请将以下可能格式不规范的SOP文档转换为标准的Markdown格式。
+保留所有关键信息（角色、职责、技能、流程步骤、质量标准等）。
+使用以下标准标题：
+## Role: [角色名]
+## Skill: [技能名]
+## Process: [流程名]
+
+非标文档内容：
+```
+{content}
+```
+
+只返回标准的Markdown内容。"""
+        
+        try:
+            return self._call_llm(prompt)
+        except Exception as e:
+            import warnings
+            warnings.warn(f"LLM preprocessing failed: {e}")
+            return content
+
     def deep_analyze(self, sop_content: str, use_llm: Optional[bool] = None) -> SOPAnalysis:
         """
         Perform deep analysis of SOP content using LLM or rule-based methods.
@@ -98,11 +124,14 @@ class SOPImporter:
         
         if use_llm and self.llm_enabled:
             try:
+                # LLM can do direct analysis OR normalization for rules
+                # For deep analysis, direct LLM analysis is preferred
                 return self._analyze_with_llm(sop_content)
             except Exception as e:
-                # Fall back to rule-based
-                analysis = self._analyze_with_rules(sop_content)
-                analysis.warnings.append(f"LLM analysis failed, using rule-based: {str(e)}")
+                # Fall back to rule-based with LLM preprocessing
+                preprocessed = self._preprocess_sop_with_llm(sop_content)
+                analysis = self._analyze_with_rules(preprocessed)
+                analysis.warnings.append(f"LLM analysis failed, using rule-based with preprocessing: {str(e)}")
                 return analysis
         else:
             return self._analyze_with_rules(sop_content)

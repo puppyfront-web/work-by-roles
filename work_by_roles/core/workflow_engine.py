@@ -5,6 +5,7 @@ Following Single Responsibility Principle - handles workflow management only.
 
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
+import warnings
 
 from .exceptions import ValidationError, WorkflowError
 from .enums import StageStatus
@@ -190,7 +191,8 @@ class WorkflowEngine:
         skill_file: Path,
         roles_file: Path,
         workflow_file: Path,
-        context_file: Optional[Path] = None
+        context_file: Optional[Path] = None,
+        shared_skills_dir: Optional[Path] = None
     ) -> None:
         """
         Load all configurations in the correct order using ConfigLoader.
@@ -206,7 +208,7 @@ class WorkflowEngine:
         
         # Load all configs in correct order
         skill_data, roles_data, workflow_data, context = config_loader.load_all(
-            skill_file, roles_file, workflow_file, context_file
+            skill_file, roles_file, workflow_file, context_file, shared_skills_dir
         )
         
         # Set context first if available
@@ -229,21 +231,31 @@ class WorkflowEngine:
         # Load workflow (workflow_data is already the full schema dict)
         self._load_workflow_from_data(workflow_data)
 
-    def load_skill_library(self, skill_file: Path) -> None:
+    def load_skill_library(self, skill_file: Path, shared_skills_dir: Optional[Path] = None) -> None:
         """Load skill library definitions - Anthropic format only"""
+        loader = ConfigLoader(self.workspace_path)
+
+        if shared_skills_dir and shared_skills_dir.exists() and shared_skills_dir.is_dir():
+            try:
+                shared_schema_data = loader._load_skill_directory(shared_skills_dir)
+                self.role_manager.load_skill_library(shared_schema_data, merge_with_existing=False)
+            except Exception as e:
+                warnings.warn(f"Failed to load shared skills from {shared_skills_dir}: {e}")
+
         if not skill_file.exists():
+            if shared_skills_dir and shared_skills_dir.exists():
+                return
             raise ValidationError(f"Skill file/directory not found: {skill_file}")
-        
+
         # Only support directory structure with Skill.md files
         if skill_file.is_dir():
-            loader = ConfigLoader(self.workspace_path)
             schema_data = loader._load_skill_directory(skill_file)
         else:
             raise ValidationError(
                 f"Skills must be in directory format with Skill.md files. "
                 f"Found file: {skill_file}. Please migrate to directory structure."
             )
-        self.role_manager.load_skill_library(schema_data)
+        self.role_manager.load_skill_library(schema_data, merge_with_existing=True)
     
     def load_roles(self, roles_file: Path) -> None:
         """Load role definitions (backward compatible)"""

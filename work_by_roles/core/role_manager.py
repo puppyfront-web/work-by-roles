@@ -26,9 +26,109 @@ from .variable_resolver import VariableResolver
 from .models import ProjectContext
 
 
+ROLE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "schema_version": {"type": "string"},
+        "roles": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "domain": {"type": "string"},
+                    "responsibility": {"type": "string"},
+                    "skills": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "required_skills": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "skill_id": {"type": "string"},
+                                "min_level": {"type": "integer"}
+                            },
+                            "required": ["skill_id"]
+                        }
+                    },
+                    "extends": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                    "constraints": {
+                        "type": "object",
+                        "properties": {
+                            "allowed_actions": {"type": "array", "items": {"type": "string"}},
+                            "forbidden_actions": {"type": "array", "items": {"type": "string"}}
+                        }
+                    },
+                    "instruction_template": {"type": "string"},
+                    "validation_rules": {"type": "array", "items": {"type": "string"}},
+                    "can_skills": {"type": "array", "items": {"type": "string"}},
+                    "cannot_skills": {"type": "array", "items": {"type": "string"}},
+                    "decision_policy": {"type": "object"}
+                },
+                "required": ["id", "name", "description"]
+            }
+        }
+    },
+    "required": ["schema_version", "roles"]
+}
+
+
 class RoleManager:
     """Manages role definitions and validation"""
     
+    ROLE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "schema_version": {"type": "string"},
+            "roles": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["id", "name", "description"],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "description": {"type": "string"},
+                        "domain": {"type": "string"},
+                        "responsibility": {"type": "string"},
+                        "skills": {
+                            "type": "array",
+                            "items": {"type": ["string", "object"]}
+                        },
+                        "required_skills": {
+                            "type": "array",
+                            "items": {"type": ["string", "object"]}
+                        },
+                        "extends": {
+                            "type": ["array", "null"],
+                            "items": {"type": "string"}
+                        },
+                        "constraints": {
+                            "type": "object",
+                            "properties": {
+                                "allowed_actions": {"type": "array", "items": {"type": "string"}},
+                                "forbidden_actions": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "validation_rules": {"type": "array", "items": {"type": "string"}},
+                        "instruction_template": {"type": "string"},
+                        "can_skills": {"type": "array", "items": {"type": "string"}},
+                        "cannot_skills": {"type": "array", "items": {"type": "string"}},
+                        "decision_policy": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "required": ["schema_version", "roles"]
+    }
+
     def __init__(self):
         self.roles: Dict[str, Role] = {}
         self.skill_library: Optional[Dict[str, Skill]] = None
@@ -405,7 +505,17 @@ class RoleManager:
         ]
     
     def load_roles(self, schema_data: Dict[str, Any]) -> None:
-        """Load roles from schema"""
+        """Load roles from schema with validation"""
+        if JSONSCHEMA_AVAILABLE:
+            try:
+                jsonschema.validate(schema_data, self.ROLE_SCHEMA)
+            except jsonschema.ValidationError as e:
+                raise ValidationError(
+                    f"Invalid role schema: {str(e)}",
+                    field="roles",
+                    context={"schema_errors": str(e)}
+                )
+
         if 'schema_version' not in schema_data:
             raise ValidationError("Missing schema_version in role schema")
         

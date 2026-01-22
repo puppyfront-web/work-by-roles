@@ -57,34 +57,55 @@ class ProjectScanner:
             "swagger.yaml", "swagger.yml", "swagger.json",
             "schema.json", "schema.yaml", "schema.yml",
             "api.yaml", "api.yml", "api.json",
+            "*.api.md", "*.api.yaml"
         ]
-        
-        for pattern in spec_patterns:
-            for spec_file in self.root_path.rglob(pattern):
-                rel_path = str(spec_file.relative_to(self.root_path))
-                # Use filename without extension as key
-                key = spec_file.stem
-                ctx.specs[key] = rel_path
-                break  # Only take first match per pattern
-        
-        # 3. Scan Standards - look for common config files
-        standard_files = {
-            "package.json": "node",
-            "requirements.txt": "python",
-            "Pipfile": "python",
-            "pyproject.toml": "python",
-            "Cargo.toml": "rust",
-            "go.mod": "go",
-            "pom.xml": "java",
-            "build.gradle": "java",
-            ".eslintrc": "javascript",
-            "tsconfig.json": "typescript",
+        for p in spec_patterns:
+            for match in self.root_path.glob(f"**/{p}"):
+                if ".workflow" in str(match) or ".git" in str(match):
+                    continue
+                rel_path = match.relative_to(self.root_path)
+                name = match.stem.replace(".spec", "").replace(".api", "")
+                if name:
+                    ctx.specs[name] = str(rel_path)
+
+        # 3. Scan Standards - more comprehensive file detection
+        standards_files = {
+            "ruff": ["ruff.toml", ".ruff.toml", "ruff.yaml", ".ruff.yaml"],
+            "mypy": ["mypy.ini", ".mypy.ini", "mypy.ini", "pyproject.toml"],
+            "pytest": ["pytest.ini", "pyproject.toml", "setup.cfg", ".pytest.ini"],
+            "black": ["pyproject.toml", ".black", "black.toml"],
+            "flake8": [".flake8", "setup.cfg", "tox.ini"],
+            "eslint": [".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yaml", "package.json"],
+            "prettier": [".prettierrc", ".prettierrc.json", ".prettierrc.yaml", "package.json"],
+            "typescript": ["tsconfig.json", "tsconfig.base.json"],
+            "python": ["pyproject.toml", "setup.py", "requirements.txt", "Pipfile", "poetry.lock"],
+            "node": ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"],
+            "docker": ["Dockerfile", "docker-compose.yml", "docker-compose.yaml", ".dockerignore"],
+            "git": [".gitignore", ".gitattributes"],
+            "ci": [".github/workflows", ".gitlab-ci.yml", ".travis.yml", "Jenkinsfile", ".circleci"]
         }
         
-        for filename, tech in standard_files.items():
-            file_path = self.root_path / filename
-            if file_path.exists():
-                ctx.standards[tech] = filename
+        for tool, files in standards_files.items():
+            for f in files:
+                file_path = self.root_path / f
+                # Handle directory-based configs (like .github/workflows)
+                if file_path.is_dir() and file_path.exists():
+                    ctx.standards[tool] = f
+                    break
+                elif file_path.is_file() and file_path.exists():
+                    ctx.standards[tool] = f
+                    break
         
+        # 4. Additional project metadata scanning
+        # Try to detect project type and add relevant info
+        # If python standard wasn't detected but Python files exist, add it
+        if "python" not in ctx.standards:
+            if (self.root_path / "setup.py").exists():
+                ctx.standards["python"] = "setup.py"
+            elif (self.root_path / "requirements.txt").exists():
+                ctx.standards["python"] = "requirements.txt"
+            elif (self.root_path / "Pipfile").exists():
+                ctx.standards["python"] = "Pipfile"
+                    
         return ctx
 

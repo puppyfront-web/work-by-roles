@@ -11,10 +11,14 @@
 ## 使用
 
 ```bash
-workflow-bootstrap --template api-service
+# 方式 1: 使用 init 命令
+workflow init --template api-service
+
+# 方式 2: 使用 setup 命令（推荐，自动检测项目类型）
+workflow setup
 ```
 
-或使用快速启动：
+或使用 Python API：
 
 ```python
 from work_by_roles import Workflow
