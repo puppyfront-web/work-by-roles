@@ -105,6 +105,69 @@ workflow wfauto         # 一键执行全部阶段
 workflow import-sop <sop_file>  # 从 SOP 文档生成配置
 ```
 
+## 🐛 常见问题
+
+### Q: 如何重置工作流状态？
+
+```bash
+# 删除状态文件
+rm .workflow/state.yaml
+
+# 或使用 --no-restore-state 参数
+workflow wfauto --no-restore-state
+```
+
+### Q: 如何重新接入项目？
+
+```bash
+# 删除现有配置
+rm -rf .workflow/
+
+# 重新接入
+workflow setup
+```
+
+### Q: 如何查看某个角色的详细信息？
+
+```bash
+workflow list-roles | grep product_analyst
+```
+
+### Q: 如何自定义技能？
+
+在 `.workflow/skills/` 目录下创建技能目录，参考现有技能的格式创建 `Skill.md` 文件，使用 Anthropic 标准格式（YAML frontmatter + Markdown）。
+
+### Q: 工作流执行失败怎么办？
+
+1. 查看 `.workflow/logs/` 目录下的日志文件
+2. 检查 `.workflow/state.yaml` 中的错误信息
+3. 使用 `workflow status` 查看当前状态
+4. 可以手动修复后继续执行
+
+### Q: 如何在不同项目间共享技能？
+
+- 在项目根目录创建 `skills/` 目录
+- 将技能文件放在该目录下
+- 系统会自动识别并使用共享技能
+- 也可以使用符号链接指向共享的技能库
+
+### Q: 支持哪些 LLM 提供商？
+
+- OpenAI（GPT-3.5, GPT-4 等）
+- Anthropic（Claude 系列）
+- 任何兼容 OpenAI API 的服务（如 Ollama、LocalAI）
+
+### Q: 如何测试 LLM 配置是否正确？
+
+```bash
+# 使用 --use-llm 参数测试
+workflow role-execute product_analyst "测试" --use-llm
+```
+
+### Q: 如何切换不同的 LLM 提供商？
+
+修改 `.workflow/config.yaml` 中的 `provider` 字段，或设置相应的环境变量（`OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`）。
+
 ## 📖 需要更多？
 
 - 📖 查看 [README.md](README.md) 了解详细功能和实用技巧
