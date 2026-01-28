@@ -38,6 +38,7 @@ try:
     from .core.skill_version_manager import SkillVersionManager
     from .core.skill_learning_system import SkillLearningSystem
     from .core.skill_composition_engine import SkillCompositionEngine
+    from .core.ide_hooks import IDEHooksManager, IDEType
     _agents_available = True
 except (ImportError, ValueError):
     # Fallback: try from .engine (forwarding module)
@@ -1584,6 +1585,115 @@ def cmd_team_delete(args):
         
         team_manager.delete_team(team_id, remove_files=args.remove_files)
         print(f"✅ 已删除团队: {team_id}")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_hooks_install(args):
+    """安装 IDE hooks（自动检测 IDE 或指定 IDE）"""
+    try:
+        workspace = Path(args.workspace or '.')
+        hooks_manager = IDEHooksManager(workspace)
+        
+        ide_type = None
+        if args.ide:
+            try:
+                ide_type = IDEType(args.ide.lower())
+            except ValueError:
+                print(f"❌ 不支持的 IDE 类型: {args.ide}", file=sys.stderr)
+                print(f"支持的 IDE: {', '.join([e.value for e in IDEType if e != IDEType.UNKNOWN])}")
+                sys.exit(1)
+        
+        detected_ide = hooks_manager.detect_ide()
+        if ide_type is None:
+            ide_type = detected_ide
+            print(f"🔍 检测到 IDE: {detected_ide.value}")
+        else:
+            print(f"📦 安装 hooks for: {ide_type.value}")
+        
+        results = hooks_manager.install_hooks(ide_type)
+        
+        print(f"\n✅ Hooks 安装完成 (IDE: {results['ide']})")
+        if results['installed']:
+            print("\n已安装:")
+            for item in results['installed']:
+                print(f"  ✅ {item}")
+        
+        if results['failed']:
+            print("\n失败:")
+            for item in results['failed']:
+                print(f"  ❌ {item}")
+        
+        print("\n💡 使用提示:")
+        if ide_type in [IDEType.VS_CODE, IDEType.CURSOR]:
+            print("  - 在 VS Code/Cursor 中按 Cmd+Shift+P (Mac) 或 Ctrl+Shift+P (Windows/Linux)")
+            print("  - 输入 'Tasks: Run Task' 选择 'Workflow: Team Execute' 或 'Workflow: Auto Execute'")
+        elif ide_type == IDEType.PYCHARM:
+            print("  - 在 PyCharm 中打开 Run/Debug Configurations")
+            print("  - 选择 'Workflow Team Execute' 或 'Workflow Auto Execute'")
+        elif ide_type in [IDEType.NEOVIM, IDEType.VIM]:
+            print(f"  - 查看 {hooks_manager.hooks_dir}/neovim_hooks.lua 或 vim_hooks.vim")
+            print("  - 将配置添加到你的 init.lua 或 .vimrc")
+        
+        print(f"\n  - 通用脚本: {hooks_manager.hooks_dir}/workflow-hook.sh")
+        print(f"  - 别名文件: {hooks_manager.hooks_dir}/aliases.sh")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def cmd_hooks_list(args):
+    """列出已安装的 hooks"""
+    try:
+        workspace = Path(args.workspace or '.')
+        hooks_manager = IDEHooksManager(workspace)
+        
+        hooks = hooks_manager.list_hooks()
+        detected_ide = hooks_manager.detect_ide()
+        
+        print(f"🔍 检测到 IDE: {detected_ide.value}")
+        print("\n📋 已安装的 Hooks:")
+        print("=" * 60)
+        
+        has_hooks = False
+        for ide_type, files in hooks.items():
+            if files:
+                has_hooks = True
+                print(f"\n{ide_type.upper()}:")
+                for file in files:
+                    print(f"  ✅ {file}")
+        
+        if not has_hooks:
+            print("\n⚠️  未找到已安装的 hooks")
+            print("💡 运行 'workflow hooks install' 安装 hooks")
+        else:
+            print("\n💡 提示: 使用 'workflow hooks install' 安装更多 hooks")
+        
+    except Exception as e:
+        print(f"❌ 错误: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_hooks_detect(args):
+    """检测当前 IDE 环境"""
+    try:
+        workspace = Path(args.workspace or '.')
+        hooks_manager = IDEHooksManager(workspace)
+        
+        detected_ide = hooks_manager.detect_ide()
+        print(f"🔍 检测到 IDE: {detected_ide.value}")
+        
+        if detected_ide == IDEType.UNKNOWN:
+            print("\n⚠️  未能自动检测 IDE")
+            print("💡 可以手动指定 IDE 类型: workflow hooks install --ide <ide_type>")
+            print(f"   支持的 IDE: {', '.join([e.value for e in IDEType if e != IDEType.UNKNOWN])}")
+        else:
+            print(f"\n✅ 可以运行 'workflow hooks install' 自动安装 {detected_ide.value} hooks")
         
     except Exception as e:
         print(f"❌ 错误: {e}", file=sys.stderr)
@@ -4384,6 +4494,24 @@ def main():
     team_templates_parser = team_subparsers.add_parser("templates", help="列出可用的团队配置模板")
     team_templates_parser.set_defaults(func=cmd_team_templates)
     
+
+    # hooks 命令组
+    hooks_parser = subparsers.add_parser("hooks", help="管理 IDE hooks（跨平台集成）")
+    hooks_subparsers = hooks_parser.add_subparsers(dest="hooks_command", help="hooks 命令")
+    
+    # hooks install
+    hooks_install_parser = hooks_subparsers.add_parser("install", help="安装 IDE hooks（自动检测或指定 IDE）")
+    hooks_install_parser.add_argument("--ide", choices=[e.value for e in IDEType if e != IDEType.UNKNOWN], help="指定 IDE 类型（可选，默认自动检测）")
+    hooks_install_parser.set_defaults(func=cmd_hooks_install)
+    
+    # hooks list
+    hooks_list_parser = hooks_subparsers.add_parser("list", help="列出已安装的 hooks")
+    hooks_list_parser.set_defaults(func=cmd_hooks_list)
+    
+    # hooks detect
+    hooks_detect_parser = hooks_subparsers.add_parser("detect", help="检测当前 IDE 环境")
+    hooks_detect_parser.set_defaults(func=cmd_hooks_detect)
+    
     # analyze 命令
     analyze_parser = subparsers.add_parser("analyze", help="分析当前阶段的工作流状态和需求")
     analyze_parser.set_defaults(func=cmd_analyze)
@@ -4618,4 +4746,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

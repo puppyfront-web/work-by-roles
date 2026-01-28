@@ -32,6 +32,7 @@ pip install -e .
 **方式 1：一键接入（推荐，适合 IDE 环境）**
 ```bash
 workflow setup
+workflow hooks install     # 推荐：安装 IDE hooks（自动检测）
 workflow role-execute product_analyst "分析用户登录功能需求"
 ```
 
@@ -73,6 +74,8 @@ workflow wfauto --intent "实现用户登录功能"
 | `workflow role-execute <role> "<requirement>"` | 执行角色任务 |
 | `workflow import-sop <file>` | 从 SOP 文档生成配置 |
 | `workflow status` | 查看工作流状态 |
+| `workflow hooks install` | 安装 IDE hooks（推荐） |
+| `workflow hooks detect` | 检测当前 IDE 环境 |
 
 **工作流模式命令**:
 ```bash
@@ -81,6 +84,23 @@ workflow wfauto            # 自动执行全部阶段
 workflow start <stage>     # 启动特定阶段
 workflow complete          # 完成当前阶段
 ```
+
+## 🧩 IDE Hooks（推荐）
+
+我们更推荐通过 **hooks → command 形式** 在 IDE 内触发团队/角色执行（任务、脚本或别名），
+而不是手动输入长命令。
+
+```bash
+workflow hooks detect       # 检测当前 IDE
+workflow hooks install      # 安装 hooks（不会自动运行）
+```
+
+安装后可通过：
+- VS Code/Cursor：`Tasks: Run Task` → `Workflow: Team Execute / Workflow: Auto Execute`
+- 通用脚本：`.workflow/hooks/workflow-hook.sh`
+- 别名：`.workflow/hooks/aliases.sh`（`wt` / `wa`）
+
+说明：`workflow setup` / `workflow init` **不会自动安装 hooks**，需要手动执行一次 `workflow hooks install`。
 
 ## ⭐ 核心功能
 

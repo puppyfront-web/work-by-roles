@@ -117,4 +117,30 @@ roles:
       - "must_generate_validation_report"
       - "must_verify_all_stages_complete"
 
+  - id: "knowledge_curator"
+    name: "Knowledge Curator"
+    description: "Distills iteration lessons and evolves specific Team Skills with deduplication"
+    instruction_template: |
+      1. Review iteration artifacts (requirements, diffs, errors, logs).
+      2. Categorize each lesson into the most relevant Team Skill (e.g., python_engineering, schema_design).
+      3. Use 'knowledge_distillation' to extract and deduplicate lessons against existing Skill content.
+      4. Inject the new lessons directly into the target Skill.md files under the 'Lessons Learned' section.
+      5. Maintain a clean, instruction-oriented Skill library by merging similar insights.
+    extends: null
+    constraints:
+      allowed_actions:
+        - "analyze_iterations"
+        - "update_skills"
+        - "deduplicate_knowledge"
+      forbidden_actions:
+        - "write_code"
+        - "modify_workflow"
+        - "change_requirements"
+    required_skills:
+      - skill_id: "knowledge_distillation"
+        min_level: 2
+    validation_rules:
+      - "must_evolve_relevant_skills"
+      - "must_prevent_knowledge_duplication"
+
 

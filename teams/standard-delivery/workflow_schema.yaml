@@ -122,4 +122,17 @@ workflow:
           required: false  # 报告可选，用户无特殊要求不生成
           name: "validation_report.json"
 
+    - id: "learning"
+      name: "Skill Evolution & Knowledge Distillation"
+      role: "knowledge_curator"
+      order: 5
+      goal_template: "Extract lessons from this iteration and evolve relevant Team Skills"
+      prerequisites:
+        - "validation"
+      quality_gates:
+        - type: "documentation"
+          criteria:
+            - "skills_updated_with_lessons"
+          validator: "content_validator"
+          strict: false  # 宽松模式：不阻塞流程
 

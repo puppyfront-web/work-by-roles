@@ -3,6 +3,7 @@ Quality gate system for evaluating workflow stage quality gates.
 Following Single Responsibility Principle - handles quality gate evaluation only.
 """
 
+import subprocess
 from typing import Dict, List, Callable, Any, Tuple, Optional
 from pathlib import Path
 
@@ -54,6 +55,7 @@ class QualityGateSystem:
             self._validators["end_to_end"] = self._validate_e2e
             self._validators["documentation"] = self._validate_documentation
             self._validators["spec_compliance"] = self._validate_spec_compliance
+            self._validators["content_validator"] = self._validate_content
             
             # New class-based validators
             linter = LinterValidator()
@@ -68,6 +70,7 @@ class QualityGateSystem:
             self._validators["end_to_end"] = self._validate_e2e
             self._validators["documentation"] = self._validate_documentation
             self._validators["spec_compliance"] = self._validate_spec_compliance
+            self._validators["content_validator"] = self._validate_content
     
     def evaluate_gate(self, gate: QualityGate, stage: Stage, workspace_path: Path) -> Tuple[bool, List[str]]:
         """
@@ -196,6 +199,54 @@ class QualityGateSystem:
         if not readme_path.exists():
             errors.append("README.md not found")
         return len(errors) == 0, errors
+
+    def _validate_content(self, gate: QualityGate, stage: Stage, workspace_path: Path) -> Tuple[bool, List[str]]:
+        """Validate content-based criteria (e.g., skill updates)"""
+        errors = []
+        for criterion in gate.criteria:
+            if criterion == "skills_updated_with_lessons":
+                changed_skills = self._find_changed_skill_files(workspace_path)
+                if not changed_skills:
+                    errors.append("No Skill.md changes detected for skills_updated_with_lessons")
+        return len(errors) == 0, errors
+
+    def _find_changed_skill_files(self, workspace_path: Path) -> List[str]:
+        """Find Skill.md files changed in the working tree (git-based)."""
+        if not (workspace_path / ".git").exists():
+            return []
+        try:
+            subprocess.run(
+                ["git", "rev-parse", "--verify", "HEAD"],
+                cwd=workspace_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            diff_result = subprocess.run(
+                ["git", "diff", "--name-only", "HEAD"],
+                cwd=workspace_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            candidates = diff_result.stdout.splitlines()
+        except subprocess.CalledProcessError:
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=workspace_path,
+                capture_output=True,
+                text=True,
+            )
+            candidates = []
+            for line in status_result.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # format: XY path
+                parts = line.split(maxsplit=1)
+                if len(parts) == 2:
+                    candidates.append(parts[1])
+        return [path for path in candidates if path.endswith("Skill.md")]
     
     def _validate_spec_compliance(self, gate: QualityGate, stage: Stage, workspace_path: Path) -> Tuple[bool, List[str]]:
         """Validate implementation compliance with spec files"""
@@ -230,4 +281,3 @@ class QualityGateSystem:
         # e.g., "implementation_matches_spec" would require deeper analysis
         
         return len(errors) == 0, errors
-

@@ -34,6 +34,9 @@ class ProjectScanner:
                 if dir_path.is_dir():
                     ctx.paths[key] = p
                     break
+
+        docs_dir = ctx.paths.get("docs", "docs")
+        ctx.paths.setdefault("learning_history", f"{docs_dir}/LEARNING_HISTORY.md")
         
         # If no src found, try to find Python package directories
         if "src" not in ctx.paths:
