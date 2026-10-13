@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "work-by-roles"
-version = "0.4.0"
-description = "Contract-driven expert-team governance system with native review paradigm, Harness quality gates, audit and regression (work-by-roles)"
+version = "1.0.0"
+description = "Contract-driven expert-team governance system: role contracts, native review paradigm, isolated memory, Harness regression gates, contract-bound cache, full-chain audit (work-by-roles)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -17,7 +17,7 @@ keywords = [
   "harness", "evaluation", "audit", "agents", "review", "quality-gates",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -57,6 +57,7 @@ redis = [
 ]
 
 [project.scripts]
+wbr = "wbr.cli:main"
 workflow = "work_by_roles.cli:main"
 workflow-cli = "work_by_roles.cli:main"
 workflow-bootstrap = "work_by_roles.bootstrap:main"
@@ -66,7 +67,7 @@ include = ["work_by_roles*", "wbr*"]
 
 [tool.setuptools.package-data]
 work_by_roles = ["templates/**/*.yaml", "templates/**/*.yml"]
-wbr = ["templates/**/*.yaml", "templates/**/*.yml", "templates/**/*.json", "app/canvas/static/*"]
+wbr = ["templates/teams/**/*.yaml", "templates/teams/**/*.json", "app/canvas/static/*"]
 
 [tool.ruff]
 line-length = 100

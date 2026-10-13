@@ -1,259 +1,123 @@
-# 多角色技能工作流框架
+# work-by-roles · 专家团治理系统
 
-> 一个轻量级的工作流约束框架，通过角色边界和工作流阶段来规范开发流程。
+> 契约驱动、会审范式原生、带原生 Harness 质量门禁的开源专家团治理系统。
+> 让每一个 LLM 角色都有一份可版本化、可审计、可回归的"角色契约"。
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)]()
 
-[中文](README.md) | [English](README_EN.md)
-
-## ✨ 核心特性
-
-- 🎯 **角色驱动** - 通过角色边界规范任务分配和执行
-- 🛠️ **技能库管理** - 支持 Anthropic 标准格式的技能定义
-- 🔄 **双模式支持** - Workflow 模式（多阶段）和 Role Executor 模式（简化）
-- ⭐ **SOP 导入** - 从标准操作流程文档一键生成团队配置
-- 🤖 **Agent 编排** - 自动使用 Agent + Skills 执行任务
-- 🔌 **MCP 集成** - 支持 Model Context Protocol 调用外部服务
-- 📦 **零配置启动** - 自动检测项目类型，使用合适模板
-
-## 🚀 快速开始
-
-### 安装
-
-```bash
-git clone https://github.com/puppyfront-web/work-by-roles.git
-cd work-by-roles
-pip install -e .
-```
-
-### 使用（2 种方式）
-
-**方式 1：一键接入（推荐，适合 IDE 环境）**
-```bash
-workflow setup
-workflow hooks install     # 推荐：安装 IDE hooks（自动检测）
-workflow role-execute product_analyst "分析用户登录功能需求"
-```
-
-**方式 2：完整工作流（适合大型项目）**
-```bash
-workflow init --quick
-workflow wfauto --intent "实现用户登录功能"
-```
-
-📖 **详细指南**: [QUICKSTART.md](QUICKSTART.md) | [完整文档](#-文档)
-
-## 🎯 核心概念
-
-### 两种工作模式
-
-**Workflow 模式** - 多阶段流程，适合大型项目
-```
-需求分析 → 系统设计 → 架构设计 → 代码实现 → 质量保证 → 完成
-```
-
-**Role Executor 模式** - 简化模式，适合 IDE 环境（推荐）
-```
-用户需求 → 直接调用角色 → 角色使用技能 → 完成任务
-```
-
-### 关键概念
-
-- **角色（Role）**: 谁做什么（如：产品分析师、系统架构师）
-- **技能（Skill）**: 角色使用的能力（Anthropic 标准格式）
-- **阶段（Stage）**: 什么时候做什么（Workflow 模式）
-
-## 📚 常用命令
-
-| 命令 | 说明 |
-|------|------|
-| `workflow setup` | 一键接入项目 |
-| `workflow list-roles` | 列出所有角色 |
-| `workflow list-skills` | 列出所有技能 |
-| `workflow role-execute <role> "<requirement>"` | 执行角色任务 |
-| `workflow import-sop <file>` | 从 SOP 文档生成配置 |
-| `workflow status` | 查看工作流状态 |
-| `workflow hooks install` | 安装 IDE hooks（推荐） |
-| `workflow hooks detect` | 检测当前 IDE 环境 |
-
-**工作流模式命令**:
-```bash
-workflow init --quick      # 快速初始化
-workflow wfauto            # 自动执行全部阶段
-workflow start <stage>     # 启动特定阶段
-workflow complete          # 完成当前阶段
-```
-
-## 🧩 IDE Hooks（推荐）
-
-我们更推荐通过 **hooks → command 形式** 在 IDE 内触发团队/角色执行（任务、脚本或别名），
-而不是手动输入长命令。
-
-```bash
-workflow hooks detect       # 检测当前 IDE
-workflow hooks install      # 安装 hooks（不会自动运行）
-```
-
-安装后可通过：
-- VS Code/Cursor：`Tasks: Run Task` → `Workflow: Team Execute / Workflow: Auto Execute`
-- 通用脚本：`.workflow/hooks/workflow-hook.sh`
-- 别名：`.workflow/hooks/aliases.sh`（`wt` / `wa`）
-
-说明：`workflow setup` / `workflow init` **不会自动安装 hooks**，需要手动执行一次 `workflow hooks install`。
-
-## ⭐ 核心功能
-
-### SOP 文档导入
-
-从标准操作流程文档自动生成团队配置：
-
-```bash
-workflow import-sop your_sop.md
-```
-
-**功能特点**:
-- 🎯 智能提取角色、技能和工作流
-- 🔄 自动匹配团队模板
-- 📝 生成 Anthropic 标准格式技能文件
-- 🤖 支持 LLM 增强分析（可选）
-
-📖 [查看示例](examples/ecommerce_order_sop.md)
-
-### LLM 配置
-
-支持多种 LLM 提供商（OpenAI、Anthropic、Ollama 等）：
-
-**环境变量方式**:
-```bash
-export OPENAI_API_KEY='your-api-key'
-export LLM_MODEL='gpt-4'
-```
-
-**配置文件方式** (`.workflow/config.yaml`):
-```yaml
-llm:
-  provider: openai
-  api_key: your-api-key
-  model: gpt-4
-```
-
-📖 [详细配置指南](docs/ARCHITECTURE.md#6-配置系统)
-
-### MCP 集成
-
-支持通过 Model Context Protocol 调用外部服务：
-
-```yaml
-# 在技能定义中添加 MCP 配置
-metadata:
-  mcp:
-    action: fetch_resource
-    server: cursor-browser-extension
-    resource_uri: "mcp://cursor-browser-extension/page/content"
-```
-
-📖 [MCP 集成指南](docs/ARCHITECTURE.md#38-mcp-集成)
-
-## 💡 使用场景
-
-**快速分析需求**
-```bash
-workflow role-execute product_analyst "分析用户登录功能需求" --use-llm
-```
-
-**设计系统架构**
-```bash
-workflow role-execute system_architect "设计微服务架构" --use-llm
-```
-
-**完整功能实现**
-```bash
-workflow wfauto --intent "实现用户登录功能，包含注册、登录、登出和密码重置"
-```
-
-**代码审查**
-```bash
-workflow role-execute qa_reviewer "检查代码质量和测试覆盖率" --use-llm
-```
-
-## 🐍 Python API
-
-```python
-from work_by_roles import Workflow
-
-# 零配置启动
-workflow = Workflow.quick_start()
-
-# 启动阶段
-workflow.start("requirements")
-
-# 完成阶段
-workflow.complete()
-
-# 查看状态
-status = workflow.status()
-```
-
-📖 [完整 API 文档](docs/API.md)
-
-## 📖 文档
-
-- 📖 [快速开始](QUICKSTART.md) - 30秒接入指南
-- 🔗 [角色与技能关系指南](ROLES_AND_SKILLS.md) - 理解角色和技能的关系
-- 🧠 [API 文档](docs/API.md) - 详细 API 参考
-- 🏗️ [架构文档](docs/ARCHITECTURE.md) - 系统架构和设计说明
-- 📊 [技能分层分类](docs/SKILLS_LAYERED_CLASSIFICATION.md) - 技能分类体系
-
-## 🐛 常见问题
-
-**Q: 如何重置工作流状态？**
-```bash
-rm .workflow/state.yaml
-# 或使用 --no-restore-state 参数
-workflow wfauto --no-restore-state
-```
-
-**Q: 如何自定义技能？**
-在 `.workflow/skills/` 目录下创建技能目录，参考现有技能格式创建 `Skill.md` 文件（Anthropic 标准格式）。
-
-**Q: 支持哪些 LLM 提供商？**
-OpenAI、Anthropic、以及任何兼容 OpenAI API 的服务（如 Ollama、LocalAI）。
-
-**Q: 工作流执行失败怎么办？**
-1. 查看 `.workflow/logs/` 目录下的日志文件
-2. 检查 `.workflow/state.yaml` 中的错误信息
-3. 使用 `workflow status` 查看当前状态
-
-📖 [更多常见问题](QUICKSTART.md#常见问题)
-
-## 📊 项目状态
-
-✅ **生产就绪** - 所有核心功能已实现并通过测试
-
-**功能特性**:
-- ✅ 一键接入，零配置启动
-- ✅ 支持多种 IDE（Cursor、VS Code 等）
-- ✅ 自动使用 Agent + Skills 执行
-- ✅ 支持多种 LLM 提供商
-- ✅ MCP 协议集成
-- ✅ 完整的 Python API
-- ✅ 丰富的项目模板
-
-## 🤝 贡献
-
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献指南。
-
-## 📄 开源协议
-
-MIT License - 详见 [LICENSE](LICENSE)
-
-## 🔗 相关链接
-
-- 📝 [报告问题](https://github.com/puppyfront-web/work-by-roles/issues)
-- 💬 [功能建议](https://github.com/puppyfront-web/work-by-roles/discussions)
-- 📧 联系: puppy.front@gmail.com
+中文 | [English](README_EN.md)
 
 ---
 
-**开始使用**: [快速开始](#-快速开始) | [查看文档](#-文档) | [报告问题](https://github.com/puppyfront-web/work-by-roles/issues)
+## 它解决什么问题
+
+直接把多个 LLM Agent 拼在一起，会得到：职责漂移、输出不可控、结论无据可查、改一行提示词不知道会不会弄坏别的能力、审计无从下手。work-by-roles 用一套**治理内核**回答这些问题：
+
+| 能力 | 说明 |
+|---|---|
+| 📜 **角色契约 RoleContract** | 职责 SOP、禁区、输出 Schema、证据规范、工具白名单、记忆权限、Token 配额、评审标准——全部声明式，版本化 + 内容哈希定版 |
+| ⚖️ **会审范式** | Coordinator 拆解 → 多专家并行 → Verifier 独立复核；**分歧留存不仲裁** |
+| 🧠 **多层隔离记忆** | 角色长期 / 角色会话 / 任务暂存 / 全局受控四层，读写按契约授权并全程审计 |
+| 🧪 **原生 Harness** | 黄金用例库 + 基线快照（契约/模型版本锁定）+ 一键回归 + 六项指标 + 能力退化自动检测 |
+| 💾 **契约绑定缓存** | 缓存键 = 契约哈希 ‖ 问题哈希 ‖ 证据快照；契约变更自动失效，绝不脏读 |
+| 🛡️ **安全防注入** | 中英双语注入规则库 + 外部内容二阶隔离 + 边界符转义 |
+| 🔍 **全链路审计** | 每次编译/调用/校验/裁决均产生 TraceID 关联的强类型审计事件，可导出标准审计包 |
+| 🔌 **LangGraph 兼容** | 存量项目 **3 行代码** 接入；也可一键生成原生会审 Graph |
+
+## 架构（三层，依赖单向）
+
+```
+App 层      wbr/app        FastAPI 服务 · 专家画布(SPA) · 异步任务队列
+Adapter 层  wbr/adapters   LangGraph 适配 · Redis/Memory 存储 · HITL interrupt
+Core 层     wbr/core       契约·编译器·Diff·审计·记忆·编排·安全·Token·缓存·Harness
+```
+
+Core 只依赖标准库 + Pydantic V2，框架无关、可独立使用（SDK 优先，Web 画布只是上层应用）。
+
+## 快速开始
+
+```bash
+pip install "work-by-roles[langgraph]"        # 或 pip install -e ".[server]"
+```
+
+### 30 秒跑通一次会审（纯 SDK）
+
+```python
+from wbr.templates.registry import load_team_spec
+from wbr.core.orchestration import ReviewSession
+
+spec = load_team_spec("arch_review_team")     # 开箱即用专家团模板
+
+session = ReviewSession(
+    coordinator_contract=spec.coordinator,
+    expert_contracts=spec.experts,
+    verifier_contract=spec.verifier,
+    invoker=your_invoker,                     # 实现 ModelInvoker 协议即可接入任意模型
+)
+result = session.run("评审：订单系统微服务拆分方案")
+print(result.final_answer, result.disagreements)
+```
+
+CLI 体验（内置确定性演示输出，不调用外部模型）：
+
+```bash
+wbr list-teams
+wbr run-team arch_review_team "评审：订单系统微服务拆分方案"
+```
+
+### 存量 LangGraph 项目：3 行接入
+
+```python
+from wbr.adapters.langgraph import WBRGuard
+
+guard = WBRGuard(output_keys={"answer": contract}, audit=trail)  # 1
+graph = guard.wrap(your_compiled_graph)                          # 2
+result = graph.invoke({"question": "..."})                       # 3
+```
+
+不改变原有 State 键语义、不改节点逻辑、Checkpointer / interrupt（断点续跑、HITL）天然兼容。
+详见 [docs/INTEGRATION_LANGGRAPH.md](docs/INTEGRATION_LANGGRAPH.md)。
+
+### 完整平台（API + 画布）
+
+```bash
+pip install "work-by-roles[server]"
+uvicorn --factory wbr.app.api.main:create_app --port 8000
+# 浏览器打开 http://127.0.0.1:8000/canvas —— 搭建专家团、运行会审、看分歧、导出审计包
+```
+
+## 两套官方专家团模板（开箱即用）
+
+| 模板 | 构成 |
+|---|---|
+| `arch_review_team` | 协调者 + 接口设计 / 数据架构 / 基础设施三位专家 + 复核人（三维评审标准） |
+| `security_audit_team` | 协调者 + 注入 / 认证越权 / 数据泄露三位审计员 + 复核人（严重级校准） |
+
+## 文档
+
+- [SDK 全量 API](docs/SDK.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md) · [安全说明](docs/SECURITY.md)
+- 设计规格：[docs/spec/README.md](docs/spec/README.md)（SPEC-000~006 + 审核记录）· 阶段验收报告：[docs/acceptance/](docs/acceptance/)
+- 示例索引：[examples/README.md](examples/README.md)
+
+## 开发与测试
+
+```bash
+pip install -e ".[dev,langgraph,server]"
+pytest tests/wbr -q                       # 本系统全量（240+ 用例）
+pytest tests -q                           # 含 Legacy 工作流 CLI 套件
+pytest tests/wbr/phase5 -q                # 含打包构建与性能基准（slow/performance 标记）
+```
+
+## Legacy：多角色技能工作流 CLI（附录）
+
+本仓库同时保留了早期的轻量工作流框架（`work_by_roles` 包，`workflow` 命令：
+workflow setup / init / wfauto / role-execute / import-sop 等，面向 IDE 内的多角色技能约束）。
+该部分已冻结维护，原 README 存档于 [docs/LEGACY_README.md](docs/LEGACY_README.md)，
+使用文档见 [QUICKSTART.md](QUICKSTART.md) 与 [ROLES_AND_SKILLS.md](ROLES_AND_SKILLS.md)；
+新项目请使用上文的 `wbr` SDK / CLI。
+
+## License
+
+MIT © Work-by-Roles Contributors

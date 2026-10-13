@@ -1,239 +1,96 @@
-# Multi-Role Skills Workflow Framework
+# work-by-roles · Expert Team Governance System
 
-> A lightweight workflow constraint framework that standardizes development processes through role boundaries and workflow stages.
+> A contract-driven, review-paradigm-native, open-source governance system for LLM expert teams
+> with native Harness quality gates. Give every LLM role a versioned, auditable, regression-safe
+> "role contract".
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)]()
 
 [中文](README.md) | English
 
-## ✨ Core Features
+## Why
 
-- 🎯 **Role-Driven** - Standardize task assignment and execution through role boundaries
-- 🛠️ **Skill Library Management** - Support for Anthropic standard format skill definitions
-- 🔄 **Dual Mode Support** - Workflow mode (multi-stage) and Role Executor mode (simplified)
-- ⭐ **SOP Import** - Generate team configurations from standard operating procedure documents with one click
-- 🤖 **Agent Orchestration** - Automatically execute tasks using Agent + Skills
-- 🔌 **MCP Integration** - Support for Model Context Protocol to call external services
-- 📦 **Zero-Config Startup** - Automatically detect project type and use appropriate templates
+Wiring multiple LLM agents together usually yields role drift, uncontrolled outputs, unverifiable
+conclusions, and no safe way to change a prompt. work-by-roles answers with a governance kernel:
 
-## 🚀 Quick Start
+- **RoleContract** — SOP duties, forbidden behaviors, output schema, evidence rules, tool
+  whitelist, memory permissions, token quota, review criteria: fully declarative, versioned with
+  content-hash pinning.
+- **Review paradigm** — Coordinator decomposes → experts run in parallel → Verifier independently
+  judges; **disagreements are preserved, never arbitrated away**.
+- **Layered isolated memory** — role-static / role-session / task-scratch / global-shared, gated
+  by contract permissions, fully audited.
+- **Native Harness** — golden cases + baseline snapshots (contract & model pinning) + one-click
+  regression + six metrics + capability-degradation detection.
+- **Contract-bound cache** — key = contract hash ‖ question hash ‖ evidence snapshot; contract
+  changes invalidate automatically; never serves stale entries.
+- **Security** — bilingual prompt-injection rule set, second-order content isolation, boundary
+  marker escaping.
+- **Full-chain audit** — typed events on every compile/call/validate/verdict, exportable audit
+  packs.
+- **LangGraph compatible** — 3-line drop-in guard for existing graphs, or one-call native review
+  graph.
 
-### Installation
+## Architecture
+
+```
+App       wbr/app        FastAPI service · expert canvas (SPA) · async task queue
+Adapter   wbr/adapters   LangGraph mapping/guard/HITL · Redis/Memory storage
+Core      wbr/core       contracts · compiler · diff · audit · memory · orchestration
+                         security · token · cache · schema · harness   (stdlib + pydantic only)
+```
+
+## Quick start
 
 ```bash
-git clone https://github.com/puppyfront-web/work-by-roles.git
-cd work-by-roles
-pip install -e .
+pip install "work-by-roles[langgraph]"
 ```
-
-### Usage (2 Ways)
-
-**Method 1: One-Click Setup (Recommended for IDE environments)**
-```bash
-workflow setup
-workflow role-execute product_analyst "Analyze user login feature requirements"
-```
-
-**Method 2: Full Workflow (Suitable for large projects)**
-```bash
-workflow init --quick
-workflow wfauto --intent "Implement user login functionality"
-```
-
-📖 **Detailed Guide**: [QUICKSTART_EN.md](QUICKSTART_EN.md) | [Full Documentation](#-documentation)
-
-## 🎯 Core Concepts
-
-### Two Working Modes
-
-**Workflow Mode** - Multi-stage process, suitable for large projects
-```
-Requirements Analysis → System Design → Architecture Design → Code Implementation → Quality Assurance → Complete
-```
-
-**Role Executor Mode** - Simplified mode, suitable for IDE environments (Recommended)
-```
-User Requirements → Direct Role Call → Role Uses Skills → Complete Task
-```
-
-### Key Concepts
-
-- **Role**: Who does what (e.g., Product Analyst, System Architect)
-- **Skill**: Capabilities used by roles (Anthropic standard format)
-- **Stage**: When to do what (Workflow mode)
-
-## 📚 Common Commands
-
-| Command | Description |
-|---------|-------------|
-| `workflow setup` | One-click project setup |
-| `workflow list-roles` | List all roles |
-| `workflow list-skills` | List all skills |
-| `workflow role-execute <role> "<requirement>"` | Execute role task |
-| `workflow import-sop <file>` | Generate configuration from SOP document |
-| `workflow status` | View workflow status |
-
-**Workflow Mode Commands**:
-```bash
-workflow init --quick      # Quick initialization
-workflow wfauto            # Auto-execute all stages
-workflow start <stage>     # Start specific stage
-workflow complete          # Complete current stage
-```
-
-## ⭐ Core Features
-
-### SOP Document Import
-
-Automatically generate team configurations from standard operating procedure documents:
-
-```bash
-workflow import-sop your_sop.md
-```
-
-**Features**:
-- 🎯 Intelligent extraction of roles, skills, and workflows
-- 🔄 Automatic team template matching
-- 📝 Generate Anthropic standard format skill files
-- 🤖 Support for LLM-enhanced analysis (optional)
-
-📖 [View Example](examples/ecommerce_order_sop.md) (Chinese example, English version coming soon)
-
-### LLM Configuration
-
-Support for multiple LLM providers (OpenAI, Anthropic, Ollama, etc.):
-
-**Environment Variables**:
-```bash
-export OPENAI_API_KEY='your-api-key'
-export LLM_MODEL='gpt-4'
-```
-
-**Configuration File** (`.workflow/config.yaml`):
-```yaml
-llm:
-  provider: openai
-  api_key: your-api-key
-  model: gpt-4
-```
-
-📖 [Detailed Configuration Guide](docs/ARCHITECTURE.md#6-配置系统) (See Architecture docs for LLM configuration details)
-
-### MCP Integration
-
-Support for calling external services through Model Context Protocol:
-
-```yaml
-# Add MCP configuration in skill definition
-metadata:
-  mcp:
-    action: fetch_resource
-    server: cursor-browser-extension
-    resource_uri: "mcp://cursor-browser-extension/page/content"
-```
-
-📖 [MCP Integration Guide](docs/ARCHITECTURE.md#38-mcp-集成) (See Architecture docs for MCP integration details)
-
-## 💡 Use Cases
-
-**Quick Requirements Analysis**
-```bash
-workflow role-execute product_analyst "Analyze user login feature requirements" --use-llm
-```
-
-**System Architecture Design**
-```bash
-workflow role-execute system_architect "Design microservices architecture" --use-llm
-```
-
-**Complete Feature Implementation**
-```bash
-workflow wfauto --intent "Implement user login functionality including registration, login, logout, and password reset"
-```
-
-**Code Review**
-```bash
-workflow role-execute qa_reviewer "Check code quality and test coverage" --use-llm
-```
-
-## 🐍 Python API
 
 ```python
-from work_by_roles import Workflow
+from wbr.templates.registry import load_team_spec
+from wbr.core.orchestration import ReviewSession
 
-# Zero-config startup
-workflow = Workflow.quick_start()
-
-# Start stage
-workflow.start("requirements")
-
-# Complete stage
-workflow.complete()
-
-# View status
-status = workflow.status()
+spec = load_team_spec("arch_review_team")     # ready-made expert team
+session = ReviewSession(
+    coordinator_contract=spec.coordinator,
+    expert_contracts=spec.experts,
+    verifier_contract=spec.verifier,
+    invoker=your_invoker,                     # implement the ModelInvoker protocol
+)
+result = session.run("Review: monolith → microservices split")
+print(result.final_answer, result.disagreements)
 ```
 
-📖 [Full API Documentation](docs/API_EN.md)
+3-line drop-in for existing LangGraph graphs:
 
-## 📖 Documentation
+```python
+from wbr.adapters.langgraph import WBRGuard
 
-- 📖 [Quick Start](QUICKSTART_EN.md) - 30-second setup guide
-- 🔗 [Roles and Skills Guide](ROLES_AND_SKILLS_EN.md) - Understanding role and skill relationships
-- 🧠 [API Documentation](docs/API_EN.md) - Detailed API reference
-- 🏗️ [Architecture Documentation](docs/ARCHITECTURE.md) - System architecture and design (Chinese, English version coming soon)
-- 📊 [Skills Layered Classification](docs/SKILLS_LAYERED_CLASSIFICATION_EN.md) - Skills classification system
-
-## 🐛 FAQ
-
-**Q: How to reset workflow state?**
-```bash
-rm .workflow/state.yaml
-# Or use --no-restore-state parameter
-workflow wfauto --no-restore-state
+guard = WBRGuard(output_keys={"answer": contract}, audit=trail)  # 1
+graph = guard.wrap(your_compiled_graph)                          # 2
+result = graph.invoke({"question": "..."})                       # 3
 ```
 
-**Q: How to customize skills?**
-Create a skill directory under `.workflow/skills/`, and create a `Skill.md` file following the existing skill format (Anthropic standard format).
+Full platform (API + visual canvas): `pip install "work-by-roles[server]"` then
+`uvicorn --factory wbr.app.api.main:create_app --port 8000` and open `/canvas`.
 
-**Q: Which LLM providers are supported?**
-OpenAI, Anthropic, and any service compatible with OpenAI API (such as Ollama, LocalAI).
+CLI (built-in deterministic demo invoker, no external LLM): `wbr list-teams`,
+`wbr run-team arch_review_team "Review this design"`.
 
-**Q: What to do if workflow execution fails?**
-1. Check log files in `.workflow/logs/` directory
-2. Check error information in `.workflow/state.yaml`
-3. Use `workflow status` to view current state
+## Docs
 
-📖 [More FAQs](QUICKSTART_EN.md#faq)
+[SDK API](docs/SDK.md) · [LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) ·
+[Harness](docs/HARNESS.md) · [Deploy](docs/DEPLOY.md) ·
+[Specs](docs/spec/README.md) · [Acceptance reports](docs/acceptance/)
 
-## 📊 Project Status
+## Legacy appendix
 
-✅ **Production Ready** - All core features implemented and tested
+The early lightweight workflow framework (`work_by_roles` package, `workflow` CLI) is frozen but
+still shipped; its README is archived at [docs/LEGACY_README_EN.md](docs/LEGACY_README_EN.md) and
+[docs/LEGACY_README.md](docs/LEGACY_README.md).
 
-**Features**:
-- ✅ One-click setup, zero-config startup
-- ✅ Support for multiple IDEs (Cursor, VS Code, etc.)
-- ✅ Automatic execution using Agent + Skills
-- ✅ Support for multiple LLM providers
-- ✅ MCP protocol integration
-- ✅ Complete Python API
-- ✅ Rich project templates
+## License
 
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING_EN.md](CONTRIBUTING_EN.md) for contribution guidelines.
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) for details
-
-## 🔗 Links
-
-- 📝 [Report Issues](https://github.com/puppyfront-web/work-by-roles/issues)
-- 💬 [Feature Suggestions](https://github.com/puppyfront-web/work-by-roles/discussions)
-- 📧 Contact: puppy.front@gmail.com
-
----
-
-**Get Started**: [Quick Start](#-quick-start) | [Documentation](#-documentation) | [Report Issues](https://github.com/puppyfront-web/work-by-roles/issues)
+MIT © Work-by-Roles Contributors

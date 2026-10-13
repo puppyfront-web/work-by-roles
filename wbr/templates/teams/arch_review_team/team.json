@@ -1,0 +1,31 @@
+{
+  "team": "arch_review_team",
+  "version": "1.0.0",
+  "roles": [
+    {
+      "role_id": "coordinator",
+      "role_type": "coordinator",
+      "file": "coordinator.yaml"
+    },
+    {
+      "role_id": "api_design_expert",
+      "role_type": "expert",
+      "file": "api_design_expert.yaml"
+    },
+    {
+      "role_id": "data_architect",
+      "role_type": "expert",
+      "file": "data_architect.yaml"
+    },
+    {
+      "role_id": "infra_expert",
+      "role_type": "expert",
+      "file": "infra_expert.yaml"
+    },
+    {
+      "role_id": "verifier",
+      "role_type": "verifier",
+      "file": "verifier.yaml"
+    }
+  ]
+}
