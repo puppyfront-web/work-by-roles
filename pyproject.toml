@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "work-by-roles"
-version = "0.1.0"
+version = "0.2.0"
 description = "Contract-driven expert-team governance system with native review paradigm, Harness quality gates, audit and regression (work-by-roles)"
 readme = "README.md"
 requires-python = ">=3.10"
