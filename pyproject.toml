@@ -5,38 +5,55 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "work-by-roles"
 version = "0.1.0"
-description = "Multi-Role Skills Workflow Framework - enforce role-based workflows and quality gates"
+description = "Contract-driven expert-team governance system with native review paradigm, Harness quality gates, audit and regression (work-by-roles)"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
   {name = "Work-by-Roles Contributors", email = "open@work-by-roles.example"}
 ]
-keywords = ["workflow", "roles", "quality-gates", "skills", "collaboration"]
+keywords = [
+  "expert-team", "role-contract", "llm-governance", "langgraph",
+  "harness", "evaluation", "audit", "agents", "review", "quality-gates",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
+  "pydantic>=2.5",
   "pyyaml>=6.0",
-  "pytest>=7.0",
   "jsonschema>=4.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "pytest>=7.0",
+  "pytest-cov>=4.0.0",
   "black>=23.0.0",
   "ruff>=0.1.0",
   "mypy>=1.0.0",
-  "pytest-cov>=4.0.0",
+  "build>=1.0.0",
+]
+langgraph = [
+  "langgraph>=0.2",
+  "langchain-core>=0.2",
+]
+server = [
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "httpx>=0.26",
+]
+redis = [
+  "redis>=5.0",
 ]
 
 [project.scripts]
@@ -44,18 +61,18 @@ workflow = "work_by_roles.cli:main"
 workflow-cli = "work_by_roles.cli:main"
 workflow-bootstrap = "work_by_roles.bootstrap:main"
 
-[tool.setuptools]
-packages = ["work_by_roles", "work_by_roles.core", "work_by_roles.validators", "work_by_roles.utils"]
+[tool.setuptools.packages.find]
+include = ["work_by_roles*", "wbr*"]
 
 [tool.setuptools.package-data]
 work_by_roles = ["templates/**/*.yaml", "templates/**/*.yml"]
+wbr = ["templates/**/*.yaml", "templates/**/*.yml", "templates/**/*.json", "app/canvas/static/*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+target-version = "py310"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-
