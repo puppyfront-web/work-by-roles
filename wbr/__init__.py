@@ -5,7 +5,7 @@ Core 仅依赖 stdlib + Pydantic V2（SPEC-000 D-01）。
 """
 from __future__ import annotations
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from wbr.core.audit_bus import AuditBus, AuditEvent
 from wbr.core.config import WBRConfig

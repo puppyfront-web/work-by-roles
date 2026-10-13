@@ -61,3 +61,43 @@ class RedisStorageBackend:
 
 def list_matches(client_keys, pattern: str) -> list:  # pragma: no cover - Fake 辅助
     return [k for k in client_keys if fnmatch.fnmatch(k, pattern)]
+
+
+class RedisCacheBackend:
+    """CacheBackend 协议的 Redis 实现（SPEC-004 §2.2），客户端注入。"""
+
+    def __init__(self, client: Any, *, prefix: str = "wbr:cache") -> None:
+        self._client = client
+        self._prefix = prefix
+
+    def get(self, key: str) -> dict | None:
+        raw = self._client.get(f"{self._prefix}:{key}")
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        import json
+
+        return json.loads(raw)
+
+    def set(self, key: str, value: dict) -> None:
+        import json
+
+        self._client.set(f"{self._prefix}:{key}", json.dumps(value, ensure_ascii=False))
+
+    def delete(self, key: str) -> None:
+        self._client.delete(f"{self._prefix}:{key}")
+
+    def keys(self) -> list[str]:
+        out = []
+        for k in self._client.keys(f"{self._prefix}:*"):
+            if isinstance(k, bytes):
+                k = k.decode("utf-8")
+            out.append(k.split(":", 2)[-1])
+        return sorted(out)
+
+    def clear(self) -> None:
+        for k in list(self._client.keys(f"{self._prefix}:*")):
+            self._client.delete(k)
+
+    evictions = 0  # Redis 自行管理淘汰；保持协议兼容
