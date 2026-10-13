@@ -5,7 +5,7 @@ import wbr
 
 
 def test_version_and_exports():
-    assert wbr.__version__ == "0.3.0"
+    assert wbr.__version__ == "0.4.0"
     assert "WBRError" in wbr.__all__
     assert wbr.WBRError is not None
     assert wbr.AuditBus is not None

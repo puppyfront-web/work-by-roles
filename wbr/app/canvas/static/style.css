@@ -1,0 +1,45 @@
+/* work-by-roles 专家画布样式（零依赖） */
+:root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --danger:#ef4444; --ok:#34d399; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background:var(--bg); color:var(--text); }
+header { display:flex; align-items:baseline; gap:12px; padding:12px 20px; border-bottom:1px solid var(--line); }
+header h1 { font-size:18px; margin:0; }
+.muted { color:var(--muted); font-size:12px; }
+main { display:grid; grid-template-columns: 1fr 380px; gap:0; height: calc(100vh - 53px); }
+#canvas-pane { border-right:1px solid var(--line); overflow:auto; }
+#toolbar { padding:8px 12px; display:flex; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
+button { background:var(--accent); color:#04283a; border:0; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; }
+button.danger { background:var(--danger); color:#fff; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+#side-pane { overflow:auto; padding:14px; }
+.hidden { display:none; }
+label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+input, textarea, select { width:100%; background:#0b1220; border:1px solid var(--line); color:var(--text); border-radius:6px; padding:6px 8px; font-size:13px; font-family:ui-monospace, monospace; }
+.row { display:flex; gap:8px; align-items:center; margin:8px 0; }
+.row .muted { min-width:80px; }
+h2 { font-size:15px; margin:6px 0; }
+h3 { font-size:13px; margin:10px 0 4px; }
+.badge { background:var(--line); border-radius:10px; padding:2px 8px; font-size:11px; }
+.badge.done { background:var(--ok); color:#052e1c; }
+.badge.failed { background:var(--danger); color:#fff; }
+.feedback { font-size:11px; margin-top:2px; }
+.feedback.ok { color:var(--ok); }
+.feedback.err { color:var(--danger); }
+#version-info { font-size:11px; white-space:pre-wrap; }
+/* SVG 节点 */
+.node rect { fill:var(--panel); stroke:var(--line); rx:10; }
+.node.coordinator rect { stroke:#f59e0b; }
+.node.verifier rect { stroke:#a78bfa; }
+.node.expert rect { stroke:var(--accent); }
+.node.disputed rect { stroke:var(--danger); stroke-dasharray:6 3; stroke-width:2.5; }
+.node text { fill:var(--text); font-size:12px; }
+.node .sub { fill:var(--muted); font-size:10px; }
+.node { cursor:grab; }
+.edge { stroke:var(--line); stroke-width:1.5; fill:none; }
+.edge.disputed { stroke:var(--danger); stroke-dasharray:6 3; }
+#expert-checks label { display:flex; gap:6px; align-items:center; color:var(--text); margin:4px 0; }
+#expert-checks input { width:auto; }
+#final-answer { background:#0b1220; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:13px; margin:8px 0; }
+.expert-card { background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:6px; padding:8px; margin:6px 0; font-size:12px; }
+.expert-card .viol { color:var(--danger); }
+.disagree-card { background:#2a1215; border:1px solid var(--danger); border-radius:6px; padding:8px; margin:6px 0; font-size:12px; }

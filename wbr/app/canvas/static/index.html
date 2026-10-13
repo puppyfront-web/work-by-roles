@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>work-by-roles · 专家画布</title>
+<link rel="stylesheet" href="/canvas/static/style.css">
+</head>
+<body>
+<header>
+  <h1>⬡ work-by-roles 专家画布</h1>
+  <span id="api-version" class="muted"></span>
+</header>
+<main>
+  <section id="canvas-pane">
+    <div id="toolbar">
+      <button id="btn-refresh">刷新契约</button>
+      <button id="btn-new">新建契约</button>
+      <span class="muted">拖拽节点调整布局 · 点击节点编辑契约</span>
+    </div>
+    <svg id="canvas" width="100%" height="620" viewBox="0 0 960 620">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"></path>
+        </marker>
+        <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"></path>
+        </marker>
+      </defs>
+      <g id="edges"></g>
+      <g id="nodes"></g>
+    </svg>
+  </section>
+  <aside id="side-pane">
+    <div id="editor" class="hidden">
+      <h2 id="editor-title">契约编辑</h2>
+      <label>role_id <input id="f-role-id" placeholder="expert_xxx"></label>
+      <label>名称 <input id="f-name"></label>
+      <label>角色类型
+        <select id="f-role-type">
+          <option value="expert">expert</option>
+          <option value="coordinator">coordinator</option>
+          <option value="verifier">verifier</option>
+        </select>
+      </label>
+      <label>描述 <textarea id="f-desc" rows="2"></textarea></label>
+      <label>SOP 步骤（每行：step_id|标题|指令）<textarea id="f-sop" rows="3"></textarea></label>
+      <label>禁区（每行一条）<textarea id="f-forbidden" rows="2"></textarea></label>
+      <label>输出 Schema（JSON）<textarea id="f-schema" rows="5"></textarea></label>
+      <div id="schema-feedback" class="feedback"></div>
+      <label>工具白名单（逗号分隔）<input id="f-tools"></label>
+      <label>记忆读层（逗号分隔: role_static,role_session,task_scratch,global_shared）<input id="f-read"></label>
+      <label>记忆写层 <input id="f-write"></label>
+      <label>Token 配额（prompt/completion/turn）<input id="f-quota" value="6000/2000/8000"></label>
+      <div class="row">
+        <button id="btn-save">保存（新版本）</button>
+        <button id="btn-delete" class="danger">删除</button>
+        <button id="btn-close-editor">关闭</button>
+      </div>
+      <pre id="version-info" class="muted"></pre>
+    </div>
+    <div id="runner">
+      <h2>会审运行</h2>
+      <label>问题 <textarea id="f-question" rows="2"></textarea></label>
+      <div class="row">
+        <span class="muted">Coordinator</span><select id="sel-coordinator"></select>
+      </div>
+      <div class="row"><span class="muted">Verifier</span><select id="sel-verifier"></select></div>
+      <div id="expert-checks"></div>
+      <button id="btn-run">▶ 运行会审</button>
+      <div id="run-result" class="hidden">
+        <h3>结果 <span id="run-status" class="badge"></span></h3>
+        <div id="final-answer"></div>
+        <div id="expert-cards"></div>
+        <div id="disagreements"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+<script src="/canvas/static/app.js"></script>
+</body>
+</html>
