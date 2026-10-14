@@ -12,7 +12,10 @@
 | [SPEC-004-阶段3-Harness与缓存](SPEC-004-阶段3-Harness与缓存.md) | 黄金用例库、基线快照、回归引擎、六项指标、AI Judge 钩子、契约绑定缓存、审计包 |
 | [SPEC-005-阶段4-API与画布](SPEC-005-阶段4-API与画布.md) | FastAPI 路由、任务队列、画布 MVP、错误规范 |
 | [SPEC-006-阶段5-V1.0发布](SPEC-006-阶段5-V1.0发布.md) | 官方模板库、文档、PyPI 打包、性能加固 |
-| [SPEC-REVIEW](SPEC-REVIEW.md) | 规格自审核记录：覆盖矩阵、八规则合规、17 项问题裁定（R1~R17） |
+| [SPEC-007-V1x迭代](SPEC-007-V1x迭代.md) | 脱敏/知识库/语义缓存/反馈闭环/MCP/OTel（V1.1） |
+| [SPEC-008-V2企业版](SPEC-008-V2企业版.md) | 哈希链/Workspace/受控辩论/Bundle/灰度A/B（V2.0） |
+| [SPEC-009-意图与受控Loop](SPEC-009-意图与受控Loop.md) | 意图推理流水线/类型A内循环/辩论合规/Harness专项指标（V2.1） |
+| [SPEC-REVIEW](SPEC-REVIEW.md) | 规格自审核记录：覆盖矩阵、八规则合规、裁定 R1~R40（含 §10 规格资产总索引） |
 
 ## 计划与用例
 

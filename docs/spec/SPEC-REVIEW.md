@@ -113,3 +113,25 @@ SPEC-000~006 通过审核，进入 Plan/TESTCASES 设计（docs/plan/）。此�
 | R35 | 补充方案中"阶段1/2 时序"已过时（V2.0 已交付） | 按现状一次性落地于 2.1.0；原阶段验收追加条款并入 PHASE8 报告核对表 |
 
 结论：SPEC-009 通过审核。
+
+## 9. V2.1.1 代码 Review 与优化迭代留档（2026-10-14）
+
+> 依据：用户指令"完成开发周期后 review、代码优化、交付"。本迭代无新 SPEC（纯优化补丁，无 API 变更），留存于验收侧 [acceptance/REVIEW-V2.1.md](../acceptance/REVIEW-V2.1.md)，此处登记结论：
+
+| # | 事项 | 结论 |
+|---|---|---|
+| R36 | 审计轨迹锁失效（PLW2101：`with threading.Lock()` 每次新建） | **已修复**：AuditTrail 实例级 RLock 字段（pydantic exclude），并行专家写审计竞态消除 |
+| R37 | F821 潜在炸弹 ×3（engine/metrics 的 TYPE_CHECKING 导入缺失） | **已修复**：注解名全量可解析 |
+| R38 | 静态清零 | ruff `--select F,E9` 全绿；139 项可自动项修复；刻意保留的兜底 except（总线/桥零反噬设计）留档于 REVIEW-V2.1.md §1 |
+| R39 | SPEC-009 完整性缺口（§4.4 循环快照未接主流程） | **已闭环**：`ReviewSession.run(loop_snapshots=...)` 按角色注入专家 evidence 通道，含集成测试 |
+| R40 | 版本 2.1.1（补丁级：无 API 变更）；验证 356 passed / 1 skipped，存量回归零差异 | 交付 |
+
+## 10. 规格资产总索引（截至 V2.1.1）
+
+| 迭代 | SPEC | 审核裁定 | 验收报告 | 版本 |
+|---|---|---|---|---|
+| 五阶段基础 | SPEC-000~006 | §1~§5（R1~R17） | PHASE0~5 + FINAL | 1.0.0 |
+| V1.x 生态扩展 | SPEC-007 | §6（R18~R23） | PHASE6 | 1.1.0 |
+| V2.0 企业版 | SPEC-008 | §7（R24~R29） | PHASE7 | 2.0.0 |
+| 意图与受控Loop | SPEC-009 | §8（R30~R35） | PHASE8 | 2.1.0 |
+| Review 优化 | —（无新 SPEC） | §9（R36~R40） | REVIEW-V2.1 | 2.1.1 |
