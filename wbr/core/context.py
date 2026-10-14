@@ -5,11 +5,10 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Iterator
-
-from contextlib import contextmanager
 
 _trace_id_var: ContextVar[str | None] = ContextVar("wbr_trace_id", default=None)
 _span_id_var: ContextVar[str | None] = ContextVar("wbr_span_id", default=None)

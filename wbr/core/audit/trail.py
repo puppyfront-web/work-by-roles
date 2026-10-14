@@ -14,13 +14,17 @@ class AuditTrail(BaseModel):
 
     events: list[AuditEvent] = Field(default_factory=list)
     behaviors: list[RoleBehaviorRecord] = Field(default_factory=list)
+    lock: threading.RLock = Field(
+        default_factory=threading.RLock, exclude=True, repr=False,
+        validation_alias="lock", serialization_alias="lock",
+    )
 
     def append(self, event: AuditEvent) -> None:
-        with threading.Lock():
+        with self.lock:
             self.events.append(event)
 
     def append_behavior(self, record: RoleBehaviorRecord) -> None:
-        with threading.Lock():
+        with self.lock:
             self.behaviors.append(record)
 
     def events_for(self, trace_id: str) -> list[AuditEvent]:

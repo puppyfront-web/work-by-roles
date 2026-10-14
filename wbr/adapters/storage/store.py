@@ -5,7 +5,7 @@ from typing import Any
 
 from wbr.adapters.storage.base import StorageBackend
 from wbr.core.constants import MemoryLayer
-from wbr.core.memory.base import MemoryRecord, MemoryStore
+from wbr.core.memory.base import MemoryRecord
 from wbr.core.memory.hub import MemoryHub
 
 

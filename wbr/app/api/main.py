@@ -11,6 +11,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 import wbr
 from wbr.app.store import ContractRegistry
 from wbr.app.tasks.queue import (
@@ -27,7 +29,6 @@ from wbr.core.contract.models import RoleContract
 from wbr.core.exceptions import AppError, WBRError
 from wbr.core.harness import BaselineSnapshot, CaseSuite, RegressionEngine
 from wbr.core.orchestration import ReviewSession, ScriptedInvoker
-from pydantic import BaseModel, Field
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "canvas" / "static"
 
@@ -75,7 +76,7 @@ class _DemoInvoker(ScriptedInvoker):
         self.question = "（未提供问题）"
         self.expert_ids: list[str] = []
 
-    def invoke(self, request):  # noqa: D102 - 与协议一致
+    def invoke(self, request):
         contract = request.role_contract
         rid = contract.role_id
         question = "（未提供问题）"
@@ -103,7 +104,7 @@ class _DemoInvoker(ScriptedInvoker):
         )
 
 
-def _resolve_contracts(services: "_Services", cids: list[str]) -> dict[str, RoleContract]:
+def _resolve_contracts(services: _Services, cids: list[str]) -> dict[str, RoleContract]:
     out: dict[str, RoleContract] = {}
     for cid in cids:
         c = services.registry.get(cid)
@@ -113,7 +114,7 @@ def _resolve_contracts(services: "_Services", cids: list[str]) -> dict[str, Role
     return out
 
 
-def _handle_review(services: "_Services", record: TaskRecord) -> dict:
+def _handle_review(services: _Services, record: TaskRecord) -> dict:
     payload = record.payload
     contracts = _resolve_contracts(
         services, [payload["coordinator"], *payload["experts"], payload["verifier"]]
@@ -129,7 +130,7 @@ def _handle_review(services: "_Services", record: TaskRecord) -> dict:
     return json.loads(result.to_json())
 
 
-def _handle_regression(services: "_Services", record: TaskRecord) -> dict:
+def _handle_regression(services: _Services, record: TaskRecord) -> dict:
     payload = record.payload
     contracts = _resolve_contracts(services, payload["contract_ids"])
     suite = CaseSuite.model_validate(payload["suite"])
@@ -165,7 +166,7 @@ def create_app(
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import FileResponse, JSONResponse
         from fastapi.staticfiles import StaticFiles
-        from pydantic import BaseModel, Field, ValidationError
+        from pydantic import ValidationError  # noqa: F401 - 可用性探测
     except ImportError as e:  # pragma: no cover
         raise AppError(
             "API 服务需要安装可选依赖: pip install 'work-by-roles[server]' (fastapi/uvicorn/httpx)"

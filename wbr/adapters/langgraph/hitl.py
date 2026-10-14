@@ -20,7 +20,7 @@ def interrupt_for_approval(request: ApprovalRequest) -> Any:
     return interrupt(request.model_dump())
 
 
-def resume_command(decision: "ApprovalState | str", *, decided_by: str | None = None, comment: str | None = None) -> Any:
+def resume_command(decision: ApprovalState | str, *, decided_by: str | None = None, comment: str | None = None) -> Any:
     try:
         from langgraph.types import Command
     except ImportError as e:  # pragma: no cover

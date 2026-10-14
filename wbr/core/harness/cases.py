@@ -26,7 +26,7 @@ class GoldenCase(BaseModel):
     expect_disagreement: bool = False  # 构造为含分歧的用例（用于分歧检出率）
 
     @model_validator(mode="after")
-    def _case_id_required(self) -> "GoldenCase":
+    def _case_id_required(self) -> GoldenCase:
         return self
 
 
@@ -39,13 +39,13 @@ class CaseSuite(BaseModel):
     created_at: float = Field(default_factory=time.time)
 
     @model_validator(mode="after")
-    def _unique_case_ids(self) -> "CaseSuite":
+    def _unique_case_ids(self) -> CaseSuite:
         ids = [c.case_id for c in self.cases]
         if len(ids) != len(set(ids)):
             raise HarnessError("用例 case_id 必须唯一", code="E7003")
         return self
 
-    def add(self, case: GoldenCase) -> "CaseSuite":
+    def add(self, case: GoldenCase) -> CaseSuite:
         if any(c.case_id == case.case_id for c in self.cases):
             raise HarnessError(f"case_id 已存在: {case.case_id}", code="E7003")
         self.cases.append(case)
@@ -62,7 +62,7 @@ class CaseSuite(BaseModel):
         Path(path).write_text(self.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str) -> "CaseSuite":
+    def load(cls, path: str) -> CaseSuite:
         from pathlib import Path
 
         return cls.model_validate_json(Path(path).read_text(encoding="utf-8"))

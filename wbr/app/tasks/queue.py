@@ -8,9 +8,10 @@ import asyncio
 import threading
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from enum import Enum
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -65,7 +66,7 @@ class InlineTaskQueue:
         try:
             record.result = self.handler(record)
             record.status = TaskStatus.DONE
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             record.status = TaskStatus.FAILED
             record.error = str(e)
         finally:
@@ -117,7 +118,7 @@ class InProcessTaskQueue:
                     result = await result
                 record.result = result
                 record.status = TaskStatus.DONE
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 record.status = TaskStatus.FAILED
                 record.error = str(e)
             finally:
@@ -139,7 +140,7 @@ class InProcessTaskQueue:
         try:
             record.result = self.handler(record)
             record.status = TaskStatus.DONE
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             record.status = TaskStatus.FAILED
             record.error = str(e)
         finally:
@@ -178,7 +179,7 @@ class JsonTaskStore:
         for p in sorted(self.root.glob("*.json")):
             try:
                 out.append(TaskRecord.model_validate_json(p.read_text(encoding="utf-8")))
-            except Exception:  # noqa: BLE001 - 损坏文件跳过
+            except Exception:
                 continue
         return out
 

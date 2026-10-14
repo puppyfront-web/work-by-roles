@@ -34,7 +34,7 @@ class JsonFormatter(logging.Formatter):
 class TraceFilter(logging.Filter):
     """将当前 trace_id 注入每条日志记录。"""
 
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+    def filter(self, record: logging.LogRecord) -> bool:
         if not hasattr(record, "trace_id"):
             record.trace_id = get_trace_id()  # type: ignore[attr-defined]
         return True

@@ -21,7 +21,7 @@ class WBRConfig(BaseModel):
     cache_max_entries: int = Field(default=4096, ge=1)
     extra: dict[str, Any] = Field(default_factory=dict)
 
-    def overlay(self, **kw: Any) -> "WBRConfig":
+    def overlay(self, **kw: Any) -> WBRConfig:
         """返回应用了覆盖项的新配置实例（不可变更新）。"""
         data = self.model_dump()
         data.update(kw)

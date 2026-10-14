@@ -143,3 +143,36 @@ def test_contract_default_config_used():
     snap = make_executor(scripts, contract=c).run("q")
     assert snap.rounds_used == 1  # 契约 max_rounds=1 生效
     assert snap.stopped_because == "max_rounds_risk"
+
+
+def test_snapshot_feeds_review_session():
+    """快照作为主会审流程输入：对应专家的编译 prompt 含快照结论。"""
+    from tests.wbr.factories import coordinator_contract, verifier_contract
+    from wbr.core.orchestration import ReviewSession
+
+    scripts = {"expert_a": round_out("内循环沉淀结论", ["[^1] 内部证据"], cont=False)}
+    executor = make_executor(scripts)
+    snap = executor.run("缓存选型")
+
+    captured = {}
+
+    def expert_spy(request):
+        captured["system_prompt"] = request.compiled_prompt.system_prompt
+        return {"conclusion": "综合内循环结论", "confidence": 0.9}
+
+    full_scripts = {
+        "coordinator": {"assignments": [{"expert_role_id": "expert_a", "sub_question": "缓存选型"}]},
+        "expert_a": expert_spy,
+        "verifier": {"passed": True, "scores": {"completeness": 0.8, "accuracy": 0.8},
+                     "comments": "ok", "final_answer": "A"},
+    }
+    session = ReviewSession(
+        coordinator_contract=coordinator_contract(),
+        expert_contracts=[expert_contract("expert_a")],
+        verifier_contract=verifier_contract(),
+        invoker=ScriptedInvoker(full_scripts),
+    )
+    result = session.run("主问题", loop_snapshots=[snap])
+    # 快照经证据规范段进入专家系统上下文（evidence 通道）
+    assert "内循环沉淀结论" in captured["system_prompt"]
+    assert result.status.value == "completed"

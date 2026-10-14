@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from wbr.core.audit.models import AuditEvent
 from wbr.core.canonical import canonical_json, sha256_hex
@@ -77,7 +77,7 @@ class HashChainAuditor:
         )
 
     @classmethod
-    def from_json(cls, raw: str) -> "HashChainAuditor":
+    def from_json(cls, raw: str) -> HashChainAuditor:
         data = json.loads(raw)
         auditor = cls()
         auditor._events = [ChainedEvent.model_validate(e) for e in data["events"]]

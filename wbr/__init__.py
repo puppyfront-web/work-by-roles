@@ -5,29 +5,20 @@ Core 仅依赖 stdlib + Pydantic V2（SPEC-000 D-01）。
 """
 from __future__ import annotations
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 # ---- 基础设施 ----
-from wbr.core.audit_bus import AuditBus, AuditEvent as BusAuditEvent
+# ---- 审计 ----
+from wbr.core.audit import AuditEvent, AuditEventType, AuditTrail, RoleBehaviorRecord
+from wbr.core.audit.chain import ChainedEvent, ChainVerification, HashChainAuditor, HashChainTrail
+from wbr.core.audit.pack import AuditPack, AuditPackBuilder
+from wbr.core.audit_bus import AuditBus
+from wbr.core.audit_bus import AuditEvent as BusAuditEvent
+from wbr.core.bundle import BaselineBundle
+from wbr.core.cache import ContractBoundCache, InMemoryCacheBackend
+from wbr.core.cache.semantic import SemanticCache
 from wbr.core.config import WBRConfig
 from wbr.core.context import get_trace_id, new_trace_id, set_trace_id
-from wbr.core.exceptions import (
-    AdapterError,
-    AppError,
-    CacheError,
-    ConfigError,
-    ContractCompileError,
-    ContractValidationError,
-    ForbiddenViolationError,
-    HarnessError,
-    MemoryPermissionDeniedError,
-    OrchestrationError,
-    SchemaValidationError,
-    SecurityViolationError,
-    TokenBudgetExceededError,
-    ToolPermissionDeniedError,
-    WBRError,
-)
 
 # ---- 契约 ----
 from wbr.core.contract import (
@@ -51,10 +42,49 @@ from wbr.core.contract import (
     TokenQuota,
     ToolPolicy,
 )
+from wbr.core.exceptions import (
+    AdapterError,
+    AppError,
+    CacheError,
+    ConfigError,
+    ContractCompileError,
+    ContractValidationError,
+    ForbiddenViolationError,
+    HarnessError,
+    MemoryPermissionDeniedError,
+    OrchestrationError,
+    SchemaValidationError,
+    SecurityViolationError,
+    TokenBudgetExceededError,
+    ToolPermissionDeniedError,
+    WBRError,
+)
+from wbr.core.experiment import ABExperiment, ABReport, ABVariant
 
-# ---- 审计 ----
-from wbr.core.audit import AuditEvent, AuditEventType, AuditTrail, RoleBehaviorRecord
-from wbr.core.audit.pack import AuditPack, AuditPackBuilder
+# ---- Harness ----
+from wbr.core.harness import (
+    BaselineSnapshot,
+    CaseResult,
+    CaseSuite,
+    GoldenCase,
+    HarnessMetrics,
+    HeuristicJudge,
+    RegressionEngine,
+    RegressionReport,
+)
+from wbr.core.harness.feedback import FeedbackLoop, FeedbackRecord
+from wbr.core.harness.loop_metrics import (
+    DebateLoopMetrics,
+    IntentMetrics,
+    LoopMetrics,
+)
+from wbr.core.knowledge import (
+    KnowledgeBase,
+    KnowledgeDocument,
+    KnowledgeEvidenceCollector,
+    KnowledgeSearchHit,
+)
+from wbr.core.loop_config import InnerLoopConfig, IntentPolicy, LoopSummarySnapshot
 
 # ---- 记忆 / 编排 ----
 from wbr.core.memory import InMemoryMemoryStore, MemoryHub, MemoryRecord, MemoryStore
@@ -75,47 +105,11 @@ from wbr.core.orchestration import (
     Violation,
     ViolationKind,
 )
-
-# ---- 安全 / Token / 缓存 ----
-from wbr.core.security import (
-    InjectionDetector,
-    InjectionReport,
-    RiskLevel,
-    RiskControlPolicy,
-    RiskDecision,
-    guard_user_input,
-    wrap_external_content,
-)
-from wbr.core.security.redactor import Redactor, RedactionReport
-from wbr.core.token import (
-    BudgetPolicy,
-    HeuristicTokenCounter,
-    TokenBudget,
-    TokenCounter,
-    TokenMeter,
-)
-from wbr.core.cache import ContractBoundCache, InMemoryCacheBackend
-from wbr.core.cache.semantic import SemanticCache
-
-# ---- Harness ----
-from wbr.core.harness import (
-    BaselineSnapshot,
-    CaseResult,
-    CaseSuite,
-    GoldenCase,
-    HarnessMetrics,
-    HeuristicJudge,
-    RegressionEngine,
-    RegressionReport,
-)
-from wbr.core.harness.feedback import FeedbackLoop, FeedbackRecord
-from wbr.core.audit.chain import ChainVerification, ChainedEvent, HashChainAuditor, HashChainTrail
-from wbr.core.bundle import BaselineBundle
-from wbr.core.experiment import ABExperiment, ABReport, ABVariant
-from wbr.core.harness.loop_metrics import (
-    DebateLoopMetrics,
-    IntentMetrics,
-    LoopMetrics,
+from wbr.core.orchestration.debate import (
+    DebateConfig,
+    DebateModerator,
+    DebateResult,
+    DebateTurn,
 )
 from wbr.core.orchestration.intent import (
     IntentPipeline,
@@ -123,18 +117,24 @@ from wbr.core.orchestration.intent import (
     IntentType,
     NextAction,
 )
-from wbr.core.loop_config import InnerLoopConfig, IntentPolicy, LoopSummarySnapshot
-from wbr.core.orchestration.debate import (
-    DebateConfig,
-    DebateModerator,
-    DebateResult,
-    DebateTurn,
+
+# ---- 安全 / Token / 缓存 ----
+from wbr.core.security import (
+    InjectionDetector,
+    InjectionReport,
+    RiskControlPolicy,
+    RiskDecision,
+    RiskLevel,
+    guard_user_input,
+    wrap_external_content,
 )
-from wbr.core.knowledge import (
-    KnowledgeBase,
-    KnowledgeDocument,
-    KnowledgeEvidenceCollector,
-    KnowledgeSearchHit,
+from wbr.core.security.redactor import RedactionReport, Redactor
+from wbr.core.token import (
+    BudgetPolicy,
+    HeuristicTokenCounter,
+    TokenBudget,
+    TokenCounter,
+    TokenMeter,
 )
 
 __all__ = [

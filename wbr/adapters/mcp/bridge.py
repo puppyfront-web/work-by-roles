@@ -71,7 +71,7 @@ class MCPToolBridge:
         # 2) 调用 MCP
         try:
             payload = self._client.call_tool(tool_name, dict(arguments))
-        except Exception as e:  # noqa: BLE001 - MCP 故障降级为结果
+        except Exception as e:
             return MCPToolResult(allowed=False, tool=tool_name, error=str(e))
         import json as _json
 

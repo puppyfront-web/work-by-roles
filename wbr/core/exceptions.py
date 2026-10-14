@@ -23,7 +23,7 @@ class WBRError(Exception):
         self.trace_id = trace_id
         self.details: dict[str, Any] = details or {}
 
-    def __str__(self) -> str:  # noqa: D105
+    def __str__(self) -> str:
         base = f"[{self.code}] {self.message}"
         if self.trace_id:
             base = f"{base} (trace_id={self.trace_id})"

@@ -16,11 +16,12 @@ from pydantic import BaseModel, Field
 
 from wbr.core.audit.models import AuditEvent, AuditEventType, RoleBehaviorRecord
 from wbr.core.audit.trail import AuditTrail
-from wbr.core.context import apply_context, current_context, new_trace_id, set_trace_id
 from wbr.core.constants import MemoryLayer
+from wbr.core.context import apply_context, current_context, new_trace_id, set_trace_id
 from wbr.core.contract.compiler import ContractCompiler
 from wbr.core.contract.models import RoleContract, RoleType
 from wbr.core.exceptions import OrchestrationError
+from wbr.core.loop_config import LoopSummarySnapshot
 from wbr.core.memory.hub import MemoryHub
 from wbr.core.orchestration.invoker import (
     ModelInvoker,
@@ -153,13 +154,28 @@ class ReviewSession:
         self._max_workers = max_workers
         self._token_meter = token_meter
         self._session_id = session_id
+        self._loop_snapshots: dict[str, Any] = {}
         self._compiler = ContractCompiler()
 
     # ---- 公共入口 ----
-    def run(self, question: str, *, context: dict[str, Any] | None = None) -> ReviewResult:
+    def run(
+        self,
+        question: str,
+        *,
+        context: dict[str, Any] | None = None,
+        loop_snapshots: list["LoopSummarySnapshot"] | None = None,
+    ) -> ReviewResult:
+        """执行会审。
+
+        loop_snapshots：可选的内循环总结快照（InnerLoopExecutor 产出），
+        按角色注入对应专家的证据/上下文（SPEC-009 §4.4：快照进主流程，原始消息不进）。
+        """
         result = ReviewResult(question=question)
         result.trace_id = new_trace_id()
         set_trace_id(result.trace_id)
+        self._loop_snapshots = {
+            s.role_id: s for s in (loop_snapshots or [])
+        }
         self._emit(AuditEventType.SESSION_STARTED, payload={"question_digest": _digest(question)})
         started = time.time()
         try:
@@ -179,7 +195,7 @@ class ReviewSession:
         except OrchestrationError as e:
             result.status = ReviewStatus.FAILED
             result.error = str(e)
-        except Exception as e:  # noqa: BLE001 - 会审不向调用方抛裸异常
+        except Exception as e:
             result.status = ReviewStatus.FAILED
             result.error = f"内部错误: {e}"
         finally:
@@ -208,7 +224,6 @@ class ReviewSession:
     @staticmethod
     def _normalize_assignments(plan: dict[str, Any], question: str) -> dict[str, str]:
         assignments: dict[str, str] = {}
-        known = None
         for a in plan.get("assignments", []):
             if isinstance(a, dict) and a.get("expert_role_id") and a.get("sub_question"):
                 assignments[a["expert_role_id"]] = str(a["sub_question"])
@@ -242,6 +257,13 @@ class ReviewSession:
         )
         try:
             evidence = self._collect_evidence(contract)
+            snapshot = (self._loop_snapshots or {}).get(contract.role_id)
+            if snapshot is not None:
+                loop_ctx = (
+                    f"[内循环快照 {snapshot.role_id}] 轮次={snapshot.rounds_used} "
+                    f"结论={snapshot.conclusion} 证据={snapshot.evidence}"
+                )
+                evidence = [*(evidence or []), loop_ctx]
             compiled = self._compile(contract, sub_question, evidence=evidence)
             response = self._invoke(contract, compiled, _trace_of(ctx))
             outcome.raw_text = response.text
@@ -266,7 +288,7 @@ class ReviewSession:
                 outcome.error = "; ".join(v.detail for v in outcome.violations)
             else:
                 outcome.status = ExpertStatus.COMPLETED
-        except Exception as e:  # noqa: BLE001 - 单专家失败降级
+        except Exception as e:
             outcome.status = ExpertStatus.FAILED
             outcome.error = str(e)
         finally:
@@ -449,7 +471,7 @@ class ReviewSession:
                         value = self._memory.read(layer, key, contract=contract)
                         if value is not None:
                             items.append(str(value))
-            except Exception:  # noqa: BLE001 - 证据收集失败不阻断
+            except Exception:
                 continue
         return items or None
 
@@ -471,7 +493,7 @@ class ReviewSession:
             try:
                 for key in self._memory.keys_of(layer, contract=contract):
                     snap[f"{layer.value}:{key}"] = self._memory.read(layer, key, contract=contract)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
         return snap
 

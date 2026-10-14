@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import ClassVar
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -77,8 +78,8 @@ class ContractDiffEngine:
     """对两份契约做递归字段级 Diff（列表按身份键/标量值对齐）。"""
 
     # 复杂对象列表按身份键对齐；标量列表按值对齐（"@scalar"）
-    LIST_KEYS = {("sop", "steps"): "step_id"}
-    SCALAR_LISTS = {
+    LIST_KEYS: ClassVar[dict] = {("sop", "steps"): "step_id"}
+    SCALAR_LISTS: ClassVar[set] = {
         "forbidden.behaviors",
         "forbidden.domains",
         "tool_policy.whitelist",

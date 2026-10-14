@@ -11,8 +11,8 @@ import unicodedata
 
 from pydantic import BaseModel, Field
 
-from wbr.core.canonical import canonical_json, sha256_hex
 from wbr.core.cache.backends import CacheBackend, InMemoryCacheBackend
+from wbr.core.canonical import canonical_json, sha256_hex
 from wbr.core.contract.models import RoleContract
 
 

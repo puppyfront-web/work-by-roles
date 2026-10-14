@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from wbr.core.orchestration.review import ExpertStatus, ViolationKind
 
 if TYPE_CHECKING:  # pragma: no cover
-    from wbr.core.orchestration.review import ReviewResult
+    from wbr.core.harness.engine import CaseResult
 
 
 class HarnessMetrics(BaseModel):
@@ -26,7 +26,7 @@ class HarnessMetrics(BaseModel):
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.model_dump().items()}
 
-    def delta(self, previous: "HarnessMetrics") -> dict[str, float]:
+    def delta(self, previous: HarnessMetrics) -> dict[str, float]:
         """相对上一份报告的指标变化（负值=恶化）。"""
         out: dict[str, float] = {}
         for field_name in (
@@ -46,10 +46,9 @@ class HarnessMetrics(BaseModel):
 
 
 def from_case_results(
-    case_results: list["CaseResult"], *, stability_runs: int = 1
+    case_results: list[CaseResult], *, stability_runs: int = 1
 ) -> HarnessMetrics:
     """由用例结果自动统计六项指标。"""
-    from wbr.core.harness.engine import CaseResult  # 局部导入避免环
 
     total_exec = 0
     compliant = 0

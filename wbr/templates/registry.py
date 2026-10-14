@@ -3,11 +3,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-
-import yaml
 from typing import Any
 
-import wbr
+import yaml
+
 from wbr.core.contract.models import RoleContract
 from wbr.core.exceptions import AppError
 

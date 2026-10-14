@@ -20,7 +20,7 @@ class JudgeScore(BaseModel):
 class JudgeHook(Protocol):
     """AI Judge 钩子：回归引擎可注入任意外部评估器（含 LLM Judge）。"""
 
-    def judge(self, case: "GoldenCase", result: "ReviewResult") -> JudgeScore: ...
+    def judge(self, case: GoldenCase, result: ReviewResult) -> JudgeScore: ...
 
 
 class HeuristicJudge:
@@ -40,7 +40,7 @@ class HeuristicJudge:
         self.evidence_weight = evidence_weight / total
         self.judge_id = judge_id
 
-    def judge(self, case: "GoldenCase", result: "ReviewResult") -> JudgeScore:
+    def judge(self, case: GoldenCase, result: ReviewResult) -> JudgeScore:
         # 关键词命中
         text_pool = result.final_answer + "\n" + "\n".join(
             o.raw_text for o in result.expert_outcomes

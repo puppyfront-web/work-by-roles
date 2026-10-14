@@ -51,7 +51,7 @@ class BaselineBundle(BaseModel):
         suite: CaseSuite,
         baseline: BaselineSnapshot,
         note: str = "",
-    ) -> "BaselineBundle":
+    ) -> BaselineBundle:
         if not contracts:
             raise HarnessError("Bundle 至少包含一个契约", code="E7001")
         contract_payloads = [
@@ -125,7 +125,7 @@ class BaselineBundle(BaseModel):
         Path(path).write_text(self.to_json(), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str) -> "BaselineBundle":
+    def load(cls, path: str) -> BaselineBundle:
         import json
         from pathlib import Path
 

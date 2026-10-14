@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -15,13 +16,13 @@ from wbr.core.orchestration.review import (
     ExpertStatus,
     ReviewSession,
     ReviewStatus,
-    ViolationKind,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
     from wbr.core.contract.models import RoleContract
     from wbr.core.harness.baseline import BaselineSnapshot
     from wbr.core.harness.cases import CaseSuite, GoldenCase
+    from wbr.core.orchestration.review import ReviewResult
 
 
 class CaseResult(BaseModel):
@@ -59,7 +60,7 @@ class RegressionReport(BaseModel):
 
         Path(path).write_text(self.to_json(), encoding="utf-8")
 
-    def compare_with(self, previous: "RegressionReport", *, threshold: float = -0.05) -> dict[str, Any]:
+    def compare_with(self, previous: RegressionReport, *, threshold: float = -0.05) -> dict[str, Any]:
         from wbr.core.harness.metrics import detect_degradation
 
         return {
@@ -74,10 +75,10 @@ class RegressionEngine:
     def __init__(
         self,
         *,
-        contracts: dict[str, "RoleContract"],
+        contracts: dict[str, RoleContract],
         invoker: Any,
-        coordinator: "RoleContract | None" = None,
-        verifier: "RoleContract | None" = None,
+        coordinator: RoleContract | None = None,
+        verifier: RoleContract | None = None,
         memory_factory: Callable[[], MemoryHub] | None = None,
         audit: AuditTrail | None = None,
     ) -> None:
@@ -90,7 +91,7 @@ class RegressionEngine:
         self.memory_factory = memory_factory
         self.audit = audit
 
-    def _find_role(self, role_type: str) -> "RoleContract":
+    def _find_role(self, role_type: str) -> RoleContract:
         from wbr.core.contract.models import RoleType
 
         for c in self.contracts.values():
@@ -99,7 +100,7 @@ class RegressionEngine:
         raise HarnessError(f"契约集中缺少 {role_type} 角色", code="E7001")
 
     # ---- 单用例执行 ----
-    def _run_case_once(self, case: "GoldenCase") -> "ReviewResult":
+    def _run_case_once(self, case: GoldenCase) -> ReviewResult:
         from wbr.core.contract.models import RoleType
 
         wanted = sorted(set(case.expert_role_ids)) if case.expert_role_ids else sorted(
@@ -132,9 +133,9 @@ class RegressionEngine:
     # ---- 批量回归 ----
     def run_suite(
         self,
-        suite: "CaseSuite",
+        suite: CaseSuite,
         *,
-        baseline: "BaselineSnapshot | None" = None,
+        baseline: BaselineSnapshot | None = None,
         stability_runs: int = 1,
         judge=None,
         judge_pass_threshold: float = 0.6,
@@ -156,7 +157,7 @@ class RegressionEngine:
                     runs.append(self._run_case_once(case))
             except HarnessError:
                 raise
-            except Exception as e:  # noqa: BLE001 - 单用例失败记录后继续
+            except Exception as e:
                 cr.failures.append(f"执行异常: {e}")
                 cr.duration_ms = int((time.time() - started) * 1000)
                 report.case_results.append(cr)

@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -75,7 +75,7 @@ class Redactor:
         for rule in self.rules:
             try:
                 pattern = re.compile(rule.pattern)
-            except re.error:  # noqa: PERF - 用户自定义规则容错
+            except re.error:  # 用户自定义规则容错
                 continue
 
             def _sub(m: re.Match, _rule=rule) -> str:

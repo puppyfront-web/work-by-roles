@@ -5,10 +5,7 @@
 """
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any
-
-from pydantic import BaseModel, Field
 
 from wbr.core.audit.models import AuditEvent, AuditEventType
 from wbr.core.audit.trail import AuditTrail
@@ -16,29 +13,17 @@ from wbr.core.cache.contract_cache import ContractBoundCache
 from wbr.core.constants import MemoryLayer
 from wbr.core.contract.compiler import ContractCompiler
 from wbr.core.contract.models import RoleContract
-from wbr.core.orchestration.invoker import ModelInvoker, ModelRequest, parse_json_output
 from wbr.core.loop_config import (
+    LOOP_SCHEMA,
     InnerLoopConfig,
     LoopRound,
     LoopSummarySnapshot,
-    LOOP_SCHEMA,
     QuotaExhaustedAction,
     StopReason,
 )
+from wbr.core.orchestration.invoker import ModelInvoker, ModelRequest, parse_json_output
 from wbr.core.schema.validator import validate as schema_validate
-from wbr.core.token.meter import TokenBudget, TokenMeter
-
-LOOP_SCHEMA = {
-    "type": "object",
-    "required": ["conclusion", "evidence", "continue_loop", "reason"],
-    "properties": {
-        "conclusion": {"type": "string", "minLength": 1},
-        "evidence": {"type": "array", "items": {"type": "string"}},
-        "continue_loop": {"type": "boolean"},
-        "reason": {"type": "string"},
-    },
-}
-
+from wbr.core.token.meter import TokenMeter
 
 class InnerLoopExecutor:
     """单角色内部推理循环执行器。config 缺省读契约 inner_loop 字段（契约约束，无上限构造不存在）。"""
@@ -171,7 +156,7 @@ class InnerLoopExecutor:
                 {"round": rnd.round_no, "conclusion": rnd.conclusion[:120]},
                 contract=self._contract, session_id=self._session_id,
             )
-        except Exception:  # noqa: BLE001 - 记忆失败不阻断循环
+        except Exception:
             pass
 
     def _emit(self, round_no: int, detail: str, *, degraded: bool = False,

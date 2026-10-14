@@ -163,7 +163,7 @@ class KnowledgeEvidenceCollector:
         for h in hits:
             doc = docs.get(h.doc_id)
             if doc is None:
-                with self._kb._lock:  # noqa: SLF001 - 同模块只读访问
+                with self._kb._lock:
                     doc = self._kb._docs.get(h.doc_id)
             if doc is not None:
                 evidence.append(f"[{h.doc_id}] {doc.title}: {doc.content[:200]}")

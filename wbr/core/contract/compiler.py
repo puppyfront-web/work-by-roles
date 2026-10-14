@@ -14,7 +14,7 @@ from wbr.core.constants import (
     USER_INPUT_CLOSE,
     USER_INPUT_OPEN,
 )
-from wbr.core.contract.models import RoleContract, RoleType
+from wbr.core.contract.models import RoleContract
 
 SAFETY_GUARD_HEADER = (
     "【系统规则优先级声明】\n"

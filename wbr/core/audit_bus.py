@@ -9,8 +9,9 @@ from __future__ import annotations
 import queue
 import threading
 import uuid
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -89,7 +90,7 @@ class AuditBus:
                 self._queue.put_nowait(event)
             except queue.Full:
                 self._dropped += 1
-        except Exception:  # noqa: BLE001 - 总线绝不反噬业务流
+        except Exception:
             self._errors += 1
 
     # ---- 内部 ----
@@ -99,12 +100,12 @@ class AuditBus:
         for sub in subs:
             try:
                 sub.callback(event)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 self._errors += 1
                 if sub.on_error is not None:
                     try:
                         sub.on_error(e)
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         pass
 
     def _run(self) -> None:

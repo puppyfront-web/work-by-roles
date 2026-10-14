@@ -13,7 +13,7 @@ class MemoryLayer(str, Enum):
     GLOBAL_SHARED = "global_shared"    # 全局公共受控记忆
 
     @classmethod
-    def all_layers(cls) -> list["MemoryLayer"]:
+    def all_layers(cls) -> list[MemoryLayer]:
         return list(cls)
 
 

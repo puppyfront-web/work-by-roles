@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from wbr.core.audit.models import AuditEvent, AuditEventType
 from wbr.core.audit.trail import AuditTrail

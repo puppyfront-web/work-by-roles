@@ -9,9 +9,9 @@ import math
 import threading
 from typing import Protocol, runtime_checkable
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from wbr.core.cache.contract_cache import CacheStats, ContractBoundCache
+from wbr.core.cache.contract_cache import ContractBoundCache
 from wbr.core.contract.models import RoleContract
 
 

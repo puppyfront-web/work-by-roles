@@ -4,9 +4,8 @@ winner 三级判定（R27）：pass_rate 高者 → forbidden_rate 低者 → No
 """
 from __future__ import annotations
 
-import time
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 

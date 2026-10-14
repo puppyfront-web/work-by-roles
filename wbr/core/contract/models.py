@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import datetime as _dt
-import copy
 from enum import Enum
 from typing import Any, Literal
 
@@ -14,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from wbr.core.canonical import canonical_json, sha256_hex
 from wbr.core.constants import MemoryLayer
-from wbr.core.loop_config import IntentPolicy, InnerLoopConfig  # noqa: F401
+from wbr.core.loop_config import InnerLoopConfig, IntentPolicy
 
 _SEMVER = r"^\d+\.\d+\.\d+$"
 _ROLE_ID = r"^[a-z][a-z0-9_]{2,63}$"
@@ -163,13 +162,13 @@ class RoleContract(BaseModel):
     memory_permissions: MemoryPermissions = Field(default_factory=MemoryPermissions)
     token_quota: TokenQuota = Field(default_factory=TokenQuota)
     review_criteria: ReviewCriteria | None = None
-    intent_policy: "IntentPolicy | None" = None      # Coordinator 语义
-    inner_loop: "InnerLoopConfig | None" = None      # Expert/Verifier 语义
+    intent_policy: IntentPolicy | None = None      # Coordinator 语义
+    inner_loop: InnerLoopConfig | None = None      # Expert/Verifier 语义
     meta: ContractMeta = Field(default_factory=ContractMeta)
 
     # ---- 跨字段校验 ----
     @model_validator(mode="after")
-    def _validate_role_type_rules(self) -> "RoleContract":
+    def _validate_role_type_rules(self) -> RoleContract:
         if self.identity.role_type == RoleType.VERIFIER and self.review_criteria is None:
             raise ValueError("Verifier 角色必须声明 review_criteria")
         if self.identity.role_type == RoleType.COORDINATOR and self.review_criteria is not None:
@@ -191,14 +190,14 @@ class RoleContract(BaseModel):
 
     # ---- 构建 / 定版 ----
     @classmethod
-    def build(cls, **kw: Any) -> "RoleContract":
+    def build(cls, **kw: Any) -> RoleContract:
         """构建契约并计算内容哈希（业务字段定版，meta 不参与）。"""
         contract = cls(**kw)
         contract.meta.content_hash = cls.compute_hash(contract)
         return contract
 
     @staticmethod
-    def compute_hash(contract: "RoleContract") -> str:
+    def compute_hash(contract: RoleContract) -> str:
         payload = contract.model_dump(exclude={"meta"}, by_alias=True)
         return sha256_hex(canonical_json(payload))
 
@@ -210,7 +209,7 @@ class RoleContract(BaseModel):
         return self.model_dump_json(by_alias=True, exclude_none=False)
 
     @classmethod
-    def from_json(cls, raw: str | bytes) -> "RoleContract":
+    def from_json(cls, raw: str | bytes) -> RoleContract:
         return cls.model_validate_json(raw)
 
     def save(self, path: str) -> None:
@@ -219,7 +218,7 @@ class RoleContract(BaseModel):
         Path(path).write_text(self.to_json(), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str) -> "RoleContract":
+    def load(cls, path: str) -> RoleContract:
         from pathlib import Path
 
         return cls.from_json(Path(path).read_text(encoding="utf-8"))
@@ -231,7 +230,7 @@ class RoleContract(BaseModel):
         bump: Literal["major", "minor", "patch"] = "patch",
         changelog: str | None = None,
         **kw: Any,
-    ) -> "RoleContract":
+    ) -> RoleContract:
         """派生新版本契约（copy-on-write）：版本号 bump、哈希重算、changelog 追加。
 
         支持顶层字段与点路径嵌套更新，如 ``identity.description="..."``、

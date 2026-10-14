@@ -11,15 +11,16 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from wbr.adapters.langgraph.interceptors import (
+    ForbiddenDetectorInterceptor,
+    SchemaValidationInterceptor,
+)
+from wbr.adapters.langgraph.state import WBR_META_KEY, inject_meta, read_meta
 from wbr.core.audit.models import AuditEvent, AuditEventType
 from wbr.core.audit.trail import AuditTrail
-from wbr.core.constants import USER_INPUT_CLOSE, USER_INPUT_OPEN
 from wbr.core.context import new_trace_id, set_trace_id
 from wbr.core.contract.models import RoleContract
-from wbr.core.schema.validator import validate as schema_validate
 from wbr.core.security.guard import InjectionDetector
-from wbr.adapters.langgraph.interceptors import ForbiddenDetectorInterceptor, SchemaValidationInterceptor
-from wbr.adapters.langgraph.state import WBR_META_KEY, inject_meta, read_meta
 
 
 class _GuardConfig(BaseModel):
@@ -65,7 +66,7 @@ class WBRGuard:
         self.last_violations: list[dict] = []
 
     # ---- 3 行接入入口 ----
-    def wrap(self, graph: Any) -> "WBRGuardedGraph":
+    def wrap(self, graph: Any) -> WBRGuardedGraph:
         return WBRGuardedGraph(graph, self)
 
     # ---- 节点级加固（可选） ----

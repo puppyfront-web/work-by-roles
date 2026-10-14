@@ -8,9 +8,8 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 from wbr.adapters.langgraph.base import require_langgraph
-from wbr.adapters.langgraph.state import WBR_META_KEY, inject_meta
+from wbr.adapters.langgraph.state import WBR_META_KEY
 from wbr.core.audit.trail import AuditTrail
-from wbr.core.context import new_trace_id
 from wbr.core.contract.compiler import ContractCompiler
 from wbr.core.contract.models import RoleContract
 from wbr.core.orchestration.invoker import ModelInvoker, parse_json_output

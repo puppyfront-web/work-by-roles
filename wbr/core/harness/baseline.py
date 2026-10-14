@@ -31,11 +31,11 @@ class BaselineSnapshot(BaseModel):
     def capture(
         cls,
         *,
-        contracts: dict[str, "RoleContract"],
-        suite: "CaseSuite",
+        contracts: dict[str, RoleContract],
+        suite: CaseSuite,
         model_fingerprint: str = "unknown",
         note: str = "",
-    ) -> "BaselineSnapshot":
+    ) -> BaselineSnapshot:
         return cls(
             contract_hashes={rid: c.content_hash for rid, c in sorted(contracts.items())},
             suite_hash=suite.content_hash(),
@@ -44,7 +44,7 @@ class BaselineSnapshot(BaseModel):
         )
 
     def is_current(
-        self, contracts: dict[str, "RoleContract"], suite: "CaseSuite"
+        self, contracts: dict[str, RoleContract], suite: CaseSuite
     ) -> ConsistencyReport:
         """与当前契约集/用例库比对，报告不一致项（能力退化检测的前置）。"""
         mismatches: list[str] = []
@@ -68,7 +68,7 @@ class BaselineSnapshot(BaseModel):
         Path(path).write_text(self.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str) -> "BaselineSnapshot":
+    def load(cls, path: str) -> BaselineSnapshot:
         from pathlib import Path
 
         return cls.model_validate_json(Path(path).read_text(encoding="utf-8"))

@@ -120,7 +120,7 @@ class InjectionDetector:
         for rule in self.rules:
             try:
                 pattern = rule.compiled()
-            except re.error:  # noqa: PERF - 用户自定义规则容错
+            except re.error:  # 用户自定义规则容错
                 continue
             for m in pattern.finditer(text):
                 report.matches.append(

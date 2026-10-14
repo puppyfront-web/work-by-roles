@@ -14,7 +14,7 @@ from wbr.core.audit.models import AuditEvent, AuditEventType
 from wbr.core.audit.trail import AuditTrail
 from wbr.core.contract.compiler import ContractCompiler
 from wbr.core.contract.models import RoleContract, RoleType
-from wbr.core.orchestration.invoker import ModelInvoker, ModelRequest, parse_json_output
+from wbr.core.orchestration.invoker import ModelInvoker, parse_json_output
 from wbr.core.orchestration.review import Disagreement
 from wbr.core.schema.validator import validate as schema_validate
 
@@ -138,7 +138,7 @@ class DebateModerator:
                 ModelRequest(role_contract=contract, compiled_prompt=compiled, trace_id="")
             )
             output = parse_json_output(response.text)
-        except Exception as e:  # noqa: BLE001 - 评估失败保守视为未收敛
+        except Exception as e:
             output = None
             err = str(e)
         else:

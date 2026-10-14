@@ -4,14 +4,9 @@
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-if TYPE_CHECKING:  # pragma: no cover
-    from wbr.core.loop_config import LoopSummarySnapshot
-    from wbr.core.orchestration.intent import IntentResult, IntentType
-    from wbr.core.orchestration.debate import DebateResult
 
 
 class IntentMetrics(BaseModel):
@@ -21,16 +16,12 @@ class IntentMetrics(BaseModel):
     sample_sizes: dict[str, int] = Field(default_factory=dict)
 
     @classmethod
-    def from_results(cls, results, expected: list | None = None) -> "IntentMetrics":
+    def from_results(cls, results, expected: list | None = None) -> IntentMetrics:
         from wbr.core.orchestration.intent import IntentType
 
         total = len(results)
         if not total:
             return cls()
-        rejects = sum(1 for r in results
-                      if r.intent_type == IntentType.OUT_OF_SCOPE)
-        ambiguous = sum(1 for r in results
-                        if r.intent_type == IntentType.AMBIGUOUS)
         accuracy = None
         if expected is not None and len(expected) == total:
             correct = sum(1 for r, e in zip(results, expected)
@@ -50,7 +41,7 @@ class IntentMetrics(BaseModel):
             false_reject_rate=round(false_rejects / total, 6),
             ambiguous_detection_rate=(round(detected / ambiguous_total, 6)
                                       if ambiguous_total else None),
-            sample_sizes={"total": total, "rejects": rejects,
+            sample_sizes={"total": total,
                           "ambiguous_expected": ambiguous_total},
         )
 
@@ -63,7 +54,7 @@ class LoopMetrics(BaseModel):
     sample_sizes: dict[str, int] = Field(default_factory=dict)
 
     @classmethod
-    def from_snapshots(cls, snapshots, *, main_task_tokens: int = 0) -> "LoopMetrics":
+    def from_snapshots(cls, snapshots, *, main_task_tokens: int = 0) -> LoopMetrics:
         from wbr.core.loop_config import StopReason
 
         total = len(snapshots)
@@ -90,7 +81,7 @@ class DebateLoopMetrics(BaseModel):
     sample_sizes: dict[str, int] = Field(default_factory=dict)
 
     @classmethod
-    def from_results(cls, results) -> "DebateLoopMetrics":
+    def from_results(cls, results) -> DebateLoopMetrics:
         total = len(results)
         if not total:
             return cls()

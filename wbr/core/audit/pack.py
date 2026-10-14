@@ -48,7 +48,7 @@ class AuditPack(BaseModel):
         Path(path).write_text(self.to_json(), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str) -> "AuditPack":
+    def load(cls, path: str) -> AuditPack:
         import json
         from pathlib import Path
 

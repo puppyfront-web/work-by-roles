@@ -14,8 +14,8 @@ from wbr.core.audit.models import AuditEvent, AuditEventType
 from wbr.core.audit.trail import AuditTrail
 from wbr.core.contract.compiler import ContractCompiler
 from wbr.core.contract.models import RoleContract, RoleType
-from wbr.core.orchestration.invoker import ModelInvoker, ModelRequest, parse_json_output
 from wbr.core.loop_config import IntentPolicy
+from wbr.core.orchestration.invoker import ModelInvoker, ModelRequest, parse_json_output
 from wbr.core.schema.validator import validate as schema_validate
 from wbr.core.security.guard import InjectionDetector, RiskLevel, guard_user_input
 

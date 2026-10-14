@@ -32,7 +32,7 @@ class OTelBridge:
         self._spans_open = 0
 
     @classmethod
-    def with_sdk(cls, *, service_name: str = "work-by-roles", enabled: bool = True) -> "OTelBridge":
+    def with_sdk(cls, *, service_name: str = "work-by-roles", enabled: bool = True) -> OTelBridge:
         """用真实 OpenTelemetry SDK 装配（trace + 简单计数指标）。"""
         try:
             from opentelemetry import trace
@@ -72,7 +72,7 @@ class OTelBridge:
         try:
             self._record_span(event)
             self._record_metric(event)
-        except Exception:  # noqa: BLE001 - 可观测层零侵入
+        except Exception:
             pass
 
     def _record_span(self, event: AuditEvent) -> None:
@@ -85,11 +85,11 @@ class OTelBridge:
             for k, v in attrs.items():
                 try:
                     span.set_attribute(k, v)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
             try:
                 span.end()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
     def _record_metric(self, event: AuditEvent) -> None:

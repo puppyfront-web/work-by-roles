@@ -13,7 +13,7 @@ _INSTALL_HINT = (
 
 def require_langgraph() -> Any:
     try:
-        import langgraph  # noqa: F401
+        import langgraph
         from langgraph import graph  # noqa: F401
     except ImportError as e:  # pragma: no cover - 环境相关
         raise AdapterError(_INSTALL_HINT) from e

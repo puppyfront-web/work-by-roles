@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
 
 import wbr
 
@@ -64,11 +63,11 @@ def cmd_run_team(args) -> int:
         audit=audit,
     )
     # 演示 Invoker：按问题生成确定性结论
-    invoker = session._invoker  # noqa: SLF001
+    invoker = session._invoker
 
     def demo_invoke(request):
-        from wbr.core.orchestration.invoker import ModelResponse, TokenUsage
         from wbr.core.contract.models import RoleType
+        from wbr.core.orchestration.invoker import ModelResponse, TokenUsage
 
         rid = request.role_contract.role_id
         required = (request.role_contract.output_spec.schema_ or {}).get("required", [])

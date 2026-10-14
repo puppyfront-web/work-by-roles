@@ -70,7 +70,7 @@ class RoleBehaviorRecord(BaseModel):
         input_text: str = "",
         output_text: str = "",
         violations: list[str] | None = None,
-    ) -> "RoleBehaviorRecord":
+    ) -> RoleBehaviorRecord:
         return cls(
             role_id=role_id,
             action=action,
@@ -97,7 +97,7 @@ class TraceTree(BaseModel):
     nodes: list[TraceNode] = Field(default_factory=list)
 
     @classmethod
-    def from_events(cls, events: list[AuditEvent]) -> dict[str, "TraceTree"]:
+    def from_events(cls, events: list[AuditEvent]) -> dict[str, TraceTree]:
         trees: dict[str, TraceTree] = {}
         for e in sorted(events, key=lambda x: x.ts):
             tree = trees.setdefault(e.trace_id, cls(trace_id=e.trace_id))
