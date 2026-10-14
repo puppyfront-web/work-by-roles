@@ -110,7 +110,7 @@ uvicorn --factory wbr.app.api.main:create_app --port 8000
 
 ## 文档
 
-- [SDK 全量 API](docs/SDK.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md) · [安全说明](docs/SECURITY.md)
+- [架构设计方案 V2](docs/ARCHITECTURE_V2.md) · [SDK 全量 API](docs/SDK.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md) · [安全说明](docs/SECURITY.md)
 - 设计规格：[docs/spec/README.md](docs/spec/README.md)（SPEC-000~006 + 审核记录）· 阶段验收报告：[docs/acceptance/](docs/acceptance/)
 - 示例索引：[examples/README.md](examples/README.md)
 
