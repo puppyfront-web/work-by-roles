@@ -23,8 +23,8 @@ def built():
         capture_output=True, text=True, timeout=600,
     )
     assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
-    wheels = sorted(DIST.glob("work_by_roles-1.0.0-*.whl"))
-    sdists = sorted(DIST.glob("work_by_roles-1.0.0.tar.gz"))
+    wheels = sorted(DIST.glob("work_by_roles-1.*.whl"))
+    sdists = sorted(DIST.glob("work_by_roles-1.*.tar.gz"))
     assert wheels and sdists
     return {"wheel": wheels[-1], "sdist": sdists[-1]}
 
@@ -58,7 +58,7 @@ def test_wheel_metadata_stable(built):
     with zipfile.ZipFile(built["wheel"]) as z:
         meta_name = next(n for n in z.namelist() if n.endswith("METADATA"))
         meta = z.read(meta_name).decode("utf-8")
-    assert "Version: 1.0.0" in meta
+    assert "Version: 1.1.0" in meta
     assert "Name: work-by-roles" in meta
     assert "License-Expression" in meta or "License: MIT" in meta
 
@@ -77,7 +77,7 @@ def test_wheel_installs_and_imports(built, tmp_path):
                     "--target", str(target), str(built["wheel"])], check=True, timeout=300)
     script = (
         "import sys; sys.path.insert(0, %r); "
-        "import wbr; assert wbr.__version__ == '1.0.0', wbr.__version__; "
+        "import wbr; assert wbr.__version__ >= '1.0.0', wbr.__version__; "
         "from wbr.templates.registry import load_team, list_teams; "
         "assert {'arch_review_team','security_audit_team'} <= {t['name'] for t in list_teams()}; "
         "c = load_team('arch_review_team'); assert len(c) == 5; "

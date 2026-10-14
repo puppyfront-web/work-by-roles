@@ -1,5 +1,15 @@
 """安全子包公共导出。"""
 from wbr.core.security.boundaries import scan_external_content, wrap_external_content
+from wbr.core.security.redactor import (
+    DEFAULT_REDACTION_RULES,
+    RedactionReport,
+    RedactionRule,
+    Redactor,
+    RiskAction,
+    RiskControlPolicy,
+    RiskDecision,
+    assess_and_redact,
+)
 from wbr.core.security.guard import (
     GuardPolicy,
     GuardResult,
@@ -18,4 +28,6 @@ __all__ = [
     "RiskLevel", "GuardPolicy", "InputGuardPolicy", "GuardResult",
     "guard_user_input", "sanitize",
     "wrap_external_content", "scan_external_content",
+    "Redactor", "RedactionRule", "RedactionReport", "DEFAULT_REDACTION_RULES",
+    "RiskAction", "RiskControlPolicy", "RiskDecision", "assess_and_redact",
 ]

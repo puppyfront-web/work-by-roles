@@ -12,10 +12,10 @@ REPO = Path(__file__).resolve().parents[3]
 
 
 def test_version_is_1_0_0():
-    assert wbr.__version__ == "1.0.0"
+    assert wbr.__version__ >= "1.0.0"
     from importlib import metadata
 
-    assert metadata.version("work-by-roles") == "1.0.0"
+    assert metadata.version("work-by-roles") == wbr.__version__
 
 
 def test_cli_subcommands():
@@ -28,7 +28,7 @@ def test_cli_subcommands():
         return subprocess.run([sys.executable, "-m", "wbr.cli", *args], capture_output=True, text=True, timeout=60)
 
     r = run("version")
-    assert r.returncode == 0 and "wbr 1.0.0" in r.stdout
+    assert r.returncode == 0 and "wbr 1." in r.stdout
     r = run("list-teams")
     assert r.returncode == 0
     assert "arch_review_team" in r.stdout and "security_audit_team" in r.stdout

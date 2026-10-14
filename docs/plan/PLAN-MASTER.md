@@ -60,3 +60,16 @@ $VENV -m pytest tests -q                                   # 存量回归
 $VENV examples/phase1_core_demo.py && ...                  # 示例冒烟
 $VENV -m build && $VENV -m twine check dist/*              # 阶段5
 ```
+
+
+## 5. V1.x 迭代计划（SPEC-007，版本 1.1.0）
+
+| 顺序 | 任务 | TDD 载体 |
+|---|---|---|
+| 6.1 | 内容脱敏与安全风控 core/security/redactor | tests/wbr/phase6/test_redactor.py |
+| 6.2 | 角色知识库 core/knowledge | test_knowledge.py |
+| 6.3 | 语义缓存 core/cache/semantic | test_semantic_cache.py |
+| 6.4 | 反馈闭环 core/harness/feedback | test_feedback.py |
+| 6.5 | MCP 接入层 adapters/mcp | test_mcp_bridge.py |
+| 6.6 | OTel 可观测 adapters/observability | test_otel_bridge.py |
+| 6.7 | 版本 1.1.0 + 文档 + 验收报告 PHASE6.md | 全量回归 |

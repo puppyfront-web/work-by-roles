@@ -5,7 +5,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)]()
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)]()
 
 中文 | [English](README_EN.md)
 
@@ -25,6 +25,12 @@
 | 🛡️ **安全防注入** | 中英双语注入规则库 + 外部内容二阶隔离 + 边界符转义 |
 | 🔍 **全链路审计** | 每次编译/调用/校验/裁决均产生 TraceID 关联的强类型审计事件，可导出标准审计包 |
 | 🔌 **LangGraph 兼容** | 存量项目 **3 行代码** 接入；也可一键生成原生会审 Graph |
+| 🧩 **MCP 接入层** | MCP 工具纳入契约权限体系（白名单前置 + 二阶防护 + 脱敏） |
+| 📚 **角色知识库** | 角色私有/共享知识文档，权限锚定记忆层，检索接 evidence 通道 |
+| 🙈 **内容脱敏** | PII 规则库（邮箱/手机/身份证/密钥/卡号/IP），稳定占位符，可扩展 |
+| 🔭 **OpenTelemetry** | 审计总线零侵入桥接 OTel（span/指标），可关闭 |
+| 🧠 **语义缓存** | 契约哈希严格一致前提下的语义近似命中（可配阈值） |
+| 🔄 **反馈闭环** | 线上负反馈聚合为黄金用例，接入回归引擎 |
 
 ## 架构（三层，依赖单向）
 

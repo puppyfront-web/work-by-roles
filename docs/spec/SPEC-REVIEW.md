@@ -74,3 +74,16 @@
 ## 5. 批准结论
 
 SPEC-000~006 通过审核，进入 Plan/TESTCASES 设计（docs/plan/）。此后 SPEC 变更须在本文件追加变更记录。
+
+## 6. V1.x 迭代规格审核（SPEC-007，2026-10-14）
+
+| # | 问题 | 裁定 |
+|---|---|---|
+| R18 | RoleContract 为"最终版长期不改"，知识库权限如何声明而不动契约？ | 知识库锚定 `ROLE_STATIC` 记忆层语义：写=需 write_layers 含 ROLE_STATIC，读=需 read_layers 含 ROLE_STATIC（或文档标记 shared）；契约零改动 |
+| R19 | 语义缓存若跨契约命中会脏读 | 语义命中前置条件锁定：契约哈希+证据快照必须精确一致，仅问题文本允许近似 |
+| R20 | MCP SDK 是否入 Core | 否。Core 定义 MCPClient 协议；mcp SDK 仅在 adapters 惰性导入（延续 D-01/R15） |
+| R21 | OTel 依赖缺失是否阻塞 | 否。OTelBridge 支持注入 stub tracer 测试；装配真实 SDK 时才要求 opentelemetry（R15） |
+| R22 | 反馈闭环落点 | down 反馈聚合 → GoldenCase（复用 RegressionEngine），不新建评估通道；事件入审计 |
+| R23 | 脱敏占位符稳定性 | 同值同占位符（带序号映射表），保证审计可比对 |
+
+结论：SPEC-007 通过审核。

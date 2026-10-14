@@ -5,7 +5,7 @@ Core 仅依赖 stdlib + Pydantic V2（SPEC-000 D-01）。
 """
 from __future__ import annotations
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # ---- 基础设施 ----
 from wbr.core.audit_bus import AuditBus, AuditEvent as BusAuditEvent
@@ -81,9 +81,12 @@ from wbr.core.security import (
     InjectionDetector,
     InjectionReport,
     RiskLevel,
+    RiskControlPolicy,
+    RiskDecision,
     guard_user_input,
     wrap_external_content,
 )
+from wbr.core.security.redactor import Redactor, RedactionReport
 from wbr.core.token import (
     BudgetPolicy,
     HeuristicTokenCounter,
@@ -92,6 +95,7 @@ from wbr.core.token import (
     TokenMeter,
 )
 from wbr.core.cache import ContractBoundCache, InMemoryCacheBackend
+from wbr.core.cache.semantic import SemanticCache
 
 # ---- Harness ----
 from wbr.core.harness import (
@@ -103,6 +107,13 @@ from wbr.core.harness import (
     HeuristicJudge,
     RegressionEngine,
     RegressionReport,
+)
+from wbr.core.harness.feedback import FeedbackLoop, FeedbackRecord
+from wbr.core.knowledge import (
+    KnowledgeBase,
+    KnowledgeDocument,
+    KnowledgeEvidenceCollector,
+    KnowledgeSearchHit,
 )
 
 __all__ = [
@@ -136,4 +147,21 @@ __all__ = [
     # Harness
     "GoldenCase", "CaseSuite", "CaseResult", "BaselineSnapshot",
     "RegressionEngine", "RegressionReport", "HarnessMetrics", "HeuristicJudge",
+    # V1.x
+    "Redactor", "RedactionReport", "RiskControlPolicy", "RiskDecision",
+    "KnowledgeBase", "KnowledgeDocument", "KnowledgeEvidenceCollector", "KnowledgeSearchHit",
+    "SemanticCache", "FeedbackLoop", "FeedbackRecord",
 ]
+
+
+def __getattr__(name: str):
+    # 适配层惰性导出（不引入第三方依赖到 import wbr 路径）
+    if name == "MCPToolBridge":
+        from wbr.adapters.mcp.bridge import MCPToolBridge
+
+        return MCPToolBridge
+    if name == "OTelBridge":
+        from wbr.adapters.observability.otel import OTelBridge
+
+        return OTelBridge
+    raise AttributeError(name)
