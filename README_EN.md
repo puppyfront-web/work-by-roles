@@ -81,7 +81,8 @@ CLI (built-in deterministic demo invoker, no external LLM): `wbr list-teams`,
 
 ## Docs
 
-[Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) · [LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) ·
+[Architecture](docs/ARCHITECTURE_V2.md) · - [更新日志](CHANGELOG.md) · [真实项目验证指南](docs/REAL_WORLD_VALIDATION.md)
+[SDK API](docs/SDK.md) · [LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) ·
 [Harness](docs/HARNESS.md) · [Deploy](docs/DEPLOY.md) ·
 [Specs](docs/spec/README.md) · [Acceptance reports](docs/acceptance/)
 
