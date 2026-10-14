@@ -5,7 +5,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)]()
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)]()
 
 中文 | [English](README_EN.md)
 
@@ -31,6 +31,11 @@
 | 🔭 **OpenTelemetry** | 审计总线零侵入桥接 OTel（span/指标），可关闭 |
 | 🧠 **语义缓存** | 契约哈希严格一致前提下的语义近似命中（可配阈值） |
 | 🔄 **反馈闭环** | 线上负反馈聚合为黄金用例，接入回归引擎 |
+| 🔒 **审计哈希链**（企业版） | 审计事件链式哈希定版，任何篡改可检出并定位 |
+| 🏢 **多 Workspace**（企业版） | 契约/用例/任务/记忆四维隔离，跨域显式复制带血缘 |
+| ⚔️ **受控辩论**（企业版） | 对已检出分歧组织受控轮次辩论，让步即止，历史原样留存 |
+| 📦 **基线 Bundle**（企业版） | 契约+用例+基线三位一体打包，跨环境迁移完整性校验 |
+| 🧪 **灰度 A/B**（企业版） | 契约变体确定性分流 + 全量回归对比 + 三级保守裁决 |
 
 ## 架构（三层，依赖单向）
 

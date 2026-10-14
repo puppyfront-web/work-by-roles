@@ -87,3 +87,16 @@ SPEC-000~006 通过审核，进入 Plan/TESTCASES 设计（docs/plan/）。此�
 | R23 | 脱敏占位符稳定性 | 同值同占位符（带序号映射表），保证审计可比对 |
 
 结论：SPEC-007 通过审核。
+
+## 7. V2.0 企业版规格审核（SPEC-008，2026-10-14）
+
+| # | 问题 | 裁定 |
+|---|---|---|
+| R24 | 哈希链与既有 AuditTrail 关系 | 并存：HashChainTrail 门面同时写 trail 与链；不改造 AuditTrail 本体（存量零影响） |
+| R25 | Workspace 与 App 层 JsonFileStore 的关系 | Core 提供 WorkspaceRegistry（目录/命名空间语义）；App 层后续可接线，本次不动 API 路由 |
+| R26 | 辩论是否违反"分歧留存不仲裁" | 不违反：辩论受控于已检出 disagreement、轮次封顶、concedes 为专家自证；unresolved 仍原样留存 |
+| R27 | A/B winner 平局处理 | 三级判定（pass_rate → forbidden_rate → None 保守不切换），避免误导性自动切换 |
+| R28 | Bundle 完整性算法 | 与 D-09 一致：canonical JSON + sha256，manifest 逐文件 digest + 总 digest |
+
+结论：SPEC-008 通过审核。
+| R29 | WorkspaceRegistry 依赖 ContractRegistry（App 层）违反 Core→App 禁令 | 模块移至 `wbr/app/workspace.py`（组合层），隔离语义不变 |

@@ -28,7 +28,7 @@ def test_cli_subcommands():
         return subprocess.run([sys.executable, "-m", "wbr.cli", *args], capture_output=True, text=True, timeout=60)
 
     r = run("version")
-    assert r.returncode == 0 and "wbr 1." in r.stdout
+    assert r.returncode == 0 and "wbr 2." in r.stdout
     r = run("list-teams")
     assert r.returncode == 0
     assert "arch_review_team" in r.stdout and "security_audit_team" in r.stdout

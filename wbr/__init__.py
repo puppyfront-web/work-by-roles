@@ -5,7 +5,7 @@ Core 仅依赖 stdlib + Pydantic V2（SPEC-000 D-01）。
 """
 from __future__ import annotations
 
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 
 # ---- 基础设施 ----
 from wbr.core.audit_bus import AuditBus, AuditEvent as BusAuditEvent
@@ -109,6 +109,15 @@ from wbr.core.harness import (
     RegressionReport,
 )
 from wbr.core.harness.feedback import FeedbackLoop, FeedbackRecord
+from wbr.core.audit.chain import ChainVerification, ChainedEvent, HashChainAuditor, HashChainTrail
+from wbr.core.bundle import BaselineBundle
+from wbr.core.experiment import ABExperiment, ABReport, ABVariant
+from wbr.core.orchestration.debate import (
+    DebateConfig,
+    DebateModerator,
+    DebateResult,
+    DebateTurn,
+)
 from wbr.core.knowledge import (
     KnowledgeBase,
     KnowledgeDocument,
@@ -151,6 +160,11 @@ __all__ = [
     "Redactor", "RedactionReport", "RiskControlPolicy", "RiskDecision",
     "KnowledgeBase", "KnowledgeDocument", "KnowledgeEvidenceCollector", "KnowledgeSearchHit",
     "SemanticCache", "FeedbackLoop", "FeedbackRecord",
+    # V2.0
+    "HashChainAuditor", "HashChainTrail", "ChainedEvent", "ChainVerification",
+    "BaselineBundle", "ABExperiment", "ABReport", "ABVariant",
+    "DebateModerator", "DebateConfig", "DebateResult", "DebateTurn",
+    "WorkspaceRegistry",
 ]
 
 
@@ -164,4 +178,8 @@ def __getattr__(name: str):
         from wbr.adapters.observability.otel import OTelBridge
 
         return OTelBridge
+    if name == "WorkspaceRegistry":
+        from wbr.app.workspace import WorkspaceRegistry
+
+        return WorkspaceRegistry
     raise AttributeError(name)

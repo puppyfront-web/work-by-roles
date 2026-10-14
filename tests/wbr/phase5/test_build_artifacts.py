@@ -23,8 +23,8 @@ def built():
         capture_output=True, text=True, timeout=600,
     )
     assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
-    wheels = sorted(DIST.glob("work_by_roles-1.*.whl"))
-    sdists = sorted(DIST.glob("work_by_roles-1.*.tar.gz"))
+    wheels = sorted(DIST.glob("work_by_roles-*.whl"))
+    sdists = sorted(DIST.glob("work_by_roles-*.tar.gz"))
     assert wheels and sdists
     return {"wheel": wheels[-1], "sdist": sdists[-1]}
 
@@ -58,7 +58,7 @@ def test_wheel_metadata_stable(built):
     with zipfile.ZipFile(built["wheel"]) as z:
         meta_name = next(n for n in z.namelist() if n.endswith("METADATA"))
         meta = z.read(meta_name).decode("utf-8")
-    assert "Version: 1.1.0" in meta
+    assert "Version: " + __import__("wbr").__version__ in meta
     assert "Name: work-by-roles" in meta
     assert "License-Expression" in meta or "License: MIT" in meta
 

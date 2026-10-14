@@ -73,3 +73,15 @@ $VENV -m build && $VENV -m twine check dist/*              # 阶段5
 | 6.5 | MCP 接入层 adapters/mcp | test_mcp_bridge.py |
 | 6.6 | OTel 可观测 adapters/observability | test_otel_bridge.py |
 | 6.7 | 版本 1.1.0 + 文档 + 验收报告 PHASE6.md | 全量回归 |
+
+
+## 6. V2.0 企业版计划（SPEC-008，版本 2.0.0）
+
+| 顺序 | 任务 | TDD 载体 |
+|---|---|---|
+| 7.1 | 审计哈希链 core/audit/chain | tests/wbr/phase7/test_hash_chain.py |
+| 7.2 | 多 Workspace core/workspace | test_workspace.py |
+| 7.3 | 受控辩论 core/orchestration/debate | test_debate.py |
+| 7.4 | 基线 Bundle core/bundle | test_bundle.py |
+| 7.5 | 灰度 A/B core/experiment | test_experiment.py |
+| 7.6 | 版本 2.0.0 + 文档 + 验收报告 PHASE7.md | 全量回归 |
