@@ -5,7 +5,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)]()
+[![Version](https://img.shields.io/badge/version-2.1.0-green.svg)]()
 
 中文 | [English](README_EN.md)
 
@@ -36,6 +36,8 @@
 | ⚔️ **受控辩论**（企业版） | 对已检出分歧组织受控轮次辩论，让步即止，历史原样留存 |
 | 📦 **基线 Bundle**（企业版） | 契约+用例+基线三位一体打包，跨环境迁移完整性校验 |
 | 🧪 **灰度 A/B**（企业版） | 契约变体确定性分流 + 全量回归对比 + 三级保守裁决 |
+| 🧭 **意图推理流水线** | Coordinator 内置：五类意图分类/要素抽取/冲突检测/置信阈值，结构化输出+理由链审计 |
+| 🔁 **受控内循环** | 单角色多轮"推理→检索→补证"，轮次/Token/退出条件全部契约化，超限升级 HITL |
 
 ## 架构（三层，依赖单向）
 

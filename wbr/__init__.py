@@ -5,7 +5,7 @@ Core 仅依赖 stdlib + Pydantic V2（SPEC-000 D-01）。
 """
 from __future__ import annotations
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 # ---- 基础设施 ----
 from wbr.core.audit_bus import AuditBus, AuditEvent as BusAuditEvent
@@ -112,6 +112,18 @@ from wbr.core.harness.feedback import FeedbackLoop, FeedbackRecord
 from wbr.core.audit.chain import ChainVerification, ChainedEvent, HashChainAuditor, HashChainTrail
 from wbr.core.bundle import BaselineBundle
 from wbr.core.experiment import ABExperiment, ABReport, ABVariant
+from wbr.core.harness.loop_metrics import (
+    DebateLoopMetrics,
+    IntentMetrics,
+    LoopMetrics,
+)
+from wbr.core.orchestration.intent import (
+    IntentPipeline,
+    IntentResult,
+    IntentType,
+    NextAction,
+)
+from wbr.core.loop_config import InnerLoopConfig, IntentPolicy, LoopSummarySnapshot
 from wbr.core.orchestration.debate import (
     DebateConfig,
     DebateModerator,
@@ -165,6 +177,10 @@ __all__ = [
     "BaselineBundle", "ABExperiment", "ABReport", "ABVariant",
     "DebateModerator", "DebateConfig", "DebateResult", "DebateTurn",
     "WorkspaceRegistry",
+    # V2.1 意图与受控Loop
+    "IntentPipeline", "IntentResult", "IntentType", "NextAction", "IntentPolicy",
+    "InnerLoopConfig", "LoopSummarySnapshot",
+    "IntentMetrics", "LoopMetrics", "DebateLoopMetrics",
 ]
 
 

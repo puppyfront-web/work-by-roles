@@ -12,6 +12,12 @@ from wbr.core.orchestration.invoker import (
     TokenUsage,
     parse_json_output,
 )
+from wbr.core.loop_config import (  # noqa: F401 - 兼容再导出
+    InnerLoopConfig,
+    IntentPolicy,
+    LoopSummarySnapshot,
+)
+
 from wbr.core.orchestration.review import (
     Disagreement,
     ExpertOutcome,

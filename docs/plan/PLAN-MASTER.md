@@ -85,3 +85,15 @@ $VENV -m build && $VENV -m twine check dist/*              # 阶段5
 | 7.4 | 基线 Bundle core/bundle | test_bundle.py |
 | 7.5 | 灰度 A/B core/experiment | test_experiment.py |
 | 7.6 | 版本 2.0.0 + 文档 + 验收报告 PHASE7.md | 全量回归 |
+
+
+## 7. 意图与受控Loop迭代（SPEC-009，版本 2.1.0）
+
+| 顺序 | 任务 | TDD 载体 |
+|---|---|---|
+| 8.1 | 意图推理模型与流水线 core/orchestration/intent | tests/wbr/phase8/test_intent_pipeline.py |
+| 8.2 | 契约增量字段 intent_policy/inner_loop | test_contract_loop_fields.py |
+| 8.3 | 类型A内循环 core/orchestration/inner_loop | test_inner_loop.py |
+| 8.4 | 辩论合规升级（收敛评估+HITL） | test_debate_hitl.py |
+| 8.5 | Harness 三组专项指标 core/harness/loop_metrics | test_loop_metrics.py |
+| 8.6 | 版本 2.1.0 + 文档 + PHASE8 验收 | 全量回归 |

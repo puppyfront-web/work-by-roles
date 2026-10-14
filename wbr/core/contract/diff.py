@@ -68,6 +68,8 @@ _CATEGORY: dict[str, ChangeCategory] = {
     "memory_permissions": ChangeCategory.POLICY,
     "token_quota": ChangeCategory.POLICY,
     "evidence_spec": ChangeCategory.POLICY,
+    "intent_policy": ChangeCategory.POLICY,
+    "inner_loop": ChangeCategory.POLICY,
 }
 
 

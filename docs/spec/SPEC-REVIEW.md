@@ -100,3 +100,16 @@ SPEC-000~006 通过审核，进入 Plan/TESTCASES 设计（docs/plan/）。此�
 
 结论：SPEC-008 通过审核。
 | R29 | WorkspaceRegistry 依赖 ContractRegistry（App 层）违反 Core→App 禁令 | 模块移至 `wbr/app/workspace.py`（组合层），隔离语义不变 |
+
+## 8. 意图与受控Loop规格审核（SPEC-009，2026-10-14）
+
+| # | 问题 | 裁定 |
+|---|---|---|
+| R30 | 契约"最终版不改"与新增 intent_policy/inner_loop 字段冲突 | 增量可选字段（默认 None），旧 JSON 完全兼容；纳入内容哈希（改阈值=新版本=Diff 可见），符合补充方案"阈值入契约"要求 |
+| R31 | 辩论Loop已在 V2.0 实现，是否返工 | 不返工：V2.0 DebateModerator 已满足红线大部分；本迭代只增量补"每轮收敛评估+超限转HITL" |
+| R32 | 意图分类的"轻量查询"分支绕过多专家是否安全 | 由 IntentPolicy.allow_lightweight 显式开关（默认 False），且 light 分支仍走单专家契约+全套校验 |
+| R33 | 内循环 token 预算耗尽语义 | 契约二选一：escalate_hitl（默认）或 force_exit；绝不静默继续 |
+| R34 | 意图推理本身是否需要审计 | 强制：INTENT_REASONING 事件含 reasoning_trace 摘要与 policy_snapshot（防事后改阈值不可追溯） |
+| R35 | 补充方案中"阶段1/2 时序"已过时（V2.0 已交付） | 按现状一次性落地于 2.1.0；原阶段验收追加条款并入 PHASE8 报告核对表 |
+
+结论：SPEC-009 通过审核。

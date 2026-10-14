@@ -24,6 +24,8 @@ class AuditEventType(str, Enum):
     MEMORY_ACCESS = "memory_access"
     TOOL_CALL = "tool_call"
     TOKEN_RECORD = "token_record"
+    INTENT_REASONING = "intent_reasoning"
+    LOOP_STEP = "loop_step"
 
 
 class AuditEvent(BaseModel):

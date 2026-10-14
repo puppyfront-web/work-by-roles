@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from wbr.core.canonical import canonical_json, sha256_hex
 from wbr.core.constants import MemoryLayer
+from wbr.core.loop_config import IntentPolicy, InnerLoopConfig  # noqa: F401
 
 _SEMVER = r"^\d+\.\d+\.\d+$"
 _ROLE_ID = r"^[a-z][a-z0-9_]{2,63}$"
@@ -162,6 +163,8 @@ class RoleContract(BaseModel):
     memory_permissions: MemoryPermissions = Field(default_factory=MemoryPermissions)
     token_quota: TokenQuota = Field(default_factory=TokenQuota)
     review_criteria: ReviewCriteria | None = None
+    intent_policy: "IntentPolicy | None" = None      # Coordinator 语义
+    inner_loop: "InnerLoopConfig | None" = None      # Expert/Verifier 语义
     meta: ContractMeta = Field(default_factory=ContractMeta)
 
     # ---- 跨字段校验 ----

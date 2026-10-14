@@ -22,6 +22,7 @@ from wbr.core.schema.validator import validate as schema_validate
 class DebateConfig(BaseModel):
     max_rounds: int = Field(default=2, ge=1, le=10)
     require_rebuttal: bool = True
+    referee_evaluates_convergence: bool = True   # 每轮由 Verifier 评估分歧收敛程度
 
 
 class DebateTurn(BaseModel):
@@ -38,6 +39,8 @@ class DebateResult(BaseModel):
     rounds: list[list[DebateTurn]] = Field(default_factory=list)
     concessions: list[str] = Field(default_factory=list)
     unresolved_disagreements: list[Disagreement] = Field(default_factory=list)
+    convergence_evaluations: list[dict[str, Any]] = Field(default_factory=list)
+    escalated_to_hitl: bool = False
 
 
 DEBATE_SCHEMA = {
@@ -61,6 +64,7 @@ class DebateModerator:
         invoker: ModelInvoker,
         config: DebateConfig | None = None,
         audit: AuditTrail | None = None,
+        convergence_schema: dict[str, Any] | None = None,
     ) -> None:
         self._experts = {
             rid: c for rid, c in contracts.items() if c.role_type == RoleType.EXPERT
@@ -75,6 +79,15 @@ class DebateModerator:
         self._config = config or DebateConfig()
         self._audit = audit
         self._compiler = ContractCompiler()
+        self._convergence_schema = convergence_schema or {
+            "type": "object",
+            "required": ["converged", "degree", "reason"],
+            "properties": {
+                "converged": {"type": "boolean"},
+                "degree": {"type": "number", "minimum": 0, "maximum": 1},
+                "reason": {"type": "string"},
+            },
+        }
 
     # ---- 入口 ----
     def run(self, question: str, disputed: list[Disagreement]) -> DebateResult:
@@ -84,6 +97,7 @@ class DebateModerator:
         active = {
             rid for d in disputed for rid in d.between if rid in self._experts
         }
+        converged_early = False
         for round_no in range(1, self._config.max_rounds + 1):
             turns = self._run_round(round_no, question, disputed, sorted(active))
             result.rounds.append(turns)
@@ -92,10 +106,54 @@ class DebateModerator:
             active -= set(conceded)
             if conceded or not active:
                 break
-        # 未达成一致的分歧原样留存（不仲裁）
-        if not result.concessions:
+            # 每轮由 Verifier 评估分歧收敛程度（补充方案红线：受控辩论必须有收敛判定）
+            if self._config.referee_evaluates_convergence:
+                evaluation = self._evaluate_convergence(question, disputed)
+                result.convergence_evaluations.append(evaluation)
+                if evaluation["converged"]:
+                    converged_early = True
+                    break
+        # 未达成一致且未收敛 → 超限强制终止，保留全部分歧，升级 HITL
+        if not result.concessions and not converged_early:
             result.unresolved_disagreements = list(disputed)
+            result.escalated_to_hitl = True
+            self._emit("辩论超限", f"经 {len(result.rounds)} 轮未收敛，升级 HITL 仲裁")
         return result
+
+    def _evaluate_convergence(self, question: str, disputed: list[Disagreement]) -> dict[str, Any]:
+        """Verifier 结构化收敛评估；输出不合规时保守视为未收敛。"""
+        import json as _json
+
+        prompt = (
+            f"辩论议题：{disputed[0].topic}\n问题：{question}\n"
+            f"当前立场：{_json.dumps([d.model_dump() for d in disputed], ensure_ascii=False)}\n"
+            "请评估分歧收敛程度，输出 JSON：converged(bool)/degree(0~1)/reason。"
+        )
+        contract = self._referee
+        compiled = self._compiler.compile(contract, prompt)
+        try:
+            from wbr.core.orchestration.invoker import ModelRequest
+
+            response = self._invoker.invoke(
+                ModelRequest(role_contract=contract, compiled_prompt=compiled, trace_id="")
+            )
+            output = parse_json_output(response.text)
+        except Exception as e:  # noqa: BLE001 - 评估失败保守视为未收敛
+            output = None
+            err = str(e)
+        else:
+            errs = schema_validate(output, self._convergence_schema)
+            output = None if errs else output
+            err = errs[0].message if errs else ""
+        if output is None:
+            return {"converged": False, "degree": 0.0, "reason": f"评估不可用: {err}"}
+        return output
+
+    def _emit(self, detail: str, extra: str = "") -> None:
+        if self._audit is not None:
+            self._audit.append(
+                AuditEvent(event_type=AuditEventType.REVIEW_COMPLETED, trace_id="no-trace",
+                           payload={"debate_event": detail, "extra": extra}))
 
     # ---- 单轮 ----
     def _run_round(
