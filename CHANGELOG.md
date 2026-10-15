@@ -13,6 +13,10 @@
 ### Docs
 - README 中英双语重写：新增受众定位（适合谁/不适合谁）、典型场景表、零到一五步上手指南（演示→真模型→画布→SDK）、自定义专家团最小 YAML 示例、FAQ
 
+### Removed
+- **移除 Legacy 工作流框架**（V2.1 之前的多角色技能工作流 CLI，已冻结维护超过一年）：`work_by_roles` 包、`workflow`/`workflow-cli`/`workflow-bootstrap` 命令、旧测试套件（tests/unit、tests/integration、tests/e2e、tests/cli 等，存在 33 个存量失败）、旧文档（QUICKSTART、ROLES_AND_SKILLS、LEGACY_README、SKILLS_LAYERED_CLASSIFICATION、V1 ARCHITECTURE）与 `skills/`、`teams/` 资产目录。
+  新系统 `wbr` 对其零依赖（删除前已验证）；新项目请使用 `wbr` SDK / CLI
+
 ## [2.1.1] · 2026-10-14
 
 ### Fixed

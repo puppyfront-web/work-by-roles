@@ -231,7 +231,7 @@ Harness：先跑基线快照定版，之后任何变更跑一遍黄金用例回�
 
 ## 文档
 
-- [架构设计方案 V2](docs/ARCHITECTURE_V2.md) · [SDK 全量 API](docs/SDK.md) · [REST API](docs/API.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md) · [安全说明](docs/SECURITY.md)
+- [架构设计方案 V2](docs/ARCHITECTURE_V2.md) · [SDK 全量 API](docs/SDK.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md)
 - 设计规格：[docs/spec/README.md](docs/spec/README.md)（SPEC-000~006 + 审核记录）· 阶段验收报告：[docs/acceptance/](docs/acceptance/)
 - 示例索引：[examples/README.md](examples/README.md)
 
@@ -239,16 +239,9 @@ Harness：先跑基线快照定版，之后任何变更跑一遍黄金用例回�
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests/wbr -q                       # 本系统全量（370+ 用例）
-pytest tests -q                           # 含 Legacy 工作流 CLI 套件（冻结维护，存在存量失败）
+pytest tests -q                           # 全量测试（370+ 用例）
 pytest tests/wbr/phase5 -q                # 打包构建与性能基准（slow/performance 标记）
 ```
-
-## Legacy：多角色技能工作流 CLI（附录）
-
-本仓库同时保留了早期的轻量工作流框架（`work_by_roles` 包，`workflow` 命令）。
-该部分已冻结维护，原 README 存档于 [docs/LEGACY_README.md](docs/LEGACY_README.md)；
-新项目请使用上文的 `wbr` SDK / CLI。
 
 ## License
 

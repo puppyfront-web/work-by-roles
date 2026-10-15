@@ -246,9 +246,9 @@ is directly reusable).
 
 ## Docs
 
-[Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) · [REST API](docs/API.md) ·
+[Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) ·
 [LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) · [Harness](docs/HARNESS.md) ·
-[Deploy](docs/DEPLOY.md) · [Security](docs/SECURITY.md) ·
+[Deploy](docs/DEPLOY.md) ·
 [Specs](docs/spec/README.md) · [Acceptance reports](docs/acceptance/) ·
 [Examples](examples/README.md)
 
@@ -256,16 +256,9 @@ is directly reusable).
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests/wbr -q                       # this system, full suite (370+ cases)
-pytest tests -q                           # includes the frozen legacy workflow CLI suite (pre-existing failures)
+pytest tests -q                           # full suite (370+ cases)
 pytest tests/wbr/phase5 -q                # packaging & performance benchmarks (slow/performance marks)
 ```
-
-## Legacy appendix
-
-The early lightweight workflow framework (`work_by_roles` package, `workflow` CLI) is frozen but
-still shipped; its README is archived at [docs/LEGACY_README_EN.md](docs/LEGACY_README_EN.md).
-New projects should use the `wbr` SDK / CLI above.
 
 ## License
 

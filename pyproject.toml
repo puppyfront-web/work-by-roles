@@ -58,15 +58,11 @@ redis = [
 
 [project.scripts]
 wbr = "wbr.cli:main"
-workflow = "work_by_roles.cli:main"
-workflow-cli = "work_by_roles.cli:main"
-workflow-bootstrap = "work_by_roles.bootstrap:main"
 
 [tool.setuptools.packages.find]
-include = ["work_by_roles*", "wbr*"]
+include = ["wbr*"]
 
 [tool.setuptools.package-data]
-work_by_roles = ["templates/**/*.yaml", "templates/**/*.yml"]
 wbr = ["templates/teams/**/*.yaml", "templates/teams/**/*.json", "app/canvas/static/*"]
 
 [tool.ruff]

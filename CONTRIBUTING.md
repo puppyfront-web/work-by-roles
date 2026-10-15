@@ -97,7 +97,7 @@ pytest
 pytest tests/test_specific.py
 
 # 查看覆盖率
-pytest --cov=work_by_roles
+pytest tests/wbr --cov=wbr
 ```
 
 ## 📚 文档
@@ -105,8 +105,7 @@ pytest --cov=work_by_roles
 如果您修改了功能，请同时更新相关文档：
 
 - `README.md` - 主要文档
-- `QUICKSTART.md` - 快速开始指南
-- `docs/ARCHITECTURE.md` - 架构文档（如果涉及架构变更）
+- `docs/ARCHITECTURE_V2.md` - 架构文档（如果涉及架构变更）
 - `docs/API.md` - API 文档（如果涉及 API 变更）
 
 ## 🎯 贡献方向

@@ -97,7 +97,7 @@ pytest
 pytest tests/test_specific.py
 
 # View coverage
-pytest --cov=work_by_roles
+pytest tests/wbr --cov=wbr
 ```
 
 ## 📚 Documentation
@@ -105,8 +105,7 @@ pytest --cov=work_by_roles
 If you modify functionality, please also update relevant documentation:
 
 - `README.md` - Main documentation
-- `QUICKSTART.md` - Quick start guide
-- `docs/ARCHITECTURE.md` - Architecture documentation (if architecture changes are involved)
+- `docs/ARCHITECTURE_V2.md` - Architecture documentation (if architecture changes are involved)
 - `docs/API.md` - API documentation (if API changes are involved)
 
 ## 🎯 Contribution Areas
