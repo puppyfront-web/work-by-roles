@@ -1,39 +1,59 @@
-# work-by-roles · Expert Team Governance System
+# work-by-roles · LLM Expert Team Governance System
 
-> Organize a group of LLM roles into an expert team that is **well-divided, evidence-backed,
-> auditable, and regression-safe**. Every role gets a versionable "role contract": who does what
-> within which boundaries, and what every conclusion is based on — written down, verifiable.
+> Manage your AI roles like code: **contracts for duties, enforcement at runtime, evidence
+> behind conclusions, audit across the process, regression gates on every change.**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-2.1.1-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-373%20passing-brightgreen.svg)](#development--testing)
 
 [中文](README.md) | English
 
 ---
 
-## Is this project for you?
+## Why
 
-**Yes, if you are:**
+Putting multiple LLM agents into production typically hits three walls:
 
-| You | What you get |
-|---|---|
-| **An LLM application developer** | You need multi-role collaboration (review, audit, analysis) but are tired of role drift, inconsistent output formats, and unsupported conclusions — pin every role's duties, forbidden zones, and output schema with a role contract |
-| **A quality/compliance-minded engineering team** | You must answer "where is the evidence", "who reviewed it", "did this prompt change break anything" — Harness golden-case regression + full-chain audit + contract version diff give you the answers |
-| **A developer building an "expert-team platform"** | Governance kernel, REST API, and visual canvas are all built in — add user accounts and model-key management, and you have a platform where users assemble their own expert teams |
+1. **Uncontrolled output** — role drift, inconsistent formats, confident fabrication
+2. **Unverifiable conclusions** — no answer to "where is the evidence, who reviewed it, which prompt version"
+3. **Risky changes** — changing one line of a prompt is a gamble; you can't tell what else it breaks
 
-**Not for you, if you just want:**
-- A single-agent chat framework → LangChain / AutoGen / CrewAI are lighter
-- An out-of-the-box business AI product → this is a **governance kernel + SDK**, not a finished app
+work-by-roles answers by giving every LLM role a **versioned role contract** (SOP duties,
+forbidden zones, output schema, evidence rules, tool whitelist, token quota), organizing
+collaboration as a **review paradigm**, **enforcing boundaries at runtime**, and providing
+**regression gates** for every change.
 
-## Typical scenarios
+```text
+                        ┌─────────────┐
+      question/design ─▶│ Coordinator │  decompose & dispatch
+                        └──────┬──────┘
+               ┌───────────────┼───────────────┐
+               ▼               ▼               ▼
+         ┌──────────┐    ┌──────────┐    ┌──────────┐
+         │ Expert A │    │ Expert B │    │ Expert C │  answer in parallel
+         └─────┬────┘    └─────┬────┘    └─────┬────┘  (schema + citation enforced)
+               └───────────────┼───────────────┘
+                               ▼
+                        ┌─────────────┐
+                        │  Verifier   │  independent review · verdict
+                        └──────┬──────┘  disagreements preserved, never arbitrated
+                               ▼
+              structured answer + evidence chain + audit events
+```
 
-| Scenario | What you do | What you get |
+## Positioning: how it relates to mainstream tools
+
+| What you use | What it solves | What this project adds |
 |---|---|---|
-| **Architecture/design review** | Import the `arch_review_team` template, submit your design | Three experts (API / data / infrastructure) review in parallel + independent verifier verdict, conclusions carry citations |
-| **Security audit** | Import `security_audit_team` | Injection / authz / data-leakage audit dimensions with severity calibration |
-| **Custom expert team** | Write a few YAML role contracts (SOP + output schema + forbidden zones) | A team tailored to your business; every contract change gets a version, a diff, and regression safety |
-| **Build a platform for others** | Build on the bundled REST API + canvas | Users assemble their own teams on the canvas, run reviews, inspect disagreements, export audit packs |
+| LangGraph / AutoGen / CrewAI | How agents are orchestrated | Role boundaries, output constraints, evidence chains, versioning, regression, audit (`WBRGuard` wraps existing graphs in 3 lines) |
+| promptfoo / DeepEval | Offline prompt evaluation | Adds **runtime enforcement** (schema validation / tool whitelist / quotas) and a contract-versioning loop |
+| LangSmith (SaaS) | Observability & tracing | Open source, self-hostable; audit + evidence chains aimed at compliance review |
+| Hand-written multi-role prompts | — | Boundary definitions and regression safety from day one |
+
+**In one sentence: orchestration frameworks make agents run, eval tools measure them —
+this project keeps them governable.**
 
 ## Quick start: zero to first review in 5 minutes
 
@@ -44,7 +64,7 @@ pip install "work-by-roles[server]"   # SDK + CLI + API service + canvas (httpx 
 # or minimal: pip install work-by-roles
 ```
 
-### Step 2 · Run the demo first (no model key needed)
+### Step 2 · Run the demo (no model key needed)
 
 ```bash
 wbr list-teams                                    # list official team templates
@@ -52,8 +72,8 @@ wbr run-team arch_review_team "Review: monolith → microservices split"
 ```
 
 You get a full review JSON: status, final answer, participating experts, disagreement count,
-audit event count. **No external model is called** — a built-in demo invoker replays
-deterministic output so you can see what a review looks like.
+audit event count. This uses the built-in demo invoker (deterministic output) —
+**no external model is called**.
 
 ### Step 3 · Connect a real model (3 environment variables)
 
@@ -77,24 +97,21 @@ wbr run-team arch_review_team "Review: monolith → microservices split" --live
 | Ollama (local) | `http://127.0.0.1:11434/v1` | `qwen2.5:7b` (key: any non-empty value) |
 | vLLM (self-hosted) | `http://127.0.0.1:8000/v1` | your deployed model |
 
-### Step 4 · Visual canvas (assemble teams in the browser)
+### Step 4 · Visual canvas
 
 ```bash
 uvicorn --factory wbr.app.api.main:create_app --port 8000
 # open http://127.0.0.1:8000/canvas
 ```
 
-On the canvas you can:
-1. **Import official templates** — pick one from the dropdown, click Import
-2. **Assemble your own team** — create coordinator/expert/verifier contracts, drag nodes
-3. **Edit contracts** — double-click any node to edit SOP steps, forbidden zones, tool
-   whitelist, token quota, output schema (live validation); saving creates a new version
-   (history browsable, diffable)
-4. **Run reviews** — submit a question, watch disagreement nodes highlight in red,
-   export standard audit packs
+- **Import official templates** — pick one from the dropdown, click Import
+- **Assemble your own team** — create coordinator/expert/verifier contracts, drag nodes
+- **Edit contracts** — double-click any node to edit SOP, forbidden zones, tool whitelist,
+  token quota, output schema (live validation); saving creates a new version (browsable, diffable)
+- **Run reviews** — submit a question, disagreement nodes highlight in red, export audit packs
 
-The header shows the current mode: **live model** (`WBR_LLM_*` set) or **demo mode**.
-The API service auto-detects the environment variables — no code changes needed.
+The header shows the current mode (live model / demo). The API service auto-detects
+`WBR_LLM_*` environment variables — no code changes needed.
 
 ### Step 5 (optional) · Code integration
 
@@ -115,7 +132,7 @@ session = ReviewSession(
         api_key="sk-...",
         model="gpt-4o-mini",
         # model_by_role={"coordinator": "gpt-4o",   # per-role models: stronger model for
-        #                "verifier": "gpt-4o"},      # coordinator/verifier, cheap for experts
+        #                "verifier": "gpt-4o"},      # coordinator/verifier, cheaper for experts
     ),
 )
 result = session.run("Review: monolith → microservices split")
@@ -136,12 +153,28 @@ See [docs/INTEGRATION_LANGGRAPH.md](docs/INTEGRATION_LANGGRAPH.md).
 
 ## Core concepts (30 seconds)
 
-| Concept | One-liner |
+| Concept | Description |
 |---|---|
 | **RoleContract** | A role's job description: SOP, forbidden behaviors, output schema, evidence rules, tool whitelist, memory permissions, token quota, review criteria. Declarative YAML, versioned + content-hash pinned |
-| **Review** | Coordinator decomposes → experts answer in parallel → Verifier independently judges. **Disagreements are preserved, never arbitrated away** |
-| **Harness** | Quality gate: golden cases + baseline snapshots + one-click regression. Change a contract or swap a model, and you know immediately whether capability regressed |
-| **Audit** | Every compile/call/validate/verdict emits a TraceID-linked typed event; exportable audit packs |
+| **Review** | Coordinator decomposes → experts answer in parallel → Verifier independently judges. **Disagreements are preserved, never arbitrated**; final judgment stays with you |
+| **Harness quality gate** | Golden cases + baseline snapshots + one-click regression. Capability degradation after any contract or model change is detected automatically |
+| **Full-chain audit** | Every compile/call/validate/verdict emits a TraceID-linked typed event; exportable audit packs |
+
+## Design principles
+
+1. **Contract first** — boundaries are declared and enforced before runtime, not patched by after-the-fact evaluation
+2. **Preserve disagreement** — independent review reaches a verdict but never arbitrates; conclusions and disagreements are delivered together
+3. **Regression-safe changes** — the impact of any contract or model change can be verified against a baseline
+4. **Auditable end to end** — every conclusion traces back to evidence, contract version, and operations
+
+## Typical scenarios
+
+| Scenario | What you do | What you get |
+|---|---|---|
+| **Architecture / design review** | Import `arch_review_team`, submit your design | Three experts (API / data / infrastructure) review in parallel + verifier verdict, conclusions carry citations |
+| **Security audit** | Import `security_audit_team` | Injection / authz / data-leakage audit dimensions with severity calibration |
+| **Custom expert team** | Write YAML role contracts | A team tailored to your business; every contract change has version, diff, and regression safety |
+| **User-facing expert-team platform** | Build on the bundled REST API + canvas | Governance kernel, contract CRUD, async reviews, audit export out of the box — add user accounts and model-key management |
 
 ## Build your own expert team
 
@@ -173,12 +206,11 @@ evidence_spec:
   min_citations: 1
 ```
 
-Three ways to assemble a team (pick one):
-1. **Canvas** — create contracts via forms, no YAML needed
-2. **Copy an official template** — `wbr/templates/teams/arch_review_team/` has one YAML per role plus a `team.json` manifest
-3. **SDK** — build `RoleContract.model_validate(...)` and pass to `ReviewSession`
+Three ways to assemble a team: **canvas forms** (no YAML), **copy an official template**
+(`wbr/templates/teams/arch_review_team/`), or the **SDK** (`RoleContract.model_validate(...)`).
 
-## Full feature map (look up when needed)
+<details>
+<summary><b>Full feature map (click to expand)</b></summary>
 
 | Capability | Notes |
 |---|---|
@@ -203,36 +235,39 @@ Three ways to assemble a team (pick one):
 | 📦 **Baseline bundle** (enterprise) | contracts + cases + baselines packaged as one, integrity-checked migration |
 | 🧪 **Canary A/B** (enterprise) | deterministic traffic split + full regression comparison + conservative verdict |
 
+</details>
+
 ## Architecture (three layers, one-way dependencies)
 
-```
+```text
 App       wbr/app        FastAPI service · expert canvas (SPA) · async task queue
 Adapter   wbr/adapters   LangGraph · OpenAI-compatible LLM · MCP · Redis/Memory storage · OTel
 Core      wbr/core       contracts · compiler · diff · audit · memory · orchestration
                          security · token · cache · schema · harness   (stdlib + pydantic only)
 ```
 
-Core never makes network calls — all model invocation lives in the Adapter layer,
-pointed at whatever endpoint you configure.
+Core never makes network calls — all model invocation lives in the Adapter layer, pointed at
+whatever endpoint you configure. Governance takes effect at four moments: **definition**
+(contracts), **runtime** (schema / whitelist / quota enforcement), **verdict** (review + audit),
+and **evolution** (Harness regression).
 
 ## FAQ
 
 **Q: My `wbr run-team` output says "demo" everywhere — is it broken?**
 No. The default demo invoker replays deterministic output with zero external calls.
-`export WBR_LLM_API_KEY=... WBR_LLM_MODEL=...` then add `--live` for real models.
+Set `WBR_LLM_API_KEY` / `WBR_LLM_MODEL` and add `--live` for real models.
 
-**Q: How does this relate to AutoGen / CrewAI / LangGraph?**
-They solve "how to orchestrate agents"; this project solves "how to govern them once
-orchestrated": duty boundaries, output constraints, evidence, versioning, regression, audit.
-They compose — `WBRGuard` wraps an existing LangGraph in 3 lines.
+**Q: Does it compete with AutoGen / CrewAI / LangGraph?**
+No. They solve orchestration; this project solves governance after orchestration. They compose —
+`WBRGuard` adds governance to an existing LangGraph.
 
 **Q: Which models are supported?**
-Any OpenAI-compatible `/chat/completions` endpoint (see the table above). Other protocols:
+Any OpenAI-compatible `/chat/completions` endpoint (see table above). For other protocols,
 implement the `ModelInvoker` protocol (~60 lines); Core stays framework-agnostic.
 
 **Q: Where do my API key and data go?**
-Only to the endpoint you set in `WBR_LLM_BASE_URL`. Core has zero network dependencies;
-traffic can pass PII redaction and injection filtering; everything is audit-logged and exportable.
+Only to the endpoint set in `WBR_LLM_BASE_URL`. Core has zero network dependencies; traffic can
+pass PII redaction and injection filtering; everything is audit-logged and exportable.
 
 **Q: How do I know a contract/prompt change didn't break other capabilities?**
 Harness: pin a baseline snapshot first, then run the golden-case regression after any change —
@@ -240,17 +275,23 @@ six metrics compared, degradation auto-flagged. See [docs/HARNESS.md](docs/HARNE
 
 **Q: What do I need to build a "users create their own expert teams" platform?**
 The governance kernel, REST API (contract CRUD/versioning/diff, async reviews, Harness, audit
-export), and visual canvas are built in. What you add is the product shell: user accounts,
-model-key management, team-level CRUD and persistence (the enterprise multi-workspace layer
-is directly reusable).
+export), and visual canvas are built in. What you add: user accounts, model-key management,
+team-level CRUD and persistence (the enterprise multi-workspace layer is directly reusable).
 
 ## Docs
 
-[Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) ·
-[LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) · [Harness](docs/HARNESS.md) ·
-[Deploy](docs/DEPLOY.md) ·
-[Specs](docs/spec/README.md) · [Acceptance reports](docs/acceptance/) ·
-[Examples](examples/README.md)
+- [Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) ·
+  [LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) · [Harness](docs/HARNESS.md) ·
+  [Deploy](docs/DEPLOY.md)
+- Specs: [docs/spec/README.md](docs/spec/README.md) (SPEC-000~006 + review records) ·
+  Acceptance reports: [docs/acceptance/](docs/acceptance/)
+- Examples: [examples/README.md](examples/README.md) · Changelog: [CHANGELOG.md](CHANGELOG.md)
+
+## Contributing
+
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). A good starting point:
+contribute a new official team template under `wbr/templates/teams/` (contract review,
+financial report audit, and interview assessment are all in real demand).
 
 ## Development & testing
 
