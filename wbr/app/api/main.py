@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 import wbr
+from wbr.adapters.demo import SchemaDemoInvoker
 from wbr.app.store import ContractRegistry
 from wbr.app.tasks.queue import (
     InlineTaskQueue,
@@ -28,7 +29,7 @@ from wbr.core.audit.trail import AuditTrail
 from wbr.core.contract.models import RoleContract
 from wbr.core.exceptions import AppError, WBRError
 from wbr.core.harness import BaselineSnapshot, CaseSuite, RegressionEngine
-from wbr.core.orchestration import ReviewSession, ScriptedInvoker
+from wbr.core.orchestration import ReviewSession
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "canvas" / "static"
 
@@ -68,59 +69,8 @@ class RegressionSubmit(BaseModel):
     stability_runs: int = Field(default=1, ge=1, le=5)
 
 
-class _DemoInvoker(ScriptedInvoker):
-    """默认演示 Invoker：按契约类型返回确定性结构化输出（无外部 LLM 依赖）。"""
-
-    def __init__(self) -> None:
-        super().__init__({})
-        self.question = "（未提供问题）"
-        self.expert_ids: list[str] = []
-
-    def invoke(self, request):
-        contract = request.role_contract
-        rid = contract.role_id
-        question = "（未提供问题）"
-        if isinstance(request.memory_snapshot, dict):
-            question = request.memory_snapshot.get("__question__", self.question)
-        from wbr.core.contract.models import RoleType
-
-        if contract.role_type == RoleType.COORDINATOR:
-            payload = {"assignments": [
-                {"expert_role_id": cid, "sub_question": f"分析: {question}"}
-                for cid in sorted(self.expert_ids)
-            ]}
-        elif contract.role_type == RoleType.VERIFIER:
-            payload = {"passed": True, "scores": {"completeness": 0.85, "accuracy": 0.85},
-                       "comments": "复核通过（演示）", "final_answer": f"综合结论: {question}"}
-        else:
-            required = (contract.output_spec.schema_ or {}).get("required", [])
-            base = {"conclusion": f"{rid} 的结构化结论: {question}",
-                    "confidence": 0.9, "citations": ["[^1] 演示证据"]}
-            if "findings" in required:
-                payload = {"findings": [
-                    {"severity": "low", "title": "演示发现", "detail": "演示环境的示例发现（非真实）",
-                     "location": "demo://placeholder", "citations": ["[^1] 演示证据"]},
-                ], **base}
-            elif "claims" in required:
-                payload = {"claims": [
-                    {"claim": "演示主张", "verdict": "verified", "reason": "演示环境示例核查"},
-                ], **base}
-            elif "violations" in required:
-                payload = {"violations": [
-                    {"severity": "low", "rule": "演示规则", "excerpt": "演示片段", "suggestion": "演示整改建议"},
-                ], **base}
-            elif "scores" in required:
-                payload = {"scores": {"钩子": 0.8, "结构": 0.8, "行动引导": 0.8},
-                           "rewrite_suggestions": ["演示改写建议"], **base}
-            else:
-                payload = base
-        from wbr.core.orchestration.invoker import ModelResponse, TokenUsage
-
-        return ModelResponse(
-            text=json.dumps(payload, ensure_ascii=False),
-            usage=TokenUsage(prompt_tokens=100, completion_tokens=60),
-            raw=payload,
-        )
+class _DemoInvoker(SchemaDemoInvoker):
+    """默认演示 Invoker：Schema 驱动确定性输出，任意契约形状零违例（无外部 LLM 依赖）。"""
 
 
 def _resolve_contracts(services: _Services, cids: list[str]) -> dict[str, RoleContract]:

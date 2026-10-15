@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- **定位纠偏 + 第四个官方模板 `content_creation_team`（多角度竞稿团）**：专家团不等于评审团——会审范式同样适用于生产场景。构成：创作协调者 + 故事型 / 干货型 / 案例数据型三位写手并行竞稿 + 主编终审（平台调性 0.35 / 内容质量 0.35 / 目标达成 0.3），复核人承担主编 / 质量门禁角色，final_answer 即终稿全文；写手契约内置禁区（禁止编造数据、禁止虚构敏感领域经历等）
+- **`SchemaDemoInvoker`（`wbr/adapters/demo.py`）**：通用 Schema 驱动演示 Invoker——按契约输出 Schema 递归生成满足 required 约束的确定性回放（enum 取首项 / number 0.85 / minLength 自动补齐），任意新模板演示零违例，CLI 与画布统一替换；新增防回归测试"全部官方模板 × 演示 Invoker 零违例跑通"
 - **第三个官方专家团模板 `content_review_team`（内容营销会审团）**：协调者 + 事实核查 / 平台合规 / 转化力三位专家 + 终审复核人（事实准确性 0.4 / 合规安全性 0.4 / 转化力 0.2 三维评审标准）；协调者 SOP 支持把核心卖点交叉分派给事实核查与转化力专家，分歧自动留存；CLI 与画布演示 Invoker 按"契约 Schema required 字段"生成对应形状的演示输出（claims / violations / scores / findings）
 - **真实模型一键接入**：`OpenAICompatInvoker`（`wbr/adapters/llm/`）——任何 OpenAI 兼容 `/chat/completions` 端点均可接入（OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama / vLLM）；三个环境变量 `WBR_LLM_API_KEY` / `WBR_LLM_MODEL` / `WBR_LLM_BASE_URL` 即配置完成；支持按角色覆盖模型（`model_by_role`）、429/5xx 指数退避重试
 - **CLI `--live`**：`wbr run-team <team> <question> --live` 走真实模型；缺配置时给出明确指引；默认仍为零依赖演示模式

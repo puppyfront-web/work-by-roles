@@ -46,26 +46,26 @@ def cmd_run_team(args) -> int:
     from wbr.templates.registry import load_team_spec
 
     spec = load_team_spec(args.team)
+    from wbr.adapters.demo import SchemaDemoInvoker
     from wbr.core.audit.trail import AuditTrail
-    from wbr.core.orchestration import ReviewSession, ScriptedInvoker
+    from wbr.core.orchestration import ReviewSession
 
-    scripts = {}
-    invoker = ScriptedInvoker(scripts, default_usage=(90, 60))
     if getattr(args, "live", False):
         from wbr.adapters.llm import OpenAICompatInvoker
 
-        live = OpenAICompatInvoker.from_env()
-        if live is None:
+        invoker = OpenAICompatInvoker.from_env()
+        if invoker is None:
             print("错误: --live 需要环境变量 WBR_LLM_API_KEY 与 WBR_LLM_MODEL"
                   "（自定义端点另设 WBR_LLM_BASE_URL）。\n"
                   "示例: export WBR_LLM_API_KEY=sk-... WBR_LLM_MODEL=deepseek-chat",
                   file=sys.stderr)
             return 2
-        invoker = live
-    elif not args.demo_output:
-        print("提示: run-team 默认使用内置演示 Invoker（确定性输出，不调用外部 LLM）。\n"
-              "      接入真实模型: export WBR_LLM_API_KEY=... WBR_LLM_MODEL=... 后加 --live。",
-              file=sys.stderr)
+    else:
+        invoker = SchemaDemoInvoker(question=args.question)
+        if not args.demo_output:
+            print("提示: run-team 默认使用内置演示 Invoker（确定性输出，不调用外部 LLM）。\n"
+                  "      接入真实模型: export WBR_LLM_API_KEY=... WBR_LLM_MODEL=... 后加 --live。",
+                  file=sys.stderr)
     audit = AuditTrail()
     session = ReviewSession(
         coordinator_contract=spec.coordinator,
@@ -74,51 +74,8 @@ def cmd_run_team(args) -> int:
         invoker=invoker,
         audit=audit,
     )
-    # 演示 Invoker：按问题生成确定性结论（--live 时保留真实 Invoker，不覆盖）
-    invoker = session._invoker
-
-    def demo_invoke(request):
-        from wbr.core.contract.models import RoleType
-        from wbr.core.orchestration.invoker import ModelResponse, TokenUsage
-
-        rid = request.role_contract.role_id
-        required = (request.role_contract.output_spec.schema_ or {}).get("required", [])
-        if request.role_contract.role_type == RoleType.COORDINATOR:
-            payload = {"assignments": [
-                {"expert_role_id": e.role_id, "sub_question": f"{args.question} @ {e.identity.name}"}
-                for e in spec.experts
-            ]}
-        elif request.role_contract.role_type == RoleType.VERIFIER:
-            payload = {"passed": True, "scores": {d.name: 0.8 for d in spec.verifier.review_criteria.dimensions},
-                       "comments": "演示复核通过", "final_answer": f"【演示】{args.question} → 团队结论"}
-        elif "findings" in required:
-            payload = {"findings": [
-                {"severity": "low", "title": f"演示发现@{rid}", "detail": "演示环境的示例发现（非真实漏洞）",
-                 "location": "demo://placeholder", "citations": ["[^1] 演示证据"]},
-            ], "confidence": 0.85}
-        elif "claims" in required:
-            payload = {"claims": [
-                {"claim": f"演示主张@{rid}", "verdict": "verified", "reason": "演示环境的示例核查（非真实核查）"},
-            ], "conclusion": f"{rid} 关于「{args.question}」的核查结论（演示）",
-               "confidence": 0.85, "citations": ["[^1] 演示证据"]}
-        elif "violations" in required:
-            payload = {"violations": [
-                {"severity": "low", "rule": "演示规则", "excerpt": "演示片段", "suggestion": "演示整改建议"},
-            ], "conclusion": f"{rid} 关于「{args.question}」的合规结论（演示）",
-               "confidence": 0.85, "citations": ["[^1] 演示证据"]}
-        elif "scores" in required:
-            payload = {"scores": {"钩子": 0.8, "结构": 0.8, "行动引导": 0.8},
-                       "rewrite_suggestions": ["演示改写建议"],
-                       "conclusion": f"{rid} 关于「{args.question}」的转化力结论（演示）",
-                       "confidence": 0.85, "citations": ["[^1] 演示证据"]}
-        else:
-            payload = {"conclusion": f"{rid} 关于「{args.question}」的结构化结论（演示）",
-                       "confidence": 0.85, "citations": ["[^1] 演示证据"]}
-        text = json.dumps(payload, ensure_ascii=False)
-        return ModelResponse(text=text, usage=TokenUsage(prompt_tokens=90, completion_tokens=60), raw=payload)
-
-    if not getattr(args, "live", False):
-        invoker.invoke = demo_invoke  # type: ignore[method-assign]
+    if isinstance(invoker, SchemaDemoInvoker):
+        invoker.expert_ids = [e.role_id for e in spec.experts]
     result = session.run(args.question)
     print(json.dumps({
         "status": result.status.value,

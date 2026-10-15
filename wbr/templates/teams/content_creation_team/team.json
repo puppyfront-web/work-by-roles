@@ -1,0 +1,11 @@
+{
+  "team": "content_creation_team",
+  "version": "1.0.0",
+  "roles": [
+    {"role_id": "coordinator", "role_type": "coordinator", "file": "coordinator.yaml"},
+    {"role_id": "story_writer", "role_type": "expert", "file": "story_writer.yaml"},
+    {"role_id": "listicle_writer", "role_type": "expert", "file": "listicle_writer.yaml"},
+    {"role_id": "evidence_writer", "role_type": "expert", "file": "evidence_writer.yaml"},
+    {"role_id": "chief_editor", "role_type": "verifier", "file": "chief_editor.yaml"}
+  ]
+}

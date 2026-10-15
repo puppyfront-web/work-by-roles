@@ -7,12 +7,13 @@ from wbr.core.contract.models import RoleType
 from wbr.core.exceptions import AppError
 from wbr.templates.registry import list_teams, load_team, load_team_spec
 
-ALL_TEAMS = ["arch_review_team", "security_audit_team", "content_review_team"]
+ALL_TEAMS = ["arch_review_team", "security_audit_team", "content_review_team", "content_creation_team"]
 
 
 def test_list_teams_contains_two_official():
     names = {t["name"] for t in list_teams()}
-    assert {"arch_review_team", "security_audit_team", "content_review_team"} <= names
+    assert {"arch_review_team", "security_audit_team", "content_review_team",
+            "content_creation_team"} <= names
 
 
 @pytest.mark.parametrize("team", ALL_TEAMS)
@@ -199,3 +200,28 @@ def test_content_review_team_cross_review_disagreement():
     assert set(disagreement.between) == {"conversion_expert", "fact_checker"}
     assert {p["conclusion"] for p in disagreement.positions} == {
         "卖点成立，保留可提升点击率", "主张夸大，不可验证，建议改写"}
+
+
+def test_official_teams_demo_invoker_clean_run():
+    """★ 每个官方模板 × Schema 驱动演示 Invoker：零违例跑通（防演示层回归）。"""
+    from wbr.adapters.demo import SchemaDemoInvoker
+    from wbr.core.audit.trail import AuditTrail
+    from wbr.core.orchestration import ExpertStatus, ReviewSession
+
+    for team in ALL_TEAMS:
+        spec = load_team_spec(team)
+        invoker = SchemaDemoInvoker(question=f"测试: {team}")
+        session = ReviewSession(
+            coordinator_contract=spec.coordinator,
+            expert_contracts=spec.experts,
+            verifier_contract=spec.verifier,
+            invoker=invoker,
+            audit=AuditTrail(),
+        )
+        invoker.expert_ids = [e.role_id for e in spec.experts]
+        result = session.run(f"测试: {team}")
+        assert result.status.value == "completed", team
+        for outcome in result.expert_outcomes:
+            assert outcome.status == ExpertStatus.COMPLETED, (team, outcome.role_id)
+            assert not outcome.violations, (team, outcome.role_id, outcome.violations)
+        assert result.verifier_verdict.passed is True, team

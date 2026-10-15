@@ -55,6 +55,8 @@ collaboration as a **review paradigm**, **enforcing boundaries at runtime**, and
 **In one sentence: orchestration frameworks make agents run, eval tools measure them —
 this project keeps them governable.**
 
+Teams can **do work** as well as **pass judgment**: the review paradigm is not limited to evaluation — the `content_creation_team` template shows the production pattern (story / listicle / evidence-based writers compete in parallel, a chief editor synthesizes the final draft), with the verifier acting as editor-in-chief / quality gate.
+
 ## Quick start: zero to first review in 5 minutes
 
 ### Step 1 · Install
@@ -174,6 +176,7 @@ See [docs/INTEGRATION_LANGGRAPH.md](docs/INTEGRATION_LANGGRAPH.md).
 | **Architecture / design review** | Import `arch_review_team`, submit your design | Three experts (API / data / infrastructure) review in parallel + verifier verdict, conclusions carry citations |
 | **Security audit** | Import `security_audit_team` | Injection / authz / data-leakage audit dimensions with severity calibration |
 | **Pre-publish content review** | Import `content_review_team`, paste your copy and target platform | Fact-checking + platform compliance + conversion experts review in parallel; final verdict: publish / revise / reject with a must-fix list |
+| **Content creation** | Import `content_creation_team`, provide topic, platform, and goal | Story / listicle / evidence-based writers compete in parallel; the chief editor independently reviews and synthesizes the final draft |
 | **Custom expert team** | Write YAML role contracts | A team tailored to your business; every contract change has version, diff, and regression safety |
 | **User-facing expert-team platform** | Build on the bundled REST API + canvas | Governance kernel, contract CRUD, async reviews, audit export out of the box — add user accounts and model-key management |
 
