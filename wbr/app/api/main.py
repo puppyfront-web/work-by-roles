@@ -166,19 +166,23 @@ def create_app(
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import FileResponse, JSONResponse
         from fastapi.staticfiles import StaticFiles
-        from pydantic import ValidationError  # noqa: F401 - 可用性探测
+        from pydantic import ValidationError
     except ImportError as e:  # pragma: no cover
         raise AppError(
             "API 服务需要安装可选依赖: pip install 'work-by-roles[server]' (fastapi/uvicorn/httpx)"
         ) from e
 
     root = Path(data_root) if data_root else Path("./wbr-data")
-    demo_invoker = invoker if invoker is not None else _DemoInvoker()
+    if invoker is None:
+        # 环境变量配置了真实模型（WBR_LLM_API_KEY + WBR_LLM_MODEL）则自动启用，否则回落演示 Invoker
+        from wbr.adapters.llm import OpenAICompatInvoker
+
+        invoker = OpenAICompatInvoker.from_env() or _DemoInvoker()
     services = _Services(
         registry=ContractRegistry(root),
         queue=queue or InlineTaskQueue(lambda r: None),
         audit=AuditTrail(),
-        invoker=demo_invoker,
+        invoker=invoker,
         data_root=root,
         task_store=JsonTaskStore(root / "tasks"),
     )
@@ -353,6 +357,27 @@ def create_app(
         return {"task_id": record.task_id, "status": record.status.value,
                 "error": record.error, "report": record.result}
 
+    # ---- 官方模板导入 ----
+    @app.get("/api/v1/templates")
+    def list_templates():
+        from wbr.templates.registry import list_teams
+
+        return list_teams()
+
+    @app.post("/api/v1/templates/{team}/import", status_code=201)
+    def import_template(team: str):
+        from wbr.templates.registry import load_team
+
+        contracts = load_team(team)  # 未知名抛 E9003
+        imported, skipped = [], []
+        for rid in sorted(contracts):
+            if services.registry.get(rid) is not None:
+                skipped.append(rid)
+                continue
+            services.registry.create(contracts[rid])
+            imported.append(rid)
+        return {"team": team, "imported": imported, "skipped": skipped}
+
     # ---- 审计导出 ----
     @app.get("/api/v1/audits/export")
     def export_audit(
@@ -381,6 +406,8 @@ def create_app(
                 for c in services.registry.list()
             ],
             "version": wbr.__version__,
+            "invoker": type(services.invoker).__name__,
+            "live": not isinstance(services.invoker, _DemoInvoker),
         }
 
     return app

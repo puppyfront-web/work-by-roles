@@ -2,6 +2,17 @@
 
 格式参照 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；版本遵循语义化。
 
+## [Unreleased]
+
+### Added
+- **真实模型一键接入**：`OpenAICompatInvoker`（`wbr/adapters/llm/`）——任何 OpenAI 兼容 `/chat/completions` 端点均可接入（OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama / vLLM）；三个环境变量 `WBR_LLM_API_KEY` / `WBR_LLM_MODEL` / `WBR_LLM_BASE_URL` 即配置完成；支持按角色覆盖模型（`model_by_role`）、429/5xx 指数退避重试
+- **CLI `--live`**：`wbr run-team <team> <question> --live` 走真实模型；缺配置时给出明确指引；默认仍为零依赖演示模式
+- **API 自动切换**：`create_app` 检测到 `WBR_LLM_*` 环境变量自动启用真实 Invoker，`/api/v1/healthz` 与画布页头显示当前模式（真实模型/演示模式）
+- **画布模板导入**：`GET /api/v1/templates` + `POST /api/v1/templates/{team}/import`；画布左上角一键导入官方专家团模板（已存在的契约自动跳过）
+
+### Docs
+- README 中英双语重写：新增受众定位（适合谁/不适合谁）、典型场景表、零到一五步上手指南（演示→真模型→画布→SDK）、自定义专家团最小 YAML 示例、FAQ
+
 ## [2.1.1] · 2026-10-14
 
 ### Fixed

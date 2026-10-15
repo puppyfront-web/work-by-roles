@@ -50,19 +50,31 @@ def cmd_run_team(args) -> int:
     from wbr.core.orchestration import ReviewSession, ScriptedInvoker
 
     scripts = {}
-    if not args.demo_output:
+    invoker = ScriptedInvoker(scripts, default_usage=(90, 60))
+    if getattr(args, "live", False):
+        from wbr.adapters.llm import OpenAICompatInvoker
+
+        live = OpenAICompatInvoker.from_env()
+        if live is None:
+            print("错误: --live 需要环境变量 WBR_LLM_API_KEY 与 WBR_LLM_MODEL"
+                  "（自定义端点另设 WBR_LLM_BASE_URL）。\n"
+                  "示例: export WBR_LLM_API_KEY=sk-... WBR_LLM_MODEL=deepseek-chat",
+                  file=sys.stderr)
+            return 2
+        invoker = live
+    elif not args.demo_output:
         print("提示: run-team 默认使用内置演示 Invoker（确定性输出，不调用外部 LLM）。\n"
-              "      接入真实模型请使用 SDK / API（见 docs/INTEGRATION_LANGGRAPH.md）。",
+              "      接入真实模型: export WBR_LLM_API_KEY=... WBR_LLM_MODEL=... 后加 --live。",
               file=sys.stderr)
     audit = AuditTrail()
     session = ReviewSession(
         coordinator_contract=spec.coordinator,
         expert_contracts=spec.experts,
         verifier_contract=spec.verifier,
-        invoker=ScriptedInvoker(scripts, default_usage=(90, 60)),
+        invoker=invoker,
         audit=audit,
     )
-    # 演示 Invoker：按问题生成确定性结论
+    # 演示 Invoker：按问题生成确定性结论（--live 时保留真实 Invoker，不覆盖）
     invoker = session._invoker
 
     def demo_invoke(request):
@@ -90,7 +102,8 @@ def cmd_run_team(args) -> int:
         text = json.dumps(payload, ensure_ascii=False)
         return ModelResponse(text=text, usage=TokenUsage(prompt_tokens=90, completion_tokens=60), raw=payload)
 
-    invoker.invoke = demo_invoke  # type: ignore[method-assign]
+    if not getattr(args, "live", False):
+        invoker.invoke = demo_invoke  # type: ignore[method-assign]
     result = session.run(args.question)
     print(json.dumps({
         "status": result.status.value,
@@ -113,9 +126,11 @@ def main(argv: list[str] | None = None) -> int:
     show.add_argument("team")
     show.set_defaults(func=cmd_show_team)
 
-    run = sub.add_parser("run-team", help="用官方模板运行一次演示会审")
+    run = sub.add_parser("run-team", help="用官方模板运行一次会审（默认演示输出，--live 走真实模型）")
     run.add_argument("team")
     run.add_argument("question")
+    run.add_argument("--live", action="store_true",
+                     help="调用真实模型（需 WBR_LLM_API_KEY / WBR_LLM_MODEL，可选 WBR_LLM_BASE_URL）")
     run.add_argument("--demo-output", action="store_true", help="静默演示提示")
     run.set_defaults(func=cmd_run_team)
 

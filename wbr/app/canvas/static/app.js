@@ -37,7 +37,8 @@ async function refresh() {
   if (!res.ok) throw new Error("bootstrap " + res.status);
   const boot = await res.json();
   state.contracts = boot.contracts || [];
-  $("api-version").textContent = "v" + boot.version;
+  $("api-version").textContent = "v" + boot.version + " · " +
+    (boot.live ? `真实模型（${boot.invoker}）` : "演示模式（未配置 WBR_LLM_* 环境变量）");
   renderSelectors();
   layout();
 }
@@ -343,6 +344,30 @@ function renderResult(result) {
   renderGraph(); // 分歧节点红色高亮
 }
 
+/* ---------- 官方模板导入 ---------- */
+async function loadTemplates() {
+  const sel = $("tpl-select");
+  try {
+    const teams = await api("/templates");
+    teams.forEach((t) => {
+      sel.appendChild(el("option", { value: t.name }, `${t.name}（${t.roles.length} 角色）`));
+    });
+  } catch (e) { /* 旧版 API 无此端点，静默降级 */ }
+}
+
+async function importTemplate() {
+  const name = $("tpl-select").value;
+  if (!name) return alert("请先在左侧下拉选择要导入的官方模板");
+  try {
+    const r = await api(`/templates/${encodeURIComponent(name)}/import`, { method: "POST" });
+    const skipped = r.skipped.length ? `，跳过已存在 ${r.skipped.length} 个` : "";
+    alert(`已导入 ${r.imported.length} 个契约${skipped}`);
+    await refresh();
+  } catch (e) {
+    alert("导入失败: " + e.message);
+  }
+}
+
 /* ---------- 启动 ---------- */
 window.addEventListener("DOMContentLoaded", () => {
   $("btn-refresh").addEventListener("click", refresh);
@@ -351,7 +376,9 @@ window.addEventListener("DOMContentLoaded", () => {
   $("btn-delete").addEventListener("click", deleteContract);
   $("btn-close-editor").addEventListener("click", () => $("editor").classList.add("hidden"));
   $("btn-run").addEventListener("click", runReview);
+  $("btn-import-template").addEventListener("click", importTemplate);
   $("f-schema").addEventListener("input", (e) => schemaFeedback(e.target.value));
+  loadTemplates();
   refresh().catch((e) => {
     $("api-version").textContent = "API 不可用: " + e.message;
   });
