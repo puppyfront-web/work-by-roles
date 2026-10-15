@@ -93,8 +93,27 @@ class _DemoInvoker(ScriptedInvoker):
             payload = {"passed": True, "scores": {"completeness": 0.85, "accuracy": 0.85},
                        "comments": "复核通过（演示）", "final_answer": f"综合结论: {question}"}
         else:
-            payload = {"conclusion": f"{rid} 的结构化结论: {question}",
-                       "confidence": 0.9, "citations": ["[^1] 演示证据"]}
+            required = (contract.output_spec.schema_ or {}).get("required", [])
+            base = {"conclusion": f"{rid} 的结构化结论: {question}",
+                    "confidence": 0.9, "citations": ["[^1] 演示证据"]}
+            if "findings" in required:
+                payload = {"findings": [
+                    {"severity": "low", "title": "演示发现", "detail": "演示环境的示例发现（非真实）",
+                     "location": "demo://placeholder", "citations": ["[^1] 演示证据"]},
+                ], **base}
+            elif "claims" in required:
+                payload = {"claims": [
+                    {"claim": "演示主张", "verdict": "verified", "reason": "演示环境示例核查"},
+                ], **base}
+            elif "violations" in required:
+                payload = {"violations": [
+                    {"severity": "low", "rule": "演示规则", "excerpt": "演示片段", "suggestion": "演示整改建议"},
+                ], **base}
+            elif "scores" in required:
+                payload = {"scores": {"钩子": 0.8, "结构": 0.8, "行动引导": 0.8},
+                           "rewrite_suggestions": ["演示改写建议"], **base}
+            else:
+                payload = base
         from wbr.core.orchestration.invoker import ModelResponse, TokenUsage
 
         return ModelResponse(

@@ -173,6 +173,7 @@ See [docs/INTEGRATION_LANGGRAPH.md](docs/INTEGRATION_LANGGRAPH.md).
 |---|---|---|
 | **Architecture / design review** | Import `arch_review_team`, submit your design | Three experts (API / data / infrastructure) review in parallel + verifier verdict, conclusions carry citations |
 | **Security audit** | Import `security_audit_team` | Injection / authz / data-leakage audit dimensions with severity calibration |
+| **Pre-publish content review** | Import `content_review_team`, paste your copy and target platform | Fact-checking + platform compliance + conversion experts review in parallel; final verdict: publish / revise / reject with a must-fix list |
 | **Custom expert team** | Write YAML role contracts | A team tailored to your business; every contract change has version, diff, and regression safety |
 | **User-facing expert-team platform** | Build on the bundled REST API + canvas | Governance kernel, contract CRUD, async reviews, audit export out of the box — add user accounts and model-key management |
 

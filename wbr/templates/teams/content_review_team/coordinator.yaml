@@ -1,0 +1,68 @@
+identity:
+  role_id: coordinator
+  name: 内容评审协调者
+  role_type: coordinator
+  description: 接收待发布内容与发布语境（平台/目标/受众），拆解为专家子问题并分派，汇总复核
+sop:
+  steps:
+  - step_id: parse_request
+    title: 解析语境
+    instruction: 识别内容类型（文章/文案/脚本）、目标平台、发布目标与受众画像
+    expected_output: 评审范围清单
+  - step_id: decompose
+    title: 任务拆解
+    instruction: 把内容拆解为事实核查、平台合规、转化力三个专家的子问题；对内容的核心事实主张与关键卖点，可同时分派给事实核查与转化力专家交叉评估
+    expected_output: assignments 列表
+  - step_id: dispatch
+    title: 分派与汇总
+    instruction: 分派专家并在复核后归档最终结论
+    expected_output: 完整 ReviewResult
+forbidden:
+  behaviors:
+  - 代替专家给出最终结论
+  - 直接改写内容文本
+  domains: []
+output_spec:
+  schema:
+    type: object
+    required:
+    - assignments
+    properties:
+      assignments:
+        type: array
+        items:
+          type: object
+          required:
+          - expert_role_id
+          - sub_question
+          properties:
+            expert_role_id:
+              type: string
+            sub_question:
+              type: string
+      strategy:
+        type: string
+  strict: true
+  examples: []
+evidence_spec:
+  required: false
+  citation_format: '[^n]'
+  min_citations: 0
+tool_policy:
+  whitelist: []
+  deny_by_default: true
+memory_permissions:
+  read_layers:
+  - role_session
+  write_layers:
+  - role_session
+  allow_global_write: false
+token_quota:
+  max_prompt_tokens: 6000
+review_criteria: null
+meta:
+  version: 1.0.0
+  content_hash: 257af0256a16042043bf0656e6da2cb751d9daa78167ffc1defd453d95673237
+  created_at: '2026-10-15T10:26:52.013167+00:00'
+  updated_at: '2026-10-15T10:26:52.013167+00:00'
+  changelog: []

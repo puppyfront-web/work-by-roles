@@ -96,6 +96,21 @@ def cmd_run_team(args) -> int:
                 {"severity": "low", "title": f"演示发现@{rid}", "detail": "演示环境的示例发现（非真实漏洞）",
                  "location": "demo://placeholder", "citations": ["[^1] 演示证据"]},
             ], "confidence": 0.85}
+        elif "claims" in required:
+            payload = {"claims": [
+                {"claim": f"演示主张@{rid}", "verdict": "verified", "reason": "演示环境的示例核查（非真实核查）"},
+            ], "conclusion": f"{rid} 关于「{args.question}」的核查结论（演示）",
+               "confidence": 0.85, "citations": ["[^1] 演示证据"]}
+        elif "violations" in required:
+            payload = {"violations": [
+                {"severity": "low", "rule": "演示规则", "excerpt": "演示片段", "suggestion": "演示整改建议"},
+            ], "conclusion": f"{rid} 关于「{args.question}」的合规结论（演示）",
+               "confidence": 0.85, "citations": ["[^1] 演示证据"]}
+        elif "scores" in required:
+            payload = {"scores": {"钩子": 0.8, "结构": 0.8, "行动引导": 0.8},
+                       "rewrite_suggestions": ["演示改写建议"],
+                       "conclusion": f"{rid} 关于「{args.question}」的转化力结论（演示）",
+                       "confidence": 0.85, "citations": ["[^1] 演示证据"]}
         else:
             payload = {"conclusion": f"{rid} 关于「{args.question}」的结构化结论（演示）",
                        "confidence": 0.85, "citations": ["[^1] 演示证据"]}

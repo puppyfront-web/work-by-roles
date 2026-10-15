@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- **第三个官方专家团模板 `content_review_team`（内容营销会审团）**：协调者 + 事实核查 / 平台合规 / 转化力三位专家 + 终审复核人（事实准确性 0.4 / 合规安全性 0.4 / 转化力 0.2 三维评审标准）；协调者 SOP 支持把核心卖点交叉分派给事实核查与转化力专家，分歧自动留存；CLI 与画布演示 Invoker 按"契约 Schema required 字段"生成对应形状的演示输出（claims / violations / scores / findings）
 - **真实模型一键接入**：`OpenAICompatInvoker`（`wbr/adapters/llm/`）——任何 OpenAI 兼容 `/chat/completions` 端点均可接入（OpenAI / DeepSeek / Kimi / Qwen / GLM / Ollama / vLLM）；三个环境变量 `WBR_LLM_API_KEY` / `WBR_LLM_MODEL` / `WBR_LLM_BASE_URL` 即配置完成；支持按角色覆盖模型（`model_by_role`）、429/5xx 指数退避重试
 - **CLI `--live`**：`wbr run-team <team> <question> --live` 走真实模型；缺配置时给出明确指引；默认仍为零依赖演示模式
 - **API 自动切换**：`create_app` 检测到 `WBR_LLM_*` 环境变量自动启用真实 Invoker，`/api/v1/healthz` 与画布页头显示当前模式（真实模型/演示模式）
