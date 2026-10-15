@@ -1,0 +1,38 @@
+site_name: work-by-roles · LLM 专家团治理系统
+site_description: 角色契约 · 会审范式 · 质量门禁 · 全链路审计
+repo_url: https://github.com/puppyfront-web/work-by-roles
+repo_name: puppyfront-web/work-by-roles
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: 暗色模式
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 亮色模式
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+
+nav:
+  - 首页: index.md
+  - 架构设计: ARCHITECTURE_V2.md
+  - SDK 全量 API: SDK.md
+  - LangGraph 接入: INTEGRATION_LANGGRAPH.md
+  - Harness 回归与指标: HARNESS.md
+  - 部署指南: DEPLOY.md
+  - 真实项目验证: REAL_WORLD_VALIDATION.md
+  - 设计规格: spec/README.md
+  - 验收总结: acceptance/FINAL.md
+
+exclude_docs: |
+  plan/

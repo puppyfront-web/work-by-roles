@@ -115,5 +115,5 @@ class LangChainInvoker:
         return ModelResponse(text=resp.content, usage=TokenUsage(prompt_tokens=0, completion_tokens=0))
 ```
 
-可运行示例：[examples/phase2/legacy_plugin_integration.py](../examples/phase2/legacy_plugin_integration.py)、
-[examples/phase2/native_graph.py](../examples/phase2/native_graph.py)。
+可运行示例：[examples/phase2/legacy_plugin_integration.py](https://github.com/puppyfront-web/work-by-roles/blob/main/examples/phase2/legacy_plugin_integration.py)、
+[examples/phase2/native_graph.py](https://github.com/puppyfront-web/work-by-roles/blob/main/examples/phase2/native_graph.py)。

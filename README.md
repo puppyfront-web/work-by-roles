@@ -5,7 +5,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-2.1.1-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-373%20passing-brightgreen.svg)](#开发与测试)
+[![CI](https://github.com/puppyfront-web/work-by-roles/actions/workflows/ci.yml/badge.svg)](https://github.com/puppyfront-web/work-by-roles/actions/workflows/ci.yml)
 
 [中文](README.md) | [English](README_EN.md)
 

@@ -50,4 +50,4 @@ if diff["degradations"]:
 每次回归/会审的完整链路可导出标准审计包（`AuditPackBuilder`，JSON、脱敏 + content_digest），
 满足"可追溯交付物"要求。
 
-示例：[examples/phase3_harness_demo.py](../examples/phase3_harness_demo.py)（运行即见退化检出输出）。
+示例：[examples/phase3_harness_demo.py](https://github.com/puppyfront-web/work-by-roles/blob/main/examples/phase3_harness_demo.py)（运行即见退化检出输出）。

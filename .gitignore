@@ -45,3 +45,6 @@ build/
 
 .venv/
 .coverage
+
+# mkdocs build output
+site/

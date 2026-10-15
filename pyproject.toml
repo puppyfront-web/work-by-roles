@@ -55,6 +55,9 @@ server = [
 redis = [
   "redis>=5.0",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+]
 
 [project.scripts]
 wbr = "wbr.cli:main"
