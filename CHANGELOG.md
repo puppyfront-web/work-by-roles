@@ -5,7 +5,7 @@
 ## [Unreleased]
 
 ### Fixed
-- **真实模型首跑暴露的三个引擎缺陷**（DeepSeek deepseek-chat 实测，案例见 docs/REAL_WORLD_VALIDATION.md §7）：
+- **真实模型首跑暴露的三个引擎缺陷**（DeepSeek deepseek-chat 实测）：
   1. Verifier 返回嵌套 scores（`{"维度": {"score": …}}`）时 Verdict 构造崩溃 → `_coerce_scores` 容错转换
   2. 禁区字面匹配把"模型自检时复述规则原文"系统性误判为违规（规则本身编译进 system prompt）→ 否定感知 tripwire（规则拆段 + 命中前近旁否定词豁免）
   3. 专家输入只含协调者子指令、不携带原始问题 → 真实协调者产出薄指令时专家集体跑题/拒稿 → 专家输入改为"原始问题 + [你的子任务]"，回归测试断言 user_block 必含原始问题
