@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **真实模型首跑暴露的三个引擎缺陷**（DeepSeek deepseek-chat 实测，案例见 docs/REAL_WORLD_VALIDATION.md §7）：
+  1. Verifier 返回嵌套 scores（`{"维度": {"score": …}}`）时 Verdict 构造崩溃 → `_coerce_scores` 容错转换
+  2. 禁区字面匹配把"模型自检时复述规则原文"系统性误判为违规（规则本身编译进 system prompt）→ 否定感知 tripwire（规则拆段 + 命中前近旁否定词豁免）
+  3. 专家输入只含协调者子指令、不携带原始问题 → 真实协调者产出薄指令时专家集体跑题/拒稿 → 专家输入改为"原始问题 + [你的子任务]"，回归测试断言 user_block 必含原始问题
+
 ### Added
 - **定位纠偏 + 第四个官方模板 `content_creation_team`（多角度竞稿团）**：专家团不等于评审团——会审范式同样适用于生产场景。构成：创作协调者 + 故事型 / 干货型 / 案例数据型三位写手并行竞稿 + 主编终审（平台调性 0.35 / 内容质量 0.35 / 目标达成 0.3），复核人承担主编 / 质量门禁角色，final_answer 即终稿全文；写手契约内置禁区（禁止编造数据、禁止虚构敏感领域经历等）
 - **`SchemaDemoInvoker`（`wbr/adapters/demo.py`）**：通用 Schema 驱动演示 Invoker——按契约输出 Schema 递归生成满足 required 约束的确定性回放（enum 取首项 / number 0.85 / minLength 自动补齐），任意新模板演示零违例，CLI 与画布统一替换；新增防回归测试"全部官方模板 × 演示 Invoker 零违例跑通"

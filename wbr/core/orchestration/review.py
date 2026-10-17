@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -163,7 +164,7 @@ class ReviewSession:
         question: str,
         *,
         context: dict[str, Any] | None = None,
-        loop_snapshots: list["LoopSummarySnapshot"] | None = None,
+        loop_snapshots: list[LoopSummarySnapshot] | None = None,
     ) -> ReviewResult:
         """执行会审。
 
@@ -182,7 +183,7 @@ class ReviewSession:
             plan = self._run_coordinator(question, result)
             result.coordinator_plan = plan
             assignments = self._normalize_assignments(plan, question)
-            outcomes = self._run_experts(assignments, result.trace_id)
+            outcomes = self._run_experts(assignments, result.trace_id, question=question)
             result.expert_outcomes = outcomes
             result.disagreements = self._detect_disagreements(outcomes)
             verdict = self._run_verifier(question, plan, outcomes)
@@ -230,12 +231,14 @@ class ReviewSession:
         return assignments
 
     # ---- 阶段：专家并行 ----
-    def _run_experts(self, assignments: dict[str, str], trace_id: str) -> list[ExpertOutcome]:
+    def _run_experts(
+        self, assignments: dict[str, str], trace_id: str, *, question: str = ""
+    ) -> list[ExpertOutcome]:
         ctx = current_context()
         workers = self._max_workers or min(len(self._experts), 8)
         with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="wbr-expert") as pool:
             futures = [
-                pool.submit(self._run_one_expert, contract, assignments, ctx)
+                pool.submit(self._run_one_expert, contract, assignments, ctx, question)
                 for contract in self._experts
             ]
             outcomes = [f.result() for f in futures]
@@ -243,7 +246,7 @@ class ReviewSession:
         return outcomes
 
     def _run_one_expert(
-        self, contract: RoleContract, assignments: dict[str, str], ctx
+        self, contract: RoleContract, assignments: dict[str, str], ctx, question: str = ""
     ) -> ExpertOutcome:
         apply_context(ctx)
         sub_question = assignments.get(contract.role_id, "")
@@ -264,7 +267,10 @@ class ReviewSession:
                     f"结论={snapshot.conclusion} 证据={snapshot.evidence}"
                 )
                 evidence = [*(evidence or []), loop_ctx]
-            compiled = self._compile(contract, sub_question, evidence=evidence)
+            # 专家输入必须携带原始问题：协调者的 sub_question 是聚焦指令，
+            # 不保证自包含（真实协调者常产出"写故事型初稿"这类薄指令）。
+            expert_input = f"{question}\n\n[你的子任务] {sub_question}" if sub_question else question
+            compiled = self._compile(contract, expert_input, evidence=evidence)
             response = self._invoke(contract, compiled, _trace_of(ctx))
             outcome.raw_text = response.text
             outcome.prompt_tokens = response.usage.prompt_tokens
@@ -346,7 +352,7 @@ class ReviewSession:
         self._check_contract_output(self._verifier, raw, raw_text=response.text)
         verdict = Verdict(
             passed=bool(raw.get("passed", False)),
-            scores={str(k): float(v) for k, v in (raw.get("scores") or {}).items()},
+            scores=self._coerce_scores(raw.get("scores")),
             comments=str(raw.get("comments", "")),
             judge_role_id=self._verifier.role_id,
             raw_output=raw,
@@ -367,6 +373,71 @@ class ReviewSession:
             payload={"passed": verdict.passed, "scores": verdict.scores},
         )
         return verdict
+
+    # ---- 真实模型输出的容错 ----
+    _NEGATIONS = ("未", "不", "没有", "不会", "不能", "不得", "切勿", "禁止", "避免", "严禁")
+
+    @staticmethod
+    def _coerce_scores(raw_scores: Any) -> dict[str, float]:
+        """把 Verifier 的 scores 容错转换为 dict[str, float]。
+
+        真实模型常返回嵌套结构（如 {"维度": {"score": 0.8, "评语": "…"}}）：
+        dict 优先取常见分数字段，否则取数值叶子的均值；字符串尝试转 float；
+        无法转换的键跳过（演示/老模板的平铺数字映射行为不变）。
+        """
+        if not isinstance(raw_scores, dict):
+            return {}
+        out: dict[str, float] = {}
+        for key, value in raw_scores.items():
+            num = ReviewSession._coerce_number(value)
+            if num is not None:
+                out[str(key)] = num
+        return out
+
+    @staticmethod
+    def _coerce_number(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        if isinstance(value, dict):
+            for field in ("score", "value", "rating", "points"):
+                if field in value:
+                    num = ReviewSession._coerce_number(value[field])
+                    if num is not None:
+                        return num
+            leafs = [n for n in (ReviewSession._coerce_number(v) for v in value.values()) if n is not None]
+            return sum(leafs) / len(leafs) if leafs else None
+        return None
+
+    @staticmethod
+    def _rule_segments(rule: str) -> list[str]:
+        """把禁区规则按标点拆成 ≥4 字语义段，作为字面 tripwire 的匹配单元。"""
+        segments = [p.strip() for p in re.split(r"[、，,;；。/]", rule) if len(p.strip()) >= 4]
+        if not segments and rule.strip():
+            segments = [rule.strip()]
+        return segments
+
+    @classmethod
+    def _forbidden_hit(cls, rule: str, text: str) -> bool:
+        """禁区字面 tripwire：规则段出现在输出、且前方紧邻无否定/自我约束词才计命中。
+
+        禁区规则会编译进 system prompt，模型在自检中复述规则（"我未编造数据"）
+        属于合规表现——纯字面匹配会把复述系统性误判为违规。
+        """
+        for segment in cls._rule_segments(rule):
+            start = text.find(segment)
+            while start != -1:
+                window = text[max(0, start - 12): start]
+                if not any(neg in window for neg in cls._NEGATIONS):
+                    return True
+                start = text.find(segment, start + 1)
+        return False
 
     # ---- 分歧检测（留存不仲裁） ----
     def _detect_disagreements(self, outcomes: list[ExpertOutcome]) -> list[Disagreement]:
@@ -420,12 +491,12 @@ class ReviewSession:
                 for e in errs
             )
         for b in contract.forbidden.behaviors:
-            if b and b in raw_text:
+            if b and self._forbidden_hit(b, raw_text):
                 violations.append(
                     Violation(kind=ViolationKind.FORBIDDEN, detail=f"命中禁止行为: {b}")
                 )
         for d in contract.forbidden.domains:
-            if d and d in raw_text:
+            if d and self._forbidden_hit(d, raw_text):
                 violations.append(
                     Violation(kind=ViolationKind.FORBIDDEN, detail=f"命中禁止回答域: {d}")
                 )
