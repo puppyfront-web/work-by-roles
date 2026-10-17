@@ -1,0 +1,1204 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="角色契约 · 会审范式 · 质量门禁 · 全链路审计">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>SPEC 自审核记录（SPEC-REVIEW） - work-by-roles · LLM 专家团治理系统</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spec-spec-review" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="work-by-roles · LLM 专家团治理系统" class="md-header__button md-logo" aria-label="work-by-roles · LLM 专家团治理系统" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            work-by-roles · LLM 专家团治理系统
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SPEC 自审核记录（SPEC-REVIEW）
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="暗色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="暗色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="亮色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="亮色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/puppyfront-web/work-by-roles" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    puppyfront-web/work-by-roles
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="work-by-roles · LLM 专家团治理系统" class="md-nav__button md-logo" aria-label="work-by-roles · LLM 专家团治理系统" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    work-by-roles · LLM 专家团治理系统
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/puppyfront-web/work-by-roles" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    puppyfront-web/work-by-roles
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ARCHITECTURE_V2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构设计
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../SDK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK 全量 API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../INTEGRATION_LANGGRAPH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph 接入
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../HARNESS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Harness 回归与指标
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../DEPLOY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    部署指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REAL_WORLD_VALIDATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    真实项目验证
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设计规格
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../acceptance/FINAL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    验收总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 方案要求覆盖矩阵
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 八条全局规则合规检查
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 发现问题与裁定（审核实录）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 可测试性审查
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 批准结论
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-v1x-spec-0072026-10-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. V1.x 迭代规格审核（SPEC-007，2026-10-14）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-v20-spec-0082026-10-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. V2.0 企业版规格审核（SPEC-008，2026-10-14）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-loopspec-0092026-10-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 意图与受控Loop规格审核（SPEC-009，2026-10-14）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-v211-review-2026-10-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. V2.1.1 代码 Review 与优化迭代留档（2026-10-14）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-v211" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 规格资产总索引（截至 V2.1.1）
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="spec-spec-review">SPEC 自审核记录（SPEC-REVIEW）</h1>
+<blockquote>
+<p>审核对象：SPEC-000 ~ SPEC-006。审核方法：①方案要求 ↔ SPEC 覆盖矩阵核对；②八条全局规则逐条合规检查；③矛盾/歧义/可测试性专项审查。结论：<strong>全部问题已闭环，SPEC 批准进入 Plan 阶段</strong>。</p>
+</blockquote>
+<h2 id="1">1. 方案要求覆盖矩阵</h2>
+<table>
+<thead>
+<tr>
+<th>方案要求</th>
+<th>SPEC 覆盖</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>三层架构 + 依赖方向</td>
+<td>SPEC-000 §2</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>RoleContract 全字段（10 组）</td>
+<td>SPEC-002 §1</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>契约编译器（护栏头/隔离用户输入/防劫持）</td>
+<td>SPEC-002 §2</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>契约版本 Diff（字段/规则/Schema/禁区）</td>
+<td>SPEC-002 §3（category 四类全覆盖）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>基础审计模型 + 行为记录 + Trace 链路</td>
+<td>SPEC-002 §4</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>四层记忆抽象 + 内存实现</td>
+<td>SPEC-002 §5</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>最简会审 Coordinator→专家并行→Verifier</td>
+<td>SPEC-002 §6</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>LangGraph 适配（Message/State/双拦截器/权限/HITL/Checkpointer）</td>
+<td>SPEC-003 §1</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>记忆持久化 Redis 隔离</td>
+<td>SPEC-003 §2</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>安全 V1（一阶/二阶防注入 + 边界隔离符）</td>
+<td>SPEC-003 §3</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Token 计量（角色/步骤/任务 + 超限降级）</td>
+<td>SPEC-003 §4</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>两种接入示例（嵌入/原生）</td>
+<td>SPEC-003 §5</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>3 行代码接入存量项目</td>
+<td>SPEC-003 §1.5（WBRGuard.wrap）+ 验收测试</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Harness（用例库/基线快照/回归引擎/六项指标）</td>
+<td>SPEC-004 §1</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>AI Judge 钩子 + 基础实现</td>
+<td>SPEC-004 §1.5</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>缓存 Key 三要素 + 契约变更失效 + 命中率</td>
+<td>SPEC-004 §2</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>审计包导出 JSON</td>
+<td>SPEC-004 §3</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>FastAPI（契约 CRUD/会审调度/回归/审计导出）</td>
+<td>SPEC-005 §1</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>画布（拖拽/编辑/流程可视化/分歧高亮）</td>
+<td>SPEC-005 §2</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>异步任务队列</td>
+<td>SPEC-005 §3</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>两套官方模板（架构评审/安全审计）</td>
+<td>SPEC-006 §1</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>文档/示例/PyPI 打包/性能加固</td>
+<td>SPEC-006 §2-§5</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>V1.x/V2.0 内容不开发</td>
+<td>SPEC-000 §2.1 明示禁做清单</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2">2. 八条全局规则合规检查</h2>
+<table>
+<thead>
+<tr>
+<th>规则</th>
+<th>合规性说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 阶段顺序、不超前</td>
+<td>每 SPEC 设"非目标"小节；V1.x/V2.0 禁做清单（SPEC-000 §2.1）</td>
+</tr>
+<tr>
+<td>2 只做当前阶段</td>
+<td>Plan 以阶段为闸口，验收报告未过不开下一阶段</td>
+</tr>
+<tr>
+<td>3 阶段五件套</td>
+<td>各 SPEC"验收标准→测试映射"含代码/测试/示例/文档/自测报告（docs/acceptance/）</td>
+</tr>
+<tr>
+<td>4 契约优先等五原则</td>
+<td>契约模型为一切行为源头；审计/回归/插拔（StorageBackend、ModelInvoker、JudgeHook、TaskQueue、CacheBackend 五大可插拔点）</td>
+</tr>
+<tr>
+<td>5 Core 框架无关</td>
+<td>D-01 依赖白名单；SPEC-000 §2 import 方向禁令 + 阶段0 结构测试静态检查</td>
+</tr>
+<tr>
+<td>6 声明式契约、禁硬编码</td>
+<td>全部策略入 RoleContract；拦截器行为由 contract.strict/whitelist 驱动</td>
+</tr>
+<tr>
+<td>7 强类型 Pydantic V2</td>
+<td>所有模型 Pydantic V2；可序列化/可 Diff/可持久化为各 SPEC 验收项</td>
+</tr>
+<tr>
+<td>8 SDK 优先、画布不耦合内核</td>
+<td>D-10：画布仅消费 API；内核全部能力无 API 可独立使用（阶段1/3 示例证明）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3">3. 发现问题与裁定（审核实录）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>裁定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td>方案自相矛盾：要求"Core 无第三方依赖"又要求"全程 Pydantic V2"</td>
+<td><strong>D-01</strong>：Pydantic V2 为 Core 唯一许可依赖；JSON Schema 校验自研子集（D-08），PyYAML 外置（D-15）</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>存量 <code>work_by_roles/core</code> 与新三层架构目录冲突，存量 157 项测试不可破坏</td>
+<td><strong>D-02</strong>：新系统独立包 <code>wbr</code>，存量包冻结只读，作为回归基线</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>存量 <code>requires-python&gt;=3.8</code> 与 LangGraph/现代 Pydantic 冲突</td>
+<td><strong>D-03</strong>：新包要求 ≥3.10；存量代码在 3.13 验证可运行，无兼容损失</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>测试环境无 Redis 服务，"Redis 记忆持久化"不可直接集成测试</td>
+<td><strong>D-04</strong>：客户端注入 + 进程内 Fake 同协议测试；真连测 env 门控跳过</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>"多专家并行"未定义并发模型与结果确定性</td>
+<td><strong>D-05</strong>：ThreadPoolExecutor + 按契约 ID 排序；专家失败不阻断全场</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>Core 发起真实 LLM 调用将违反"框架无关+可测试"</td>
+<td><strong>D-06</strong>：ModelInvoker 协议；Core 永无网络调用；示例脚本化</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Token 精确计数依赖 tiktoken（第三方）</td>
+<td><strong>D-07</strong>：确定性启发式计数器 + 可替换协议；精确计量留 V1.x</td>
+</tr>
+<tr>
+<td>R8</td>
+<td>"断点续跑兼容 Checkpointer"可能被包装破坏 State 结构</td>
+<td>SPEC-003 §1.5：仅追加命名空间键 <code>wbr__meta</code>；MemorySaver 中断恢复纳入验收测试</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>"分歧留存"未定义检出语义，易被实现为仲裁</td>
+<td>SPEC-002 §6：同子问题结论冲突即记录 Disagreement，禁止仲裁抹平</td>
+</tr>
+<tr>
+<td>R10</td>
+<td>"专家结论稳定性"指标需重复运行语义</td>
+<td>SPEC-004 §1.4：stability_runs 参数显式化</td>
+</tr>
+<tr>
+<td>R11</td>
+<td>画布若引入 Node 构建链将违反"极简 MVP"与交付环境约束</td>
+<td><strong>D-10</strong>：原生 JS+SVG SPA，FastAPI 静态托管</td>
+</tr>
+<tr>
+<td>R12</td>
+<td>异步队列若引 Celery/Redis broker 则超阶段范围且环境不可用</td>
+<td><strong>D-11</strong>：进程内 asyncio 队列 + JSON 落盘恢复，Protocol 预留替换</td>
+</tr>
+<tr>
+<td>R13</td>
+<td>无证据时缓存 Key 的证据快照 ID 未定义</td>
+<td>SPEC-004 §2.1：取字面量 <code>"none"</code></td>
+</tr>
+<tr>
+<td>R14</td>
+<td>审计包导出含专家全文存在泄露风险</td>
+<td>SPEC-004 §3：默认脱敏（摘要+digest），<code>include_contents</code> 显式开关</td>
+</tr>
+<tr>
+<td>R15</td>
+<td>langgraph/fastapi 缺失时 import 即崩，违背"可关闭可配置"</td>
+<td>SPEC-003/005：可选依赖惰性 import，缺失抛带安装指引的错误</td>
+</tr>
+<tr>
+<td>R16</td>
+<td>Verifier 评审标准可被误配到 Coordinator/Expert</td>
+<td>SPEC-002 §1：模型级跨字段校验（Verifier 必有、Coordinator 必无）</td>
+</tr>
+<tr>
+<td>R17</td>
+<td>legacy 测试基线存在 1 项失败（test_learning_module_config）</td>
+<td>记录为存量已知问题，不属于本方案范围；最终回归标准=不新增失败</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4">4. 可测试性审查</h2>
+<ul>
+<li>全部验收标准均映射到具名测试文件与具名用例（各 SPEC 末节），无"不可验证验收项"。</li>
+<li>量化门禁：核心六模块行覆盖率 ≥90%（pytest-cov 实测）；存量回归零新增失败。</li>
+<li>全部测试不依赖外部服务（Redis 真连测除外，env 门控跳过）与外部 LLM API。</li>
+</ul>
+<h2 id="5">5. 批准结论</h2>
+<p>SPEC-000~006 通过审核，进入 Plan/TESTCASES 设计（docs/plan/）。此后 SPEC 变更须在本文件追加变更记录。</p>
+<h2 id="6-v1x-spec-0072026-10-14">6. V1.x 迭代规格审核（SPEC-007，2026-10-14）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>裁定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R18</td>
+<td>RoleContract 为"最终版长期不改"，知识库权限如何声明而不动契约？</td>
+<td>知识库锚定 <code>ROLE_STATIC</code> 记忆层语义：写=需 write_layers 含 ROLE_STATIC，读=需 read_layers 含 ROLE_STATIC（或文档标记 shared）；契约零改动</td>
+</tr>
+<tr>
+<td>R19</td>
+<td>语义缓存若跨契约命中会脏读</td>
+<td>语义命中前置条件锁定：契约哈希+证据快照必须精确一致，仅问题文本允许近似</td>
+</tr>
+<tr>
+<td>R20</td>
+<td>MCP SDK 是否入 Core</td>
+<td>否。Core 定义 MCPClient 协议；mcp SDK 仅在 adapters 惰性导入（延续 D-01/R15）</td>
+</tr>
+<tr>
+<td>R21</td>
+<td>OTel 依赖缺失是否阻塞</td>
+<td>否。OTelBridge 支持注入 stub tracer 测试；装配真实 SDK 时才要求 opentelemetry（R15）</td>
+</tr>
+<tr>
+<td>R22</td>
+<td>反馈闭环落点</td>
+<td>down 反馈聚合 → GoldenCase（复用 RegressionEngine），不新建评估通道；事件入审计</td>
+</tr>
+<tr>
+<td>R23</td>
+<td>脱敏占位符稳定性</td>
+<td>同值同占位符（带序号映射表），保证审计可比对</td>
+</tr>
+</tbody>
+</table>
+<p>结论：SPEC-007 通过审核。</p>
+<h2 id="7-v20-spec-0082026-10-14">7. V2.0 企业版规格审核（SPEC-008，2026-10-14）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>裁定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R24</td>
+<td>哈希链与既有 AuditTrail 关系</td>
+<td>并存：HashChainTrail 门面同时写 trail 与链；不改造 AuditTrail 本体（存量零影响）</td>
+</tr>
+<tr>
+<td>R25</td>
+<td>Workspace 与 App 层 JsonFileStore 的关系</td>
+<td>Core 提供 WorkspaceRegistry（目录/命名空间语义）；App 层后续可接线，本次不动 API 路由</td>
+</tr>
+<tr>
+<td>R26</td>
+<td>辩论是否违反"分歧留存不仲裁"</td>
+<td>不违反：辩论受控于已检出 disagreement、轮次封顶、concedes 为专家自证；unresolved 仍原样留存</td>
+</tr>
+<tr>
+<td>R27</td>
+<td>A/B winner 平局处理</td>
+<td>三级判定（pass_rate → forbidden_rate → None 保守不切换），避免误导性自动切换</td>
+</tr>
+<tr>
+<td>R28</td>
+<td>Bundle 完整性算法</td>
+<td>与 D-09 一致：canonical JSON + sha256，manifest 逐文件 digest + 总 digest</td>
+</tr>
+</tbody>
+</table>
+<p>结论：SPEC-008 通过审核。
+| R29 | WorkspaceRegistry 依赖 ContractRegistry（App 层）违反 Core→App 禁令 | 模块移至 <code>wbr/app/workspace.py</code>（组合层），隔离语义不变 |</p>
+<h2 id="8-loopspec-0092026-10-14">8. 意图与受控Loop规格审核（SPEC-009，2026-10-14）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>裁定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R30</td>
+<td>契约"最终版不改"与新增 intent_policy/inner_loop 字段冲突</td>
+<td>增量可选字段（默认 None），旧 JSON 完全兼容；纳入内容哈希（改阈值=新版本=Diff 可见），符合补充方案"阈值入契约"要求</td>
+</tr>
+<tr>
+<td>R31</td>
+<td>辩论Loop已在 V2.0 实现，是否返工</td>
+<td>不返工：V2.0 DebateModerator 已满足红线大部分；本迭代只增量补"每轮收敛评估+超限转HITL"</td>
+</tr>
+<tr>
+<td>R32</td>
+<td>意图分类的"轻量查询"分支绕过多专家是否安全</td>
+<td>由 IntentPolicy.allow_lightweight 显式开关（默认 False），且 light 分支仍走单专家契约+全套校验</td>
+</tr>
+<tr>
+<td>R33</td>
+<td>内循环 token 预算耗尽语义</td>
+<td>契约二选一：escalate_hitl（默认）或 force_exit；绝不静默继续</td>
+</tr>
+<tr>
+<td>R34</td>
+<td>意图推理本身是否需要审计</td>
+<td>强制：INTENT_REASONING 事件含 reasoning_trace 摘要与 policy_snapshot（防事后改阈值不可追溯）</td>
+</tr>
+<tr>
+<td>R35</td>
+<td>补充方案中"阶段1/2 时序"已过时（V2.0 已交付）</td>
+<td>按现状一次性落地于 2.1.0；原阶段验收追加条款并入 PHASE8 报告核对表</td>
+</tr>
+</tbody>
+</table>
+<p>结论：SPEC-009 通过审核。</p>
+<h2 id="9-v211-review-2026-10-14">9. V2.1.1 代码 Review 与优化迭代留档（2026-10-14）</h2>
+<blockquote>
+<p>依据：用户指令"完成开发周期后 review、代码优化、交付"。本迭代无新 SPEC（纯优化补丁，无 API 变更），留存于验收侧 <a href="../../acceptance/REVIEW-V2.1/">acceptance/REVIEW-V2.1.md</a>，此处登记结论：</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>事项</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R36</td>
+<td>审计轨迹锁失效（PLW2101：<code>with threading.Lock()</code> 每次新建）</td>
+<td><strong>已修复</strong>：AuditTrail 实例级 RLock 字段（pydantic exclude），并行专家写审计竞态消除</td>
+</tr>
+<tr>
+<td>R37</td>
+<td>F821 潜在炸弹 ×3（engine/metrics 的 TYPE_CHECKING 导入缺失）</td>
+<td><strong>已修复</strong>：注解名全量可解析</td>
+</tr>
+<tr>
+<td>R38</td>
+<td>静态清零</td>
+<td>ruff <code>--select F,E9</code> 全绿；139 项可自动项修复；刻意保留的兜底 except（总线/桥零反噬设计）留档于 REVIEW-V2.1.md §1</td>
+</tr>
+<tr>
+<td>R39</td>
+<td>SPEC-009 完整性缺口（§4.4 循环快照未接主流程）</td>
+<td><strong>已闭环</strong>：<code>ReviewSession.run(loop_snapshots=...)</code> 按角色注入专家 evidence 通道，含集成测试</td>
+</tr>
+<tr>
+<td>R40</td>
+<td>版本 2.1.1（补丁级：无 API 变更）；验证 356 passed / 1 skipped，存量回归零差异</td>
+<td>交付</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-v211">10. 规格资产总索引（截至 V2.1.1）</h2>
+<table>
+<thead>
+<tr>
+<th>迭代</th>
+<th>SPEC</th>
+<th>审核裁定</th>
+<th>验收报告</th>
+<th>版本</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>五阶段基础</td>
+<td>SPEC-000~006</td>
+<td>§1~§5（R1~R17）</td>
+<td>PHASE0~5 + FINAL</td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td>V1.x 生态扩展</td>
+<td>SPEC-007</td>
+<td>§6（R18~R23）</td>
+<td>PHASE6</td>
+<td>1.1.0</td>
+</tr>
+<tr>
+<td>V2.0 企业版</td>
+<td>SPEC-008</td>
+<td>§7（R24~R29）</td>
+<td>PHASE7</td>
+<td>2.0.0</td>
+</tr>
+<tr>
+<td>意图与受控Loop</td>
+<td>SPEC-009</td>
+<td>§8（R30~R35）</td>
+<td>PHASE8</td>
+<td>2.1.0</td>
+</tr>
+<tr>
+<td>Review 优化</td>
+<td>—（无新 SPEC）</td>
+<td>§9（R36~R40）</td>
+<td>REVIEW-V2.1</td>
+<td>2.1.1</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
