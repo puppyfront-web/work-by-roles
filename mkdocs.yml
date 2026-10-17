@@ -36,3 +36,4 @@ nav:
 
 exclude_docs: |
   plan/
+  blog/
