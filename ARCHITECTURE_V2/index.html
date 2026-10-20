@@ -1,0 +1,1182 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="角色契约 · 会审范式 · 质量门禁 · 全链路审计">
+      
+      
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../SDK/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>架构设计 - work-by-roles · LLM 专家团治理系统</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#work-by-roles-v211" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href=".." title="work-by-roles · LLM 专家团治理系统" class="md-header__button md-logo" aria-label="work-by-roles · LLM 专家团治理系统" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            work-by-roles · LLM 专家团治理系统
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              架构设计
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="暗色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="暗色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="亮色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="亮色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/puppyfront-web/work-by-roles" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    puppyfront-web/work-by-roles
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="work-by-roles · LLM 专家团治理系统" class="md-nav__button md-logo" aria-label="work-by-roles · LLM 专家团治理系统" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    work-by-roles · LLM 专家团治理系统
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/puppyfront-web/work-by-roles" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    puppyfront-web/work-by-roles
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构设计
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构设计
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 系统定位
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 分层架构总图
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 核心运行时流程
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 核心运行时流程">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 主会审流程（不变式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 质量门禁回路（Harness 闭环）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 关键设计决策（定案，含裁定编号）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 安全模型（纵深四层）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 可观测性
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 可插拔点汇总（全部有 Protocol + 默认实现 + 测试）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 部署形态
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 质量门禁（持续有效的工程约束）
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SDK/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK 全量 API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../INTEGRATION_LANGGRAPH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LangGraph 接入
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../HARNESS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Harness 回归与指标
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    部署指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REAL_WORLD_VALIDATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    真实项目验证
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设计规格
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../acceptance/FINAL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    验收总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 系统定位
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 分层架构总图
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 核心运行时流程
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 核心运行时流程">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 主会审流程（不变式）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 质量门禁回路（Harness 闭环）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 关键设计决策（定案，含裁定编号）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 安全模型（纵深四层）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 可观测性
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 可插拔点汇总（全部有 Protocol + 默认实现 + 测试）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 部署形态
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 质量门禁（持续有效的工程约束）
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="work-by-roles-v211">work-by-roles 专家团治理系统 · V2.1.1 架构设计方案</h1>
+<blockquote>
+<p>状态：与代码同步（V2.1.1）· 上游规格：docs/spec/SPEC-000~009 · 验收证据：docs/acceptance/</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 系统定位</h2>
+<p><strong>契约驱动、会审范式原生、带原生 Harness 质量门禁的开源专家团治理系统。</strong></p>
+<p>三条顶层原则（贯穿全部设计）：</p>
+<ol>
+<li><strong>契约优先</strong>：一切角色行为约束（职责 SOP、禁区、输出 Schema、证据规范、工具白名单、记忆权限、Token 配额、意图策略、循环参数）声明式写入 <code>RoleContract</code>，版本化 + 内容哈希定版，禁止业务硬编码。</li>
+<li><strong>会审主流程不变式</strong>：<code>Coordinator 拆解 → 多专家并行 → Verifier 复核 → 分歧留存/升级 HITL</code> 是 DAG 状态机；意图推理是 Coordinator 内部子模块，Agent Loop 只存在于"单角色内部"与"受控辩论"两种受控形态，<strong>顶层永不无限循环</strong>。</li>
+<li><strong>分层纯净</strong>：Core 仅依赖 stdlib + Pydantic V2（AST 静态扫描测试守护）；所有第三方（LangGraph/MCP/Redis/OTel/FastAPI）隔离在 Adapter/App 层，且全部可选、缺失给安装指引。</li>
+</ol>
+<h2 id="2">2. 分层架构总图</h2>
+<pre><code>┌────────────────────────────────────────────────────────────────────────┐
+│ App 层  wbr/app/                                                       │
+│  ├ api/        FastAPI 服务（契约CRUD/会审调度/Harness回归/审计导出/画布托管）│
+│  ├ canvas/     专家画布 SPA（拖拽建团/契约编辑/运行/分歧红色高亮，零构建）      │
+│  ├ tasks/      TaskQueue 协议：InProcessTaskQueue(asyncio) / Inline /      │
+│  │             JsonTaskStore 落盘恢复（DONE可查、PENDING重投递）             │
+│  ├ store.py    ContractRegistry（契约 CRUD + 全版本快照 + Diff）           │
+│  └ workspace.py 多 Workspace 隔离（契约/用例/任务/记忆四维，跨域显式复制带血缘）│
+├────────────────────────────────────────────────────────────────────────┤
+│ Adapter 层  wbr/adapters/    （全部可选依赖，惰性导入）                    │
+│  ├ langgraph/  WBRGuard 3行接入存量图 · 拦截器 · HITL(interrupt/Command)   │
+│  │             · build_review_graph 原生会审图 · Checkpointer 兼容         │
+│  ├ mcp/        MCPToolBridge（白名单前置+二阶防护+脱敏）· StdioMCPClient    │
+│  ├ storage/    InMemory/Redis 存储后端 · 持久化记忆门面 · RedisCacheBackend│
+│  └ observability/  OTelBridge：审计总线 → OTel span/指标（零侵入订阅）      │
+├────────────────────────────────────────────────────────────────────────┤
+│ Core 层  wbr/core/    （仅 stdlib + Pydantic V2，框架无关、无网络调用）     │
+│  contract/   RoleContract · ContractCompiler · ContractDiffEngine         │
+│  schema/     自研 JSON Schema 子集校验器（零依赖）                          │
+│  orchestration/  ReviewSession(会审状态机) · IntentPipeline(意图推理)      │
+│                  · InnerLoopExecutor(类型A受控内循环) · DebateModerator    │
+│                  · HITL审批状态机 · ModelInvoker协议/ScriptedInvoker       │
+│  memory/     四层隔离记忆（role_static/role_session/task_scratch/global）  │
+│  security/   注入检测规则库 · 边界隔离符 · 内容脱敏Redactor · 风控策略       │
+│  token/      启发式计数 · 三维计量(TokenMeter) · 预算降级(TokenBudget)      │
+│  cache/      ContractBoundCache(精确) · SemanticCache(语义) · LRU后端      │
+│  knowledge/  角色独立知识库（权限锚定记忆层，检索接 evidence 通道）           │
+│  harness/    回归引擎 · 基线快照 · 六项指标 · AI Judge 钩子 · 反馈闭环      │
+│              · IntentMetrics/LoopMetrics/DebateLoopMetrics                │
+│  audit/      强类型事件 · AuditTrail · 审计包导出 · 防篡改哈希链            │
+│  bundle/     基线 Bundle（契约+用例+基线三位一体，manifest 双层校验）        │
+│  experiment/ 灰度 A/B（确定性分流 + 三级保守裁决）                          │
+│  loop_config/canonical/constants/context/config/exceptions/logging       │
+├────────────────────────────────────────────────────────────────────────┤
+│ 资源  wbr/templates/teams/  arch_review_team · security_audit_team        │
+│ CLI   wbr.cli  →  wbr version / list-teams / show-team / run-team         │
+└────────────────────────────────────────────────────────────────────────┘
+依赖方向强制：App → Adapter → Core，禁止反向与跨层（结构测试 + AST 扫描双重守护）
+</code></pre>
+<h2 id="3">3. 核心运行时流程</h2>
+<h3 id="31">3.1 主会审流程（不变式）</h3>
+<pre><code>用户问题
+   │
+   ▼
+┌─────────────────── Coordinator（内部含意图推理流水线）──────────────────┐
+│ 1 安全过滤(guard) → 2 意图分类(契约Prompt+Schema校验) → 3 置信阈值判定    │
+│ 4 要素抽取 → 5 冲突检测(禁区比对) → 6 决策                              │
+│   next_action: run_disassemble │ ask_user │ reject │ lightweight_single │
+└──────────────┬─────────────────────────────────────────────────────────┘
+               ▼ run_disassemble
+   ┌───────── Coordinator 拆解：assignments[{expert, sub_question}] ─────────┐
+   ▼                                                                        ▼
+专家1 ┌──────────── 单角色内部受控循环（可选，契约 inner_loop）───────────┐ 专家2 …
+     │ 推理→证据不足→MCP/检索→再推理…                                    │
+     │ 退出三选一：证据充足 / max_rounds(标记风险) / loop配额耗尽(转HITL)  │
+     │ 每轮 LOOP_STEP 审计 · 角色私有记忆 · 缓存命中跳过                    │
+     └──────────────► 输出【快照摘要】进主流程（原始消息不灌入）◄──────────┘
+   │
+   ▼ 全部专家输出 → Schema 校验 + 禁区检测 + 证据完备检查（strict 违规=FAILED）
+   │
+   ├─► 分歧检测：同子问题 conclusion 冲突 → Disagreement（留存不仲裁）
+   │        └─► 受控辩论（V2.1 合规）：轮次封顶 · 每轮 Verifier 收敛评估
+   │                · 未收敛 escalated_to_hitl=True
+   ▼
+Verifier 独立复核（ReviewCriteria 多维评分）
+   ▼
+final_answer（通过=综合结论；未通过=标注复核意见）
+   │
+   ▼ 全链路审计：INTENT_REASONING / LOOP_STEP / SCHEMA_VIOLATION /
+              FORBIDDEN_VIOLATION / VERIFIER_VERDICT / REVIEW_COMPLETED …
+</code></pre>
+<h3 id="32-harness">3.2 质量门禁回路（Harness 闭环）</h3>
+<pre><code>黄金用例库 CaseSuite ──► 基线快照（契约哈希+用例哈希+模型指纹锁定）
+        │                        │
+        ▼                        ▼
+  RegressionEngine.run_suite ──► RegressionReport（六项指标 + AI Judge 分）
+        │                          │
+        ▼                          ▼
+  改契约（Diff 可见）◄──── compare_with：能力退化自动检测（阈值 -0.05）
+        │
+        └─► 契约变更 ⇒ 语义/精确缓存自动失效（Key 绑定契约哈希）
+线上负反馈 ──► FeedbackLoop ──► down 聚合为黄金用例 ──► 回归（闭环）
+</code></pre>
+<h2 id="4">4. 关键设计决策（定案，含裁定编号）</h2>
+<table>
+<thead>
+<tr>
+<th>决策</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D-01 Core 依赖</td>
+<td>仅 stdlib + Pydantic V2；JSON Schema 子集校验器自研；YAML/MCP/OTel 均在层外</td>
+</tr>
+<tr>
+<td>D-04 Redis 可测</td>
+<td>客户端注入协议；测试用同构 Fake，真连测 env 门控</td>
+</tr>
+<tr>
+<td>D-05 专家并行</td>
+<td>ThreadPool + TraceContext 显式传递 + role_id 确定性排序；单专家失败降级不阻断</td>
+</tr>
+<tr>
+<td>D-06 模型接缝</td>
+<td><code>ModelInvoker</code> 协议是唯一模型入口；Core 无网络调用；测试/示例用 ScriptedInvoker</td>
+</tr>
+<tr>
+<td>D-08 Schema 校验</td>
+<td>Core 自研子集校验器（98% 覆盖），Adapter 可选 jsonschema 增强</td>
+</tr>
+<tr>
+<td>D-09 完整性算法</td>
+<td>canonical JSON（排序键/不转义/紧凑）+ sha256；契约哈希/Bundle/哈希链/审计包统一复用</td>
+</tr>
+<tr>
+<td>D-12 HITL</td>
+<td>Core 状态机（PENDING→APPROVED/REJECTED/ESCALATED）；Adapter 映射 interrupt/Command(resume)</td>
+</tr>
+<tr>
+<td>D-14 审计总线</td>
+<td>有界队列+溢出丢弃计数+订阅者异常自吞——可观测层绝不反噬业务流</td>
+</tr>
+<tr>
+<td>R18 知识库权限</td>
+<td>锚定 ROLE_STATIC 记忆层语义，RoleContract 零改动</td>
+</tr>
+<tr>
+<td>R19 语义缓存防脏读</td>
+<td>契约哈希+证据快照精确一致才允许语义命中</td>
+</tr>
+<tr>
+<td>R26 辩论红线</td>
+<td>受控分歧辩论，unresolved 原样留存，禁止仲裁抹平</td>
+</tr>
+<tr>
+<td>R30 契约增量字段</td>
+<td>intent_policy/inner_loop 可选、进内容哈希（改阈值=新版本=Diff 可见=缓存失效）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5">5. 安全模型（纵深四层）</h2>
+<ol>
+<li><strong>输入侧</strong>：<code>InjectionDetector</code> 中英双语规则库（20+ 攻击样例回归）→ <code>guard_user_input</code> 按策略放行/清洗/阻断；</li>
+<li><strong>边界侧</strong>：外部内容（工具/MCP 返回）以 <code>wrap_external_content</code> 包裹 + 二阶注入扫描 + 边界符转义（编译器同样转义用户输入中的伪造边界）；</li>
+<li><strong>权限侧</strong>：FunctionCall/MCP 工具白名单前置（拒绝不触达）；四层记忆读写按契约授权 + 全局写双重确认 + 知识库同源校验；</li>
+<li><strong>数据侧</strong>：<code>Redactor</code> PII 脱敏（稳定占位符）可挂知识库入库、MCP 返回、审计导出；审计包默认脱敏（摘要+digest）。</li>
+</ol>
+<h2 id="6">6. 可观测性</h2>
+<ul>
+<li><strong>事件流</strong>：全部角色行为产生 <code>TraceID</code> 关联的强类型审计事件 → <code>AuditTrail</code>（进程内）+ <code>AuditBus</code>（广播）；</li>
+<li><strong>防篡改</strong>：<code>HashChainAuditor</code> 链式定版（seq+prev_hash），verify 定位断点；</li>
+<li><strong>导出</strong>：<code>AuditPackBuilder</code> 标准审计包（format_version/sessions/events/integrity.content_digest，默认脱敏）；</li>
+<li><strong>OTel</strong>：<code>OTelBridge</code> 订阅总线 → span（含 payload 属性）+ 计数指标（reviews/violations/tokens），enabled 开关，异常自吞。</li>
+</ul>
+<h2 id="7-protocol">7. 可插拔点汇总（全部有 Protocol + 默认实现 + 测试）</h2>
+<table>
+<thead>
+<tr>
+<th>扩展点</th>
+<th>位置</th>
+<th>默认实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型接入</td>
+<td><code>ModelInvoker</code></td>
+<td>ScriptedInvoker（演示）/ LangChain 封装（文档示例）</td>
+</tr>
+<tr>
+<td>记忆存储</td>
+<td><code>MemoryStore</code> / <code>StorageBackend</code></td>
+<td>InMemory / Redis</td>
+</tr>
+<tr>
+<td>缓存后端</td>
+<td><code>CacheBackend</code></td>
+<td>InMemory LRU / Redis</td>
+</tr>
+<tr>
+<td>语义向量</td>
+<td><code>EmbeddingFn</code></td>
+<td>注入（Core 不内置模型）</td>
+</tr>
+<tr>
+<td>AI 评估</td>
+<td><code>JudgeHook</code></td>
+<td>HeuristicJudge</td>
+</tr>
+<tr>
+<td>任务队列</td>
+<td><code>TaskQueue</code></td>
+<td>InProcess(asyncio) / Inline / JSON 落盘</td>
+</tr>
+<tr>
+<td>MCP 传输</td>
+<td><code>MCPClient</code></td>
+<td>StdioMCPClient（mcp SDK）/ Fake</td>
+</tr>
+<tr>
+<td>可观测</td>
+<td>tracer/meter 注入</td>
+<td>OTel SDK（with_sdk）/ Stub</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8">8. 部署形态</h2>
+<ul>
+<li><strong>SDK 嵌入</strong>：<code>pip install work-by-roles[langgraph]</code>，存量 LangGraph 项目 3 行接入（WBRGuard）；</li>
+<li><strong>独立平台</strong>：<code>pip install work-by-roles[server]</code> + <code>uvicorn --factory wbr.app.api.main:create_app</code> → API(/api/v1) + 画布(/canvas)；</li>
+<li><strong>企业多租户</strong>：WorkspaceRegistry 目录级隔离；缓存/记忆可切 Redis 共享；审计包定期归档；</li>
+<li><strong>数据布局</strong>：<code>&lt;data_root&gt;/{contracts,suites,tasks,workspaces}</code>，全部 JSON，重启可恢复。</li>
+</ul>
+<h2 id="9">9. 质量门禁（持续有效的工程约束）</h2>
+<table>
+<thead>
+<tr>
+<th>门禁</th>
+<th>标准</th>
+<th>守护方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>测试</td>
+<td>356 passed / 1 skipped</td>
+<td>pytest 全量（48 测试文件，62 ★ 必测项）</td>
+</tr>
+<tr>
+<td>覆盖率</td>
+<td>Core 关键模块 ≥90%（现 90–100%，总体 95%）</td>
+<td>pytest-cov</td>
+</tr>
+<tr>
+<td>依赖纯净</td>
+<td>Core 无第三方框架依赖</td>
+<td>AST 扫描测试</td>
+</tr>
+<tr>
+<td>静态检查</td>
+<td>ruff F/E9 全绿</td>
+<td>CI 命令</td>
+</tr>
+<tr>
+<td>异常统一</td>
+<td>100% WBRError 子类、无裸 except-pass</td>
+<td>AST 扫描测试</td>
+</tr>
+<tr>
+<td>存量回归</td>
+<td>legacy 失败清单与基线零差异</td>
+<td>每阶段 diff 验证</td>
+</tr>
+<tr>
+<td>分歧红线</td>
+<td>不仲裁抹平</td>
+<td>专项测试</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
