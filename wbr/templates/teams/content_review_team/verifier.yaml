@@ -33,6 +33,7 @@ output_spec:
         type: boolean
       scores:
         type: object
+        description: 各评审维度得分，统一使用 0-1 刻度（如 0.85），不要使用百分制
       comments:
         type: string
         minLength: 4
@@ -73,8 +74,8 @@ review_criteria:
     pass_threshold: 0.5
   overall_pass_threshold: 0.6
 meta:
-  version: 1.0.0
-  content_hash: 99d29d90f1671700af73464a15c5bd209d29f84e28a487ee158a260ed2dc7712
+  version: 1.0.1
+  content_hash: 1be8717bf2a4f2e779b633f181fd96e84dfe0fae19bd9203962da27fdaf4b5b4
   created_at: '2026-10-15T10:26:52.027249+00:00'
-  updated_at: '2026-10-15T10:26:52.027249+00:00'
+  updated_at: '2026-10-20T04:09:57.025529+00:00'
   changelog: []
