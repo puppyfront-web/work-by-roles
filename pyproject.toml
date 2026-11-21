@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-  {name = "Work-by-Roles Contributors", email = "open@work-by-roles.example"}
+  {name = "Work-by-Roles Contributors", email = "puppy.front@gmail.com"}
 ]
 keywords = [
   "expert-team", "role-contract", "llm-governance", "langgraph",
