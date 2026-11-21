@@ -16,7 +16,7 @@ import time
 from typing import Any
 
 from wbr.core.exceptions import AdapterError
-from wbr.core.orchestration.invoker import ModelRequest, ModelResponse, TokenUsage
+from wbr.core.orchestration.invoker import ModelRequest, ModelResponse, parse_provider_usage
 
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
 _RETRY_STATUS = {429, 500, 502, 503, 504}
@@ -96,6 +96,8 @@ class OpenAICompatInvoker:
         }
         if self.temperature is not None:
             payload["temperature"] = self.temperature
+        if request.max_tokens is not None:
+            payload["max_tokens"] = request.max_tokens
 
         client = self._ensure_client()
         last_error = ""
@@ -123,9 +125,5 @@ class OpenAICompatInvoker:
             text = data["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError, TypeError) as e:
             raise AdapterError(f"响应结构异常（{role_id}）: {str(data)[:200]}") from e
-        usage_data = data.get("usage") or {}
-        usage = TokenUsage(
-            prompt_tokens=int(usage_data.get("prompt_tokens") or 0),
-            completion_tokens=int(usage_data.get("completion_tokens") or 0),
-        )
+        usage = parse_provider_usage(data.get("usage") if isinstance(data.get("usage"), dict) else None)
         return ModelResponse(text=text, usage=usage, raw=data)

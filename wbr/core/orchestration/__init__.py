@@ -15,7 +15,9 @@ from wbr.core.orchestration.invoker import (
     ModelResponse,
     ScriptedInvoker,
     TokenUsage,
+    completion_cap,
     parse_json_output,
+    parse_provider_usage,
 )
 from wbr.core.orchestration.review import (
     Disagreement,
@@ -44,6 +46,8 @@ __all__ = [
     "ReviewStatus",
     "ScriptedInvoker",
     "TokenUsage",
+    "completion_cap",
+    "parse_provider_usage",
     "Verdict",
     "Violation",
     "ViolationKind",

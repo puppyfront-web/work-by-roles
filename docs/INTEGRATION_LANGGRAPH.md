@@ -89,11 +89,13 @@ memory = persistent_memory_hub(backend, audit=trail)
 ## Token 治理接线
 
 ```python
+from wbr import ReviewSession
 from wbr.core.token import TokenMeter, TokenBudget, BudgetPolicy
 
 meter = TokenMeter()
 budget = TokenBudget(BudgetPolicy(max_total_tokens=200_000, on_exceed="degrade"), meter)
 guard = WBRGuard(..., token_meter=meter)   # 图级计量；预算检查可在自定义节点内调用 budget.check(role_id)
+session = ReviewSession(..., token_meter=meter, token_budget=budget)  # 超限跳过并写审计，run() 不抛异常
 ```
 
 ## 真实模型接入

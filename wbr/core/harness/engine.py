@@ -171,6 +171,7 @@ class RegressionEngine:
                     "status": o.status.value,
                     "violations": [v.model_dump() for v in o.violations],
                     "output": o.output,
+                    "skip_reason": o.skip_reason,
                     "evidence_required": _evidence_required_for(self.contracts.get(o.role_id)),
                 }
             cr.verdict_passed = primary.verifier_verdict.passed if primary.verifier_verdict else None
