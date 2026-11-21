@@ -22,8 +22,8 @@
 ```bash
 # 在真实项目仓库内
 python -m venv .wbr-venv && source .wbr-venv/bin/activate
-pip install "work-by-roles @ file:///path/to/dist/work_by_roles-2.1.1-py3-none-any.whl"
-pip install "work-by-roles[langgraph]"        # 若接 LangGraph
+pip install "work-by-roles @ file:///path/to/dist/work_by_roles-2.2.0-py3-none-any.whl"
+pip install "work-by-roles[langgraph] @ file:///path/to/dist/work_by_roles-2.2.0-py3-none-any.whl"
 ```
 
 准备两样东西（不需要真实 LLM 也能先跑通链路，用 ScriptedInvoker 验证流程）：

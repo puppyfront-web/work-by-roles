@@ -113,4 +113,5 @@ def test_healthz(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
+    assert body["auth_required"] is False
     assert body["components"]["registry"] is True

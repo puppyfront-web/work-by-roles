@@ -5,7 +5,7 @@ Core 仅依赖 stdlib + Pydantic V2（SPEC-000 D-01）。
 """
 from __future__ import annotations
 
-__version__ = "2.1.1"
+__version__ = "2.2.0"
 
 # ---- 基础设施 ----
 # ---- 审计 ----

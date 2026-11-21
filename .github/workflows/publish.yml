@@ -1,0 +1,52 @@
+# 只在推送版本 tag（例如 v2.2.0）时发布到 PyPI。
+# 推送到分支或打开 PR 不会触发。首次发布前需：
+# 1. 把 pyproject.toml 里的作者邮箱换成真实地址（占位域名 .example 可能被 PyPI 拒绝）
+# 2. 在 PyPI 为本仓库登记 Trusted Publisher：
+#    owner=puppyfront-web，repository=work-by-roles，
+#    workflow=publish.yml，environment=pypi
+# 3. 在 GitHub 上准备名为 pypi 的 Environment（可加 required reviewers）
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refuse a tag that does not match the package version
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          text = Path("pyproject.toml").read_text(encoding="utf-8")
+          match = re.search(r'(?m)^version = "([^"]+)"$', text)
+          if match is None:
+              raise SystemExit("pyproject.toml has no version")
+          tag = os.environ["GITHUB_REF_NAME"]
+          expected = "v" + match.group(1)
+          if tag != expected:
+              raise SystemExit(f"tag {tag} does not match package version {expected}")
+          PY
+      - name: Install and test
+        run: |
+          pip install -e ".[dev,langgraph,server,llm]"
+          pytest tests -q
+      - name: Build
+        run: |
+          python -m build
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1

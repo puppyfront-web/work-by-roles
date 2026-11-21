@@ -2,16 +2,22 @@
 
 ## 安装
 
+包尚未发布到 PyPI。发布之后可以把下面的 Git 地址换成 `work-by-roles[server]`。
+
 ```bash
-pip install "work-by-roles[server]"        # fastapi + uvicorn + httpx
-# 可选: pip install "work-by-roles[redis]"  # 记忆/缓存持久化
+pip install "work-by-roles[server] @ git+https://github.com/puppyfront-web/work-by-roles.git"
+# 可选: pip install "work-by-roles[redis] @ git+https://github.com/puppyfront-web/work-by-roles.git"
 ```
+
+`[server]` 含 fastapi、uvicorn、httpx。只跑 CLI `--live`、不要 API 时，安装 `[llm]` 即可。
 
 ## 启动
 
+默认只监听本机。未配置 `WBR_API_KEY` 时不要使用 `--host 0.0.0.0`。
+
 ```bash
 # 方式一：factory 模式（默认数据目录 ./wbr-data）
-uvicorn --factory wbr.app.api.main:create_app --host 0.0.0.0 --port 8000
+uvicorn --factory wbr.app.api.main:create_app --host 127.0.0.1 --port 8000
 
 # 方式二：编程启动（自定义数据目录 / 注入真实模型 Invoker）
 python -c "
@@ -19,13 +25,29 @@ from wbr.app.api.main import create_app
 from my_org.invokers import production_invoker
 import uvicorn
 app = create_app(data_root='/var/lib/wbr', invoker=production_invoker)
-uvicorn.run(app, host='0.0.0.0', port=8000)
+uvicorn.run(app, host='127.0.0.1', port=8000)
 "
 ```
 
 - `GET /canvas`：专家画布 SPA（零外部 CDN，可内网部署）
 - `GET /docs`：OpenAPI 交互文档
-- `GET /api/v1/healthz`：健康检查（版本 + 组件状态）
+- `GET /api/v1/healthz`：健康检查（版本、组件状态、`auth_required`）。此接口不要求密钥。
+
+## 鉴权
+
+`WBR_API_KEY` 为空时，行为与旧版本相同，适合本机开发。密钥非空时，除健康检查、`/docs` 和画布静态文件外，契约、会审、Harness、模板导入、审计导出以及 `/canvas/api-bootstrap` 都要带下列之一：
+
+- `X-API-Key: <WBR_API_KEY>`
+- `Authorization: Bearer <WBR_API_KEY>`
+
+画布页头有密钥输入框，值只写在当前浏览器会话（`sessionStorage`）里，随后请求都会带上 `X-API-Key`。
+
+对外暴露二选一：
+
+1. 设置 `WBR_API_KEY` 后再把端口暴露出去；
+2. 进程继续只听 `127.0.0.1`，由已鉴权的反向代理转发。
+
+未设置密钥却监听到非本机地址（例如 `0.0.0.0`）时，第一条进入进程的 HTTP 请求会打出警告日志。告警看的是 ASGI 的实际监听地址，不看可伪造的 `Host` 头。反向代理若连到本机回环地址，进程看不到公网绑定，此时必须由代理自己鉴权，或仍然设置 `WBR_API_KEY`。
 
 ## 数据布局
 
@@ -46,12 +68,13 @@ uvicorn.run(app, host='0.0.0.0', port=8000)
 
 ## 生产建议
 
-1. **模型接入**：`create_app(invoker=...)` 注入生产 ModelInvoker（超时/重试/限流在此封装）。
-2. **安全模式**：对外暴露时建议 `WBRGuard(security="block")` 语义接入到自定义节点，
-   并启用输入侧 `guard_user_input(block_on=HIGH)`。
-3. **审计留存**：定期把 `/api/v1/audits/export` 的审计包归档到对象存储（JSON、含 content_digest）。
-4. **缓存后端**：多副本共享缓存使用 `adapters.storage.redis_backend.RedisCacheBackend`。
-5. **反向代理**：uvicorn 前置 Nginx/Caddy 终止 TLS；`/canvas` 与 `/api/v1` 同源无需 CORS。
+1. **监听与鉴权**：见上文。不要在未配置 `WBR_API_KEY` 时把 uvicorn 绑到 `0.0.0.0`。
+2. **模型接入**：`create_app(invoker=...)` 注入生产 ModelInvoker（超时/重试/限流在此封装）。
+3. **安全模式**：对外暴露时建议 `WBRGuard(security="block")` 语义接入到自定义节点，
+   并启用输入侧 `guard_user_input(block_on=HIGH)`。`WBR_API_KEY` 只保护 HTTP API，不代替输入侧防护。
+4. **审计留存**：定期把 `/api/v1/audits/export` 的审计包归档到对象存储（JSON、含 content_digest）。导出接口在启用密钥后同样需要鉴权。
+5. **缓存后端**：多副本共享缓存使用 `adapters.storage.redis_backend.RedisCacheBackend`。
+6. **反向代理**：uvicorn 前置 Nginx/Caddy 终止 TLS；`/canvas` 与 `/api/v1` 同源无需 CORS。代理若代替应用做鉴权，不要把未鉴权的流量转到应用。
 
 ## 版本与升级
 
