@@ -291,7 +291,7 @@ Core 仅依赖标准库 + Pydantic V2，**不发起任何网络调用**——模
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests -q                           # 全量测试（413 项；未配置 Redis 时跳过 1 项）
+pytest tests -q                           # 全量测试（433 项；未配置 Redis 时跳过 1 项）
 pytest tests/wbr/phase5 -q                # 打包构建与性能基准（slow/performance 标记）
 ```
 

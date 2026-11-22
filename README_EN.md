@@ -319,7 +319,7 @@ financial report audit, and interview assessment are all in real demand).
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests -q                           # full suite (413 tests; 1 skipped without Redis)
+pytest tests -q                           # full suite (433 tests; 1 skipped without Redis)
 pytest tests/wbr/phase5 -q                # packaging & performance benchmarks (slow/performance marks)
 ```
 

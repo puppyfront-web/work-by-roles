@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- **会审 API 接上 Phase 0 的预算与用量**：`POST /api/v1/reviews` 可带 `shared_context`、`skip_unassigned_experts` 和 `token_budget`（`max_total_tokens` / `per_role` / `on_exceed`）。不传时行为与引擎默认一致。结果增加 `token_meter`。画布会审面板可填写共享上下文和任务上限，并显示本次用量。
 - **API 接入多 Workspace**（SPEC-008 当时明确留给 App 层的接线）：请求头 `X-WBR-Workspace` 把契约、用例库、会审/回归任务和画布 bootstrap 切到 `<data_root>/workspaces/<name>/`。不带头时仍用原来的默认目录，已有客户端不用改。新增 `GET/POST /api/v1/workspaces`、`DELETE /api/v1/workspaces/{name}`，以及 `POST /api/v1/workspaces/{name}/contracts/{role_id}/copy`（沿用带血缘的 `copy_contract`）。画布工具栏可填写 workspace 名，只存在当前浏览器会话。审计导出仍是进程级，不按 workspace 切开。
 - **Phase 0 省 Token**（会审主流程。构造参数都是可选的；唯一的默认行为变化是未分配专家不再空跑，可用 `skip_unassigned_experts=False` 恢复）：
   - 提示词段序改为「安全护栏 → 团队共享上下文 → 角色契约 → 动态材料」。同一次运行里的专家从第一个 token 起共享前缀；不传 `shared_context` 时不插入空段，也不为凑 1024 token 缓存门槛而填充

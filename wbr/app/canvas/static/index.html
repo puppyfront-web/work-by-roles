@@ -71,6 +71,8 @@
     <div id="runner">
       <h2>会审运行</h2>
       <label>问题 <textarea id="f-question" rows="2"></textarea></label>
+      <label>共享上下文 <textarea id="f-shared" rows="2" placeholder="留空=不插入共享段"></textarea></label>
+      <label>任务 Token 上限 <input id="f-token-budget" inputmode="numeric" placeholder="留空=不设上限"></label>
       <div class="row">
         <span class="muted">Coordinator</span><select id="sel-coordinator"></select>
       </div>
@@ -80,6 +82,7 @@
       <div id="run-result" class="hidden">
         <h3>结果 <span id="run-status" class="badge"></span></h3>
         <div id="final-answer"></div>
+        <div id="token-meter" class="muted"></div>
         <div id="expert-cards"></div>
         <div id="disagreements"></div>
       </div>

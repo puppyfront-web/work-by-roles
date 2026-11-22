@@ -333,6 +333,14 @@ async function runReview() {
     experts,
     verifier: $("sel-verifier").value,
   };
+  const shared = $("f-shared").value.trim();
+  if (shared) body.shared_context = shared;
+  const budgetText = $("f-token-budget").value.trim();
+  if (budgetText) {
+    const maxTotal = Number(budgetText);
+    if (!Number.isInteger(maxTotal) || maxTotal < 1) return alert("Token 上限须为正整数");
+    body.token_budget = { max_total_tokens: maxTotal };
+  }
   if (!body.coordinator || !body.verifier) return alert("需要 Coordinator 与 Verifier 契约");
   $("btn-run").disabled = true;
   try {
@@ -367,7 +375,14 @@ function pollReview(taskId) {
 }
 
 function renderResult(result) {
-  $("final-answer").textContent = "📌 " + (result.final_answer || "（无）");
+  $("final-answer").textContent = result.status === "failed"
+    ? "失败: " + (result.error || "未知错误")
+    : "📌 " + (result.final_answer || "（无）");
+  const meter = result.token_meter;
+  $("token-meter").textContent = meter
+    ? `Token ${meter.total_tokens}（提示 ${meter.prompt_tokens} / 生成 ${meter.completion_tokens}` +
+      (meter.cached_prompt_tokens ? ` / 缓存命中 ${meter.cached_prompt_tokens}` : "") + "）"
+    : "";
   const cards = $("expert-cards");
   cards.innerHTML = "";
   state.disputed = new Set();
@@ -375,7 +390,8 @@ function renderResult(result) {
   (result.expert_outcomes || []).forEach((o) => {
     const card = el("div", { class: "expert-card" });
     const viol = (o.violations || []).map((v) => `${v.kind}: ${v.detail}`).join("; ");
-    card.innerHTML = `<b>${escapeHTML(o.role_id)}</b> <span class="muted">${o.status}</span>
+    const skip = o.skip_reason ? " · " + o.skip_reason : "";
+    card.innerHTML = `<b>${escapeHTML(o.role_id)}</b> <span class="muted">${o.status}${escapeHTML(skip)}</span>
       <div>${escapeHTML(o.output?.conclusion || o.error || "")}</div>
       ${viol ? `<div class="viol">⚠ ${escapeHTML(viol)}</div>` : ""}`;
     cards.appendChild(card);

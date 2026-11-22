@@ -9,9 +9,9 @@ from __future__ import annotations
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 import wbr
 from wbr.adapters.demo import SchemaDemoInvoker
@@ -32,6 +32,7 @@ from wbr.core.contract.models import RoleContract
 from wbr.core.exceptions import AppError, WBRError
 from wbr.core.harness import BaselineSnapshot, CaseSuite, RegressionEngine
 from wbr.core.orchestration import ReviewSession
+from wbr.core.token.meter import BudgetAction, BudgetPolicy, TokenBudget, TokenMeter
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "canvas" / "static"
 
@@ -58,11 +59,27 @@ class ContractPayload(BaseModel):
     contract: dict[str, Any]
 
 
+class ReviewTokenBudget(BaseModel):
+    max_total_tokens: int = Field(gt=0)
+    per_role: dict[str, int] = Field(default_factory=dict)
+    on_exceed: Literal["degrade", "reject"] = "degrade"
+
+    @model_validator(mode="after")
+    def _positive_role_limits(self):
+        bad = [role for role, limit in self.per_role.items() if limit <= 0]
+        if bad:
+            raise ValueError("per_role 必须大于 0: " + ", ".join(bad))
+        return self
+
+
 class ReviewSubmit(BaseModel):
     question: str = Field(min_length=1)
     coordinator: str
     experts: list[str] = Field(min_length=1)
     verifier: str
+    shared_context: str = ""
+    skip_unassigned_experts: bool = True
+    token_budget: ReviewTokenBudget | None = None
 
 
 class RegressionSubmit(BaseModel):
@@ -94,21 +111,62 @@ def _resolve_contracts(registry: ContractRegistry, cids: list[str]) -> dict[str,
     return out
 
 
+def _meter_summary(meter: TokenMeter) -> dict[str, Any]:
+    by_role: dict[str, dict[str, int]] = {}
+    prompt = completion = cached = 0
+    for rec in meter.records:
+        prompt += rec.prompt_tokens
+        completion += rec.completion_tokens
+        cached += rec.cached_prompt_tokens
+        bucket = by_role.setdefault(
+            rec.role_id,
+            {"prompt_tokens": 0, "completion_tokens": 0, "cached_prompt_tokens": 0},
+        )
+        bucket["prompt_tokens"] += rec.prompt_tokens
+        bucket["completion_tokens"] += rec.completion_tokens
+        bucket["cached_prompt_tokens"] += rec.cached_prompt_tokens
+    return {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "cached_prompt_tokens": cached,
+        "total_tokens": prompt + completion,
+        "by_role": by_role,
+    }
+
+
+def _review_budget(raw: dict[str, Any] | None, meter: TokenMeter) -> TokenBudget | None:
+    if not raw:
+        return None
+    policy = BudgetPolicy(
+        max_total_tokens=raw["max_total_tokens"],
+        per_role=raw.get("per_role") or {},
+        on_exceed=BudgetAction(raw.get("on_exceed") or "degrade"),
+    )
+    return TokenBudget(policy, meter)
+
+
 def _handle_review(services: _Services, record: TaskRecord) -> dict:
     payload = record.payload
     contracts = _resolve_contracts(
         services.registry_for(record),
         [payload["coordinator"], *payload["experts"], payload["verifier"]],
     )
+    meter = TokenMeter()
     session = ReviewSession(
         coordinator_contract=contracts[payload["coordinator"]],
         expert_contracts=[contracts[c] for c in payload["experts"]],
         verifier_contract=contracts[payload["verifier"]],
         invoker=services.invoker,
         audit=services.audit,
+        token_meter=meter,
+        token_budget=_review_budget(payload.get("token_budget"), meter),
+        shared_context=payload.get("shared_context") or "",
+        skip_unassigned_experts=payload.get("skip_unassigned_experts", True),
     )
     result = session.run(payload["question"])
-    return json.loads(result.to_json())
+    body = json.loads(result.to_json())
+    body["token_meter"] = _meter_summary(meter)
+    return body
 
 
 def _handle_regression(services: _Services, record: TaskRecord) -> dict:
