@@ -48,3 +48,7 @@ build/
 
 # mkdocs build output
 site/
+
+node_modules/
+studio/frontend/dist/
+studio/.env

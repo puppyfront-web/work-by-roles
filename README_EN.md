@@ -297,10 +297,7 @@ Harness: pin a baseline snapshot first, then run the golden-case regression afte
 six metrics compared, degradation auto-flagged. See [docs/HARNESS.md](docs/HARNESS.md).
 
 **Q: What do I need to build a "users create their own expert teams" platform?**
-The governance kernel, REST API (contract CRUD/versioning/diff, async reviews, Harness, audit
-export), and visual canvas are built in. What you add: user accounts, model-key management,
-team-level CRUD and persistence (the enterprise multi-workspace layer is directly reusable).
-`WBR_API_KEY` is a single shared secret, not a multi-user account system.
+The product shell is [`studio/`](studio/README.md) (wbr-studio): accounts, workspaces, encrypted bring-your-own model keys, teams created from the bundled templates, reviews on Redis/Arq, and a Postgres audit chain. The `wbr/` kernel stays MIT. `ee/` is reserved for a commercial license and has no features yet. The kernel's `WBR_API_KEY` is still a single shared secret, not this account system.
 
 **Q: Do audit events survive a restart?**
 Not by default. Set `WBR_AUDIT_DB` to a file path and the events plus their hash chain go into SQLite. That file is for one process. Multi-process or multi-replica deployments should implement `AuditStore` (Postgres) in wbr-studio; the kernel interface stays the same.
@@ -335,4 +332,4 @@ pytest tests/wbr/phase5 -q                # packaging & performance benchmarks (
 
 ## License
 
-MIT © Work-by-Roles Contributors
+MIT © Work-by-Roles Contributors. `wbr/` and `studio/` are the open core. `ee/` is a separate commercial-license placeholder; see [ee/LICENSE](ee/LICENSE).

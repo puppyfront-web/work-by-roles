@@ -1,0 +1,19 @@
+DRAFT — COMMERCIAL LICENSE PLACEHOLDER
+
+This file is not a finished license. The maintainer must replace it with
+counsel-reviewed terms before any code under ee/ is shipped or offered.
+
+Until that text lands:
+
+1. ee/ is not covered by the MIT license that applies to the rest of this
+   repository (wbr/, studio/, docs, and tests outside ee/).
+2. No rights are granted to copy, modify, distribute, or run software placed
+   under ee/, except for the maintainer and anyone the maintainer names in a
+   separate written agreement.
+3. This placeholder does not describe pricing, support, warranty, or liability.
+   Those terms are intentionally absent until the maintainer finalizes them.
+4. Do not add product features under ee/ while this draft is the only grant.
+
+Copyright (c) Work-by-Roles Contributors
+
+Maintainer contact: puppy.front@gmail.com
