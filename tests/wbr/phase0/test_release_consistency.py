@@ -24,7 +24,9 @@ def test_package_version_matches_pyproject_and_changelog():
     released = changelog.split(f"## [{version}]", 1)[1].split("\n## [", 1)[0]
     assert "WBR_API_KEY" in released
     unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    assert "X-WBR-Workspace" in unreleased
     assert "Phase 0 省 Token" in unreleased
+    assert "真实模型首跑" not in unreleased
 
 
 def test_readmes_point_at_git_install_and_docs():

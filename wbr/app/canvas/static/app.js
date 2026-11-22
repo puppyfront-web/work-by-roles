@@ -5,6 +5,7 @@
 
 const API = "/api/v1";
 const KEY_STORAGE = "wbr-api-key";
+const WS_STORAGE = "wbr-workspace";
 const state = {
   contracts: [],          // 契约摘要列表
   selected: null,         // 当前编辑的 role_id
@@ -33,10 +34,24 @@ function persistKey() {
   else sessionStorage.removeItem(KEY_STORAGE);
 }
 
+function currentWorkspace() {
+  const input = $("ws-name");
+  if (input && input.value.trim()) return input.value.trim();
+  return sessionStorage.getItem(WS_STORAGE) || "";
+}
+
+function persistWorkspace() {
+  const value = $("ws-name").value.trim();
+  if (value) sessionStorage.setItem(WS_STORAGE, value);
+  else sessionStorage.removeItem(WS_STORAGE);
+}
+
 function authHeaders(base) {
   const headers = Object.assign({}, base);
   const key = currentKey();
   if (key) headers["X-API-Key"] = key;
+  const workspace = currentWorkspace();
+  if (workspace) headers["X-WBR-Workspace"] = workspace;
   return headers;
 }
 
@@ -68,8 +83,9 @@ async function refresh() {
   const boot = await res.json();
   if (ticket !== refreshTicket) return;
   state.contracts = boot.contracts || [];
-  $("api-version").textContent = "v" + boot.version + " · " +
-    (boot.live ? `真实模型（${boot.invoker}）` : "演示模式（未配置 WBR_LLM_* 环境变量）");
+  const mode = boot.live ? `真实模型（${boot.invoker}）` : "演示模式（未配置 WBR_LLM_* 环境变量）";
+  $("api-version").textContent = "v" + boot.version + " · " + mode +
+    (boot.workspace ? " · " + boot.workspace : "");
   renderSelectors();
   layout();
 }
@@ -433,10 +449,26 @@ function commitApiKey() {
   });
 }
 
+function commitWorkspace() {
+  persistWorkspace();
+  loadTemplates();
+  refresh().catch((e) => {
+    $("api-version").textContent = "API 不可用: " + e.message;
+  });
+}
+
 /* ---------- 启动 ---------- */
 window.addEventListener("DOMContentLoaded", () => {
   const stored = sessionStorage.getItem(KEY_STORAGE);
   if (stored) $("api-key").value = stored;
+  const storedWs = sessionStorage.getItem(WS_STORAGE);
+  if (storedWs) $("ws-name").value = storedWs;
+  $("ws-name").addEventListener("change", commitWorkspace);
+  $("ws-name").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    commitWorkspace();
+  });
   $("api-key").addEventListener("change", commitApiKey);
   $("api-key").addEventListener("keydown", (ev) => {
     if (ev.key !== "Enter") return;

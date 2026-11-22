@@ -49,6 +49,23 @@ uvicorn.run(app, host='127.0.0.1', port=8000)
 
 未设置密钥却监听到非本机地址（例如 `0.0.0.0`）时，第一条进入进程的 HTTP 请求会打出警告日志。告警看的是 ASGI 的实际监听地址，不看可伪造的 `Host` 头。反向代理若连到本机回环地址，进程看不到公网绑定，此时必须由代理自己鉴权，或仍然设置 `WBR_API_KEY`。
 
+## Workspace
+
+一个进程可以挂多套隔离的契约、用例和任务。不传请求头时使用下面的默认目录，和以前一样。
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/workspaces \
+  -H 'content-type: application/json' -d '{"name":"team_alpha"}'
+curl http://127.0.0.1:8000/api/v1/contracts -H 'X-WBR-Workspace: team_alpha'
+```
+
+名称须匹配 `[a-z][a-z0-9_]{0,31}`。画布工具栏的 Workspace 输入框会给后续请求加上同一个头。`GET /api/v1/audits/export` 仍导出整个进程的审计，不按 workspace 过滤。跨 workspace 复制契约：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/workspaces/team_beta/contracts/expert_a/copy \
+  -H 'content-type: application/json' -d '{"source":"team_alpha"}'
+```
+
 ## 数据布局
 
 ```

@@ -9,7 +9,9 @@ header .api-key input { width:220px; }
 .muted { color:var(--muted); font-size:12px; }
 main { display:grid; grid-template-columns: 1fr 380px; gap:0; height: calc(100vh - 53px); }
 #canvas-pane { border-right:1px solid var(--line); overflow:auto; }
-#toolbar { padding:8px 12px; display:flex; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
+#toolbar { padding:8px 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); }
+#toolbar .ws-name { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+#toolbar .ws-name input { width:148px; }
 button { background:var(--accent); color:#04283a; border:0; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; }
 button.danger { background:var(--danger); color:#fff; }
 button:disabled { opacity:.5; cursor:not-allowed; }

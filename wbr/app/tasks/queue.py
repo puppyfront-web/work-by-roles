@@ -32,6 +32,7 @@ class TaskRecord(BaseModel):
     task_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     kind: TaskKind
     payload: dict[str, Any] = Field(default_factory=dict)
+    workspace: str | None = None
     status: TaskStatus = TaskStatus.PENDING
     result: Any = None
     error: str | None = None

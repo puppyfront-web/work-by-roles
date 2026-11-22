@@ -41,9 +41,15 @@ class WorkspaceRegistry:
     def _dir(self, name: str) -> Path:
         return self._root / name
 
-    def create(self, name: str) -> Workspace:
+    def _require_name(self, name: str) -> None:
         if not _WS_NAME.match(name):
-            raise AppError(f"workspace 名称不合法: {name!r}（小写字母开头，仅 [a-z0-9_]）", code="E9022")
+            raise AppError(
+                f"workspace 名称不合法: {name!r}（小写字母开头，仅 [a-z0-9_]）",
+                code="E9022",
+            )
+
+    def create(self, name: str) -> Workspace:
+        self._require_name(name)
         ws_dir = self._dir(name)
         with self._lock:
             if ws_dir.is_dir():
@@ -52,13 +58,17 @@ class WorkspaceRegistry:
         return Workspace(name=name, root=str(ws_dir))
 
     def get(self, name: str) -> Workspace:
+        self._require_name(name)
         ws_dir = self._dir(name)
         if not ws_dir.is_dir():
             raise AppError(f"workspace 不存在: {name}", code="E9003")
         return Workspace(name=name, root=str(ws_dir))
 
     def list(self) -> list[Workspace]:
-        return [self.get(d.name) for d in sorted(self._root.iterdir()) if d.is_dir()]
+        names = sorted(
+            d.name for d in self._root.iterdir() if d.is_dir() and _WS_NAME.match(d.name)
+        )
+        return [self.get(name) for name in names]
 
     def delete(self, name: str) -> None:
         self.get(name)  # 不存在即抛
