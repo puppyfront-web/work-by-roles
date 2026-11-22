@@ -22,3 +22,45 @@ jobs:
         run: pip install -e ".[dev,langgraph,server,llm]"
       - name: Test
         run: pytest tests -q
+
+  studio:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: studio
+          POSTGRES_PASSWORD: studio
+          POSTGRES_DB: studio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studio -d studio"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      STUDIO_TEST_DATABASE_URL: postgresql+psycopg://studio:studio@localhost:5432/studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          pip install -e ".[dev,llm]"
+          pip install -e studio/backend
+      - name: Studio backend tests
+        run: pytest studio/backend/tests -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: studio/frontend/package-lock.json
+      - name: Frontend typecheck and build
+        working-directory: studio/frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build

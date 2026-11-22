@@ -51,6 +51,9 @@ If you find a bug or have a feature suggestion, please:
    - Create a Pull Request on GitHub
    - Describe your changes and reasons
    - Ensure all tests pass
+   - First-time contributors sign the CLA by commenting `I have read the CLA Document and I hereby sign the CLA`. The text is [CLA.md](CLA.md). Signatures are stored on the `cla-signatures` branch.
+
+Do not add features under `ee/` yet. That directory is reserved for a commercial license. The open core is `wbr/` and `studio/`.
 
 ## 📝 Code Standards
 
@@ -130,7 +133,7 @@ If you have any questions, you can:
 
 ## 📄 License
 
-By contributing code, you agree that your contributions will be licensed under the MIT License.
+Contributions to `wbr/`, `studio/`, and the other MIT paths are licensed under MIT, under the grant in [CLA.md](CLA.md). `ee/` is outside that grant; see [ee/LICENSE](ee/LICENSE).
 
 ---
 

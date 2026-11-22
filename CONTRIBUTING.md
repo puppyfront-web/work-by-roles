@@ -51,6 +51,9 @@
    - 在 GitHub 上创建 Pull Request
    - 描述您的更改和原因
    - 确保所有测试通过
+   - 首次贡献需要签署 CLA：在 PR 评论中发送 `I have read the CLA Document and I hereby sign the CLA`。文本见 [CLA.md](CLA.md)（维护者定稿前是草稿）。签名记在 `cla-signatures` 分支。
+
+`ee/` 使用单独的商业许可草稿，当前不要向该目录提交功能。开源核心是 `wbr/` 与 `studio/`。
 
 ## 📝 代码规范
 
@@ -130,7 +133,7 @@ pytest tests/wbr --cov=wbr
 
 ## 📄 许可证
 
-通过贡献代码，您同意您的贡献将在 MIT 许可证下授权。
+对 `wbr/`、`studio/` 以及其他 MIT 目录的贡献，按 [CLA.md](CLA.md) 授予许可，并以 MIT 再分发。`ee/` 不在 MIT 范围内，见 [ee/LICENSE](ee/LICENSE)。
 
 ---
 

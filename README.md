@@ -280,7 +280,7 @@ Core 仅依赖标准库 + Pydantic V2，**不发起任何网络调用**——模
 使用 Harness：先固化基线快照，变更后运行黄金用例回归，六项指标对比，能力退化自动告警。见 [docs/HARNESS.md](docs/HARNESS.md)。
 
 **Q：想搭建"用户自建专家团"平台，需要补充什么？**
-治理内核、REST API（契约 CRUD / 版本 / Diff、异步评审、Harness、审计导出）、可视化画布均已内置；需自行补充产品外壳：用户账号体系、模型 Key 管理、团队级 CRUD 与持久化（企业版多 Workspace 可直接复用）。服务自带的 `WBR_API_KEY` 是单密钥，不能代替多用户账号。
+产品壳在 [`studio/`](studio/README.md)（wbr-studio）：账号、工作区、加密保存的自带模型 Key、从官方模板创建团队、Redis/Arq 跑会审、Postgres 审计链。内核 `wbr/` 仍是 MIT 库。`ee/` 留给商业许可，目前没有功能代码。内核服务自带的 `WBR_API_KEY` 仍是单密钥，不能代替这套账号。
 
 **Q：审计记录重启后还在吗？**
 默认不在。设置 `WBR_AUDIT_DB` 指向一个文件路径后，事件和哈希链写入 SQLite。这是单进程库；多进程或多副本要在 wbr-studio 里实现 `AuditStore`（Postgres），内核接口不用改。
@@ -308,4 +308,4 @@ pytest tests/wbr/phase5 -q                # 打包构建与性能基准（slow/p
 
 ## License
 
-MIT © Work-by-Roles Contributors
+MIT © Work-by-Roles Contributors。`wbr/` 与 `studio/` 为开源核心。`ee/` 使用单独的商业许可草稿，见 [ee/LICENSE](ee/LICENSE)。
