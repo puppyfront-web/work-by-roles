@@ -24,6 +24,9 @@ class AuditEventType(str, Enum):
     MEMORY_ACCESS = "memory_access"
     TOOL_CALL = "tool_call"
     TOKEN_RECORD = "token_record"
+    TOKEN_BUDGET_EXCEEDED = "token_budget_exceeded"
+    EXPERT_SKIPPED = "expert_skipped"
+    CACHE_HIT = "cache_hit"
     INTENT_REASONING = "intent_reasoning"
     LOOP_STEP = "loop_step"
 

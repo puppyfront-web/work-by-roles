@@ -21,8 +21,11 @@ def test_package_version_matches_pyproject_and_changelog():
     assert version == wbr.__version__ == "2.2.0"
     changelog = _read("CHANGELOG.md")
     assert f"## [{version}]" in changelog
+    released = changelog.split(f"## [{version}]", 1)[1].split("\n## [", 1)[0]
+    assert "WBR_API_KEY" in released
     unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
     assert "X-WBR-Workspace" in unreleased
+    assert "Phase 0 省 Token" in unreleased
     assert "真实模型首跑" not in unreleased
 
 

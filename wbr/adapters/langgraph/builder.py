@@ -54,8 +54,12 @@ def build_review_graph(
         from wbr.core.orchestration.invoker import ModelRequest
 
         resp = invoker.invoke(
-            ModelRequest(role_contract=contract, compiled_prompt=compiled,
-                         trace_id=_trace_of(state) or "")
+            ModelRequest(
+                role_contract=contract,
+                compiled_prompt=compiled,
+                trace_id=_trace_of(state) or "",
+                max_tokens=contract.token_quota.max_completion_tokens,
+            )
         )
         if audit is not None:
             from wbr.core.audit.models import AuditEvent, AuditEventType
