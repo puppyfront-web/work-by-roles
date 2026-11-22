@@ -66,6 +66,28 @@ curl -X POST http://127.0.0.1:8000/api/v1/workspaces/team_beta/contracts/expert_
   -H 'content-type: application/json' -d '{"source":"team_alpha"}'
 ```
 
+## 会审预算
+
+`POST /api/v1/reviews` 可以带可选字段。不传时与引擎默认一致：协调者没有分派的专家不再空跑，也不设全场 Token 上限。
+
+```json
+{
+  "question": "如何设计登录认证？",
+  "coordinator": "coordinator",
+  "experts": ["expert_a"],
+  "verifier": "verifier",
+  "shared_context": "结论必须能回溯到给定材料。",
+  "skip_unassigned_experts": true,
+  "token_budget": {
+    "max_total_tokens": 8000,
+    "per_role": {"expert_a": 2000},
+    "on_exceed": "degrade"
+  }
+}
+```
+
+`on_exceed` 取 `degrade` 或 `reject`。超限会跳过该角色并留在结果里，不会把预算异常抛出请求。结果增加 `token_meter`，汇总本次提示、生成和缓存命中的 token。画布会审面板可以填写共享上下文和任务上限。
+
 ## 数据布局
 
 ```
