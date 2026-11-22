@@ -58,6 +58,8 @@ def from_case_results(
     evidence_ok = 0
     for cr in case_results:
         for role_id, eo in cr.per_expert.items():
+            if eo.get("status") == ExpertStatus.SKIPPED.value and eo.get("skip_reason") == "unassigned":
+                continue
             total_exec += 1
             violations = eo.get("violations") or []
             kinds = {v.get("kind") for v in violations}

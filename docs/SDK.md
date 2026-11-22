@@ -35,9 +35,11 @@ SOP `step_id` 唯一；配额 > 0；权重 ∈ (0,1]。
 from wbr import ContractCompiler
 
 prompt = ContractCompiler().compile(contract, "用户问题",
-                                     evidence=["[^1] 文档"], history=[...])
-prompt.system_prompt   # 护栏头 → 契约主体 → 输出约束 → 禁区 → 证据规范（固定段序）
+                                     evidence=["[^1] 文档"], history=[...],
+                                     shared_context="本团队共用的评审约定")
+prompt.system_prompt   # 护栏 → 团队共享上下文 → 契约主体 → 输出约束 → 禁区 → 证据规则 → 动态材料
 prompt.user_block      # 用户输入被边界符隔离；输入内的边界标记自动转义
+# 缺省段（无共享上下文、无证据材料）会跳过，不会为了凑缓存长度而填充。
 ```
 
 ## 3. 版本 Diff（ContractDiffEngine）
@@ -63,9 +65,15 @@ session = ReviewSession(
     invoker=MyInvoker(),
     memory=MemoryHub(...),             # 可选
     audit=AuditTrail(),                # 可选，全链路审计
-    max_workers=None,                  # 并行度（默认 min(N,8)）
+    max_workers=None,                  # 并行度（默认 min(N,8)；设置 token_budget 时改为串行）
+    token_meter=TokenMeter(),          # 可选；记录协调者/专家/复核人用量
+    token_budget=budget,               # 可选，默认不强制；超限跳过并写审计，run() 不抛异常
+    skip_unassigned_experts=True,      # 默认 True：协调者没分配的专家不调用模型
+    shared_context="团队共用约定",       # 可选；拼在护栏之后、角色契约之前
+    response_cache=ContractBoundCache(),  # 可选，默认关闭
+    allow_semantic_cache=False,        # 仅当 response_cache 是 SemanticCache 时生效
 )
-result = session.run("问题")
+result = session.run("问题")           # 也可用 run(..., shared_context="仅本次") 覆盖
 result.status / result.final_answer / result.expert_outcomes / result.disagreements
 result.verifier_verdict.passed / .scores
 result.save(path)
@@ -73,7 +81,9 @@ result.save(path)
 
 行为语义：专家并行、按 role_id 确定性排序；strict 契约下 Schema/禁区违规 → 该专家 FAILED；
 单专家异常不阻断全场（`completed_with_failures`）；同一子问题专家 `conclusion` 冲突 → 记入
-`disagreements`（分歧留存，不仲裁）。
+`disagreements`（分歧留存，不仲裁）。未分配专家记 `status=skipped`、`skip_reason=unassigned`。
+模型请求带上契约 `token_quota.max_completion_tokens` 作为 `max_tokens`。预算超限时该角色
+`skip_reason=budget`（协调者超限则整场停止），并写 `token_budget_exceeded` 审计。
 
 ## 5. 记忆（MemoryHub）
 
@@ -107,10 +117,18 @@ from wbr import TokenMeter, BudgetPolicy, TokenBudget, HeuristicTokenCounter
 meter = TokenMeter()
 meter.record("expert_a", "expert", usage, trace_id)
 meter.usage_by_role("expert_a") / usage_by_step("expert") / usage_total
+meter.cached_prompt_tokens      # 供应商或本地缓存命中的提示 token
+meter.estimate_cost(input_price=3e-6, output_price=15e-6, cached_input_price=0.3e-6)
 budget = TokenBudget(BudgetPolicy(max_total_tokens=100000, per_role={"expert_a": 20000},
                                   on_exceed="degrade"), meter)
 budget.check("expert_a")        # OK / DEGRADE / REJECT(抛 TokenBudgetExceededError)
+budget.check("expert_a", incoming=500)  # 把即将发送的提示估计算进去
 ```
+
+`TokenUsage` 与 `parse_provider_usage`（`from wbr.core.orchestration import parse_provider_usage`）保留缓存字段：OpenAI `prompt_tokens_details.cached_tokens`、
+DeepSeek `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`（都算在 prompt 内，`cache_scope=included`）、
+Anthropic `cache_read_input_tokens` / `cache_creation_input_tokens`（相对 input 另计，`cache_scope=additional`）。
+单价由调用方传入，内核不定价。
 
 ## 8. 缓存（ContractBoundCache）
 

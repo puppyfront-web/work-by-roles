@@ -135,7 +135,12 @@ class DebateModerator:
             from wbr.core.orchestration.invoker import ModelRequest
 
             response = self._invoker.invoke(
-                ModelRequest(role_contract=contract, compiled_prompt=compiled, trace_id="")
+                ModelRequest(
+                    role_contract=contract,
+                    compiled_prompt=compiled,
+                    trace_id="",
+                    max_tokens=contract.token_quota.max_completion_tokens,
+                )
             )
             output = parse_json_output(response.text)
         except Exception as e:
@@ -187,7 +192,12 @@ class DebateModerator:
 
         compiled = self._compiler.compile(contract, prompt)
         response = self._invoker.invoke(
-            ModelRequest(role_contract=contract, compiled_prompt=compiled, trace_id="")
+            ModelRequest(
+                role_contract=contract,
+                compiled_prompt=compiled,
+                trace_id="",
+                max_tokens=contract.token_quota.max_completion_tokens,
+            )
         )
         try:
             output = parse_json_output(response.text)

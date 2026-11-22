@@ -178,7 +178,12 @@ class IntentPipeline:
         )
         compiled = self._compiler.compile(self._contract, prompt)
         response = self._invoker.invoke(
-            ModelRequest(role_contract=self._contract, compiled_prompt=compiled, trace_id="")
+            ModelRequest(
+                role_contract=self._contract,
+                compiled_prompt=compiled,
+                trace_id="",
+                max_tokens=self._contract.token_quota.max_completion_tokens,
+            )
         )
         try:
             output = parse_json_output(response.text)

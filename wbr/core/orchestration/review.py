@@ -2,6 +2,8 @@
 
 流程：Coordinator 拆解 → 多专家并行 → Verifier 独立复核 → 分歧留存。
 专家失败降级不阻断全场；strict 契约违规 → 该专家 FAILED 并留审计。
+未分配子任务的专家默认跳过。可选接入 TokenBudget（超限跳过并审计，不向外抛）
+与契约缓存（默认关闭，仅精确命中；语义命中需显式打开）。
 """
 from __future__ import annotations
 
@@ -17,19 +19,27 @@ from pydantic import BaseModel, Field
 
 from wbr.core.audit.models import AuditEvent, AuditEventType, RoleBehaviorRecord
 from wbr.core.audit.trail import AuditTrail
+from wbr.core.cache.contract_cache import ContractBoundCache
+from wbr.core.cache.semantic import SemanticCache
 from wbr.core.constants import MemoryLayer
 from wbr.core.context import apply_context, current_context, new_trace_id, set_trace_id
 from wbr.core.contract.compiler import ContractCompiler
 from wbr.core.contract.models import RoleContract, RoleType
-from wbr.core.exceptions import OrchestrationError
+from wbr.core.exceptions import OrchestrationError, TokenBudgetExceededError
 from wbr.core.loop_config import LoopSummarySnapshot
 from wbr.core.memory.hub import MemoryHub
 from wbr.core.orchestration.invoker import (
     ModelInvoker,
     ModelRequest,
+    ModelResponse,
+    TokenUsage,
+    completion_cap,
     parse_json_output,
 )
 from wbr.core.schema.validator import validate as schema_validate
+from wbr.core.token.meter import BudgetAction, TokenBudget
+
+_CACHE_KIND = "review_output_v1"
 
 _CONCLUSION_KEY = "conclusion"  # 分歧检测读取的结论键
 _CITATIONS_KEY = "citations"
@@ -40,6 +50,7 @@ class ExpertStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    SKIPPED = "skipped"
 
 
 class ViolationKind(str, Enum):
@@ -66,6 +77,42 @@ class ExpertOutcome(BaseModel):
     duration_ms: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    cached_prompt_tokens: int = 0
+    cache_hit: str = ""
+    skip_reason: str = ""
+
+
+class _BudgetSkip(Exception):
+    """预算门禁内部信号：会审层转成跳过或停止，不向外抛。"""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def _pack_cache(output: dict[str, Any], raw_text: str, usage) -> dict[str, Any]:
+    return {
+        "_wbr": _CACHE_KIND,
+        "output": output,
+        "raw_text": raw_text,
+        "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
+        "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
+    }
+
+
+def _unpack_cache(value: Any) -> tuple[dict[str, Any], str, TokenUsage] | None:
+    if not isinstance(value, dict) or value.get("_wbr") != _CACHE_KIND:
+        return None
+    output = value.get("output")
+    if not isinstance(output, dict):
+        return None
+    usage = TokenUsage(
+        prompt_tokens=0,
+        completion_tokens=0,
+        cached_prompt_tokens=int(value.get("prompt_tokens") or 0),
+        cache_scope="local",
+    )
+    return output, str(value.get("raw_text") or ""), usage
 
 
 class Verdict(BaseModel):
@@ -134,7 +181,12 @@ class ReviewSession:
         bus=None,
         max_workers: int | None = None,
         token_meter: Any | None = None,
+        token_budget: TokenBudget | None = None,
         session_id: str | None = None,
+        skip_unassigned_experts: bool = True,
+        shared_context: str = "",
+        response_cache: Any | None = None,
+        allow_semantic_cache: bool = False,
     ) -> None:
         if coordinator_contract.role_type != RoleType.COORDINATOR:
             raise OrchestrationError("coordinator_contract 角色类型必须为 coordinator")
@@ -153,8 +205,17 @@ class ReviewSession:
         self._audit = audit
         self._bus = bus
         self._max_workers = max_workers
+        self._budget = token_budget
+        if token_budget is not None and token_meter is None:
+            token_meter = token_budget.meter
         self._token_meter = token_meter
         self._session_id = session_id
+        self._skip_unassigned = skip_unassigned_experts
+        self._shared_context = shared_context or ""
+        self._response_cache = response_cache
+        self._allow_semantic_cache = allow_semantic_cache
+        self._active_shared = self._shared_context
+        self._verifier_budget_reason = ""
         self._loop_snapshots: dict[str, Any] = {}
         self._compiler = ContractCompiler()
 
@@ -165,6 +226,7 @@ class ReviewSession:
         *,
         context: dict[str, Any] | None = None,
         loop_snapshots: list[LoopSummarySnapshot] | None = None,
+        shared_context: str | None = None,
     ) -> ReviewResult:
         """执行会审。
 
@@ -174,6 +236,8 @@ class ReviewSession:
         result = ReviewResult(question=question)
         result.trace_id = new_trace_id()
         set_trace_id(result.trace_id)
+        self._active_shared = self._shared_context if shared_context is None else shared_context
+        self._verifier_budget_reason = ""
         self._loop_snapshots = {
             s.role_id: s for s in (loop_snapshots or [])
         }
@@ -188,11 +252,21 @@ class ReviewSession:
             result.disagreements = self._detect_disagreements(outcomes)
             verdict = self._run_verifier(question, plan, outcomes)
             result.verifier_verdict = verdict
-            result.final_answer = self._compose_final_answer(verdict, outcomes)
-            has_failures = any(o.status == ExpertStatus.FAILED for o in outcomes)
+            if verdict is None and self._verifier_budget_reason:
+                result.final_answer = (
+                    f"复核未完成：Token 预算超限，已跳过（{self._verifier_budget_reason}）"
+                )
+            else:
+                result.final_answer = self._compose_final_answer(verdict, outcomes)
+            budget_hit = bool(self._verifier_budget_reason) or any(
+                o.skip_reason == "budget" for o in outcomes
+            )
+            has_failures = any(o.status == ExpertStatus.FAILED for o in outcomes) or budget_hit
             result.status = (
                 ReviewStatus.COMPLETED_WITH_FAILURES if has_failures else ReviewStatus.COMPLETED
             )
+            if budget_hit and not result.error:
+                result.error = self._verifier_budget_reason or "部分角色因 Token 预算超限已跳过"
         except OrchestrationError as e:
             result.status = ReviewStatus.FAILED
             result.error = str(e)
@@ -214,12 +288,19 @@ class ReviewSession:
     # ---- 阶段：协调 ----
     def _run_coordinator(self, question: str, result: ReviewResult) -> dict[str, Any]:
         compiled = self._compile(self._coordinator, question)
-        response = self._invoke(self._coordinator, compiled, result.trace_id)
+        try:
+            response, cache_kind = self._obtain_model(
+                self._coordinator, compiled, question, None, result.trace_id, "coordinator"
+            )
+        except _BudgetSkip as exc:
+            raise OrchestrationError(f"Coordinator 因 Token 预算超限已停止: {exc.reason}") from exc
         try:
             plan = parse_json_output(response.text)
         except ValueError as e:
             raise OrchestrationError(f"Coordinator 输出解析失败: {e}") from e
         self._check_contract_output(self._coordinator, plan, raw_text=response.text)
+        if not cache_kind:
+            self._store_cache(self._coordinator, question, None, plan, response.text, response.usage)
         return plan
 
     @staticmethod
@@ -235,7 +316,8 @@ class ReviewSession:
         self, assignments: dict[str, str], trace_id: str, *, question: str = ""
     ) -> list[ExpertOutcome]:
         ctx = current_context()
-        workers = self._max_workers or min(len(self._experts), 8)
+        # 有预算时串行，使前一个角色的实际用量能挡住后一个角色。
+        workers = 1 if self._budget is not None else (self._max_workers or min(len(self._experts), 8))
         with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="wbr-expert") as pool:
             futures = [
                 pool.submit(self._run_one_expert, contract, assignments, ctx, question)
@@ -254,60 +336,63 @@ class ReviewSession:
             role_id=contract.role_id, contract_hash=contract.content_hash, sub_question=sub_question
         )
         started = time.time()
-        self._emit(
-            AuditEventType.EXPERT_STARTED, role_id=contract.role_id,
-            payload={"sub_question": sub_question},
-        )
         try:
-            evidence = self._collect_evidence(contract)
-            snapshot = (self._loop_snapshots or {}).get(contract.role_id)
-            if snapshot is not None:
-                loop_ctx = (
-                    f"[内循环快照 {snapshot.role_id}] 轮次={snapshot.rounds_used} "
-                    f"结论={snapshot.conclusion} 证据={snapshot.evidence}"
-                )
-                evidence = [*(evidence or []), loop_ctx]
-            # 专家输入必须携带原始问题：协调者的 sub_question 是聚焦指令，
-            # 不保证自包含（真实协调者常产出"写故事型初稿"这类薄指令）。
-            expert_input = f"{question}\n\n[你的子任务] {sub_question}" if sub_question else question
-            compiled = self._compile(contract, expert_input, evidence=evidence)
-            response = self._invoke(contract, compiled, _trace_of(ctx))
-            outcome.raw_text = response.text
-            outcome.prompt_tokens = response.usage.prompt_tokens
-            outcome.completion_tokens = response.usage.completion_tokens
-            if self._token_meter is not None:
-                self._token_meter.record(
-                    contract.role_id, "expert", response.usage, _trace_of(ctx) or ""
-                )
-            try:
-                output = parse_json_output(response.text)
-            except ValueError as e:
-                outcome.violations.append(Violation(kind=ViolationKind.SCHEMA, detail=str(e)))
-                output = None
-            if output is not None:
-                outcome.output = output
-                outcome.violations.extend(
-                    self._check_contract_output(contract, output, raw_text=response.text)
-                )
-            if contract.output_spec.strict and outcome.violations:
-                outcome.status = ExpertStatus.FAILED
-                outcome.error = "; ".join(v.detail for v in outcome.violations)
+            if self._skip_unassigned and not sub_question:
+                outcome.status = ExpertStatus.SKIPPED
+                outcome.skip_reason = "unassigned"
+                outcome.error = "未分配子任务，已跳过"
             else:
-                outcome.status = ExpertStatus.COMPLETED
+                self._emit(
+                    AuditEventType.EXPERT_STARTED, role_id=contract.role_id,
+                    payload={"sub_question": sub_question},
+                )
+                evidence = self._collect_evidence(contract)
+                snapshot = (self._loop_snapshots or {}).get(contract.role_id)
+                if snapshot is not None:
+                    loop_ctx = (
+                        f"[内循环快照 {snapshot.role_id}] 轮次={snapshot.rounds_used} "
+                        f"结论={snapshot.conclusion} 证据={snapshot.evidence}"
+                    )
+                    evidence = [*(evidence or []), loop_ctx]
+                # 专家输入必须携带原始问题：协调者的 sub_question 是聚焦指令，
+                # 不保证自包含（真实协调者常产出"写故事型初稿"这类薄指令）。
+                expert_input = f"{question}\n\n[你的子任务] {sub_question}" if sub_question else question
+                compiled = self._compile(contract, expert_input, evidence=evidence)
+                try:
+                    response, cache_kind = self._obtain_model(
+                        contract, compiled, expert_input, evidence, _trace_of(ctx) or "", "expert"
+                    )
+                except _BudgetSkip as exc:
+                    outcome.status = ExpertStatus.SKIPPED
+                    outcome.skip_reason = "budget"
+                    outcome.error = f"Token 预算超限，已跳过: {exc.reason}"
+                else:
+                    self._apply_model_output(outcome, contract, response, cache_kind)
+                    if outcome.output is not None and not cache_kind:
+                        self._store_cache(
+                            contract, expert_input, evidence,
+                            outcome.output, response.text, response.usage,
+                        )
         except Exception as e:
             outcome.status = ExpertStatus.FAILED
             outcome.error = str(e)
         finally:
             outcome.duration_ms = int((time.time() - started) * 1000)
+        if outcome.status == ExpertStatus.COMPLETED:
+            finished = AuditEventType.EXPERT_COMPLETED
+        elif outcome.status == ExpertStatus.SKIPPED:
+            finished = AuditEventType.EXPERT_SKIPPED
+        else:
+            finished = AuditEventType.EXPERT_FAILED
         self._emit(
-            AuditEventType.EXPERT_COMPLETED
-            if outcome.status == ExpertStatus.COMPLETED
-            else AuditEventType.EXPERT_FAILED,
+            finished,
             role_id=contract.role_id,
             payload={
                 "status": outcome.status.value,
                 "violations": [v.kind.value for v in outcome.violations],
                 "duration_ms": outcome.duration_ms,
+                "skip_reason": outcome.skip_reason,
+                "cache_hit": outcome.cache_hit,
             },
         )
         if self._audit is not None:
@@ -324,7 +409,7 @@ class ReviewSession:
         return outcome
 
     # ---- 阶段：复核 ----
-    def _run_verifier(self, question: str, plan: dict, outcomes: list[ExpertOutcome]) -> Verdict:
+    def _run_verifier(self, question: str, plan: dict, outcomes: list[ExpertOutcome]) -> Verdict | None:
         summary = json.dumps(
             {
                 "question": question,
@@ -344,12 +429,26 @@ class ReviewSession:
             ensure_ascii=False,
         )
         compiled = self._compile(self._verifier, summary)
-        response = self._invoke(self._verifier, compiled, _trace_of(current_context()) or "")
+        try:
+            response, cache_kind = self._obtain_model(
+                self._verifier, compiled, summary, None,
+                _trace_of(current_context()) or "", "verifier",
+            )
+        except _BudgetSkip as exc:
+            self._verifier_budget_reason = exc.reason
+            self._emit(
+                AuditEventType.VERIFIER_VERDICT,
+                role_id=self._verifier.role_id,
+                payload={"skipped": True, "reason": exc.reason},
+            )
+            return None
         try:
             raw = parse_json_output(response.text)
         except ValueError as e:
             raise OrchestrationError(f"Verifier 输出解析失败: {e}") from e
         self._check_contract_output(self._verifier, raw, raw_text=response.text)
+        if not cache_kind:
+            self._store_cache(self._verifier, summary, None, raw, response.text, response.usage)
         verdict = Verdict(
             passed=bool(raw.get("passed", False)),
             scores=self._coerce_scores(raw.get("scores")),
@@ -520,7 +619,9 @@ class ReviewSession:
         return violations
 
     def _compile(self, contract: RoleContract, user_input: str, *, evidence: list[str] | None = None):
-        compiled = self._compiler.compile(contract, user_input, evidence=evidence)
+        compiled = self._compiler.compile(
+            contract, user_input, evidence=evidence, shared_context=self._active_shared or None
+        )
         self._emit(
             AuditEventType.CONTRACT_COMPILED,
             role_id=contract.role_id,
@@ -546,7 +647,7 @@ class ReviewSession:
                 continue
         return items or None
 
-    def _invoke(self, contract: RoleContract, compiled, trace_id: str):
+    def _invoke(self, contract: RoleContract, compiled, trace_id: str, *, max_tokens: int | None = None):
         snapshot = {}
         if self._memory is not None:
             snapshot = self._memory_snapshot(contract)
@@ -555,8 +656,157 @@ class ReviewSession:
             compiled_prompt=compiled,
             trace_id=trace_id,
             memory_snapshot=snapshot,
+            max_tokens=completion_cap(contract, max_tokens),
         )
         return self._invoker.invoke(request)
+
+    def _obtain_model(
+        self,
+        contract: RoleContract,
+        compiled,
+        cache_input: str,
+        evidence: list[str] | None,
+        trace_id: str,
+        step: str,
+    ) -> tuple[ModelResponse, str]:
+        """返回 (response, cache_kind)。cache_kind 为空表示真实调用。预算不足抛 _BudgetSkip。"""
+        cached = self._take_cache(contract, cache_input, evidence)
+        if cached is not None:
+            response, kind = cached
+            self._record_usage(contract.role_id, step, response.usage, trace_id)
+            self._emit(
+                AuditEventType.CACHE_HIT,
+                role_id=contract.role_id,
+                payload={
+                    "step": step,
+                    "hit_kind": kind,
+                    "cached_prompt_tokens": response.usage.cached_prompt_tokens,
+                },
+            )
+            return response, kind
+        max_tokens = self._budget_gate(contract, compiled)
+        response = self._invoke(contract, compiled, trace_id, max_tokens=max_tokens)
+        self._record_usage(contract.role_id, step, response.usage, trace_id)
+        return response, ""
+
+    def _budget_gate(self, contract: RoleContract, compiled) -> int:
+        cap = completion_cap(contract)
+        if self._budget is None:
+            return cap
+        estimate = self._budget.meter.count_text(compiled.system_prompt + "\n" + compiled.user_block)
+        try:
+            decision = self._budget.check(contract.role_id, incoming=estimate)
+        except TokenBudgetExceededError as exc:
+            self._emit(
+                AuditEventType.TOKEN_BUDGET_EXCEEDED,
+                role_id=contract.role_id,
+                payload={"action": "reject", "reason": str(exc), "estimate": estimate},
+            )
+            raise _BudgetSkip(str(exc)) from exc
+        if decision.action != BudgetAction.OK:
+            self._emit(
+                AuditEventType.TOKEN_BUDGET_EXCEEDED,
+                role_id=contract.role_id,
+                payload={
+                    "action": decision.action.value,
+                    "reason": decision.reason,
+                    "estimate": estimate,
+                },
+            )
+            raise _BudgetSkip(decision.reason)
+        room = self._budget.remaining(contract.role_id) - estimate
+        if room < 1:
+            reason = f"剩余预算不足以生成输出（剩余 {self._budget.remaining(contract.role_id)}，提示估计 {estimate}）"
+            self._emit(
+                AuditEventType.TOKEN_BUDGET_EXCEEDED,
+                role_id=contract.role_id,
+                payload={"action": "degrade", "reason": reason, "estimate": estimate},
+            )
+            raise _BudgetSkip(reason)
+        return min(cap, room)
+
+    def _apply_model_output(
+        self, outcome: ExpertOutcome, contract: RoleContract, response: ModelResponse, cache_kind: str
+    ) -> None:
+        outcome.raw_text = response.text
+        outcome.prompt_tokens = response.usage.prompt_tokens
+        outcome.completion_tokens = response.usage.completion_tokens
+        outcome.cached_prompt_tokens = response.usage.cached_prompt_tokens
+        outcome.cache_hit = cache_kind
+        try:
+            output = parse_json_output(response.text)
+        except ValueError as e:
+            outcome.violations.append(Violation(kind=ViolationKind.SCHEMA, detail=str(e)))
+            output = None
+        if output is not None:
+            outcome.output = output
+            outcome.violations.extend(
+                self._check_contract_output(contract, output, raw_text=response.text)
+            )
+        if contract.output_spec.strict and outcome.violations:
+            outcome.status = ExpertStatus.FAILED
+            outcome.error = "; ".join(v.detail for v in outcome.violations)
+        else:
+            outcome.status = ExpertStatus.COMPLETED
+
+    def _record_usage(self, role_id: str, step: str, usage, trace_id: str) -> None:
+        meters: list[Any] = []
+        if self._budget is not None:
+            meters.append(self._budget.meter)
+        if self._token_meter is not None and all(meter is not self._token_meter for meter in meters):
+            meters.append(self._token_meter)
+        for meter in meters:
+            meter.record(role_id, step, usage, trace_id or "")
+
+    def _cache_question(self, user_input: str) -> str:
+        shared = (self._active_shared or "").strip()
+        if not shared:
+            return user_input
+        return f"[shared]\n{shared}\n[input]\n{user_input}"
+
+    def _take_cache(self, contract: RoleContract, user_input: str, evidence: list[str] | None):
+        cache = self._response_cache
+        if cache is None:
+            return None
+        question = self._cache_question(user_input)
+        if isinstance(cache, SemanticCache):
+            value, kind = cache.get(
+                contract, question, evidence, semantic=self._allow_semantic_cache
+            )
+        elif isinstance(cache, ContractBoundCache):
+            value = cache.get(contract, question, evidence)
+            kind = "exact" if value is not None else "miss"
+        else:
+            got = cache.get(contract, question, evidence)
+            if isinstance(got, tuple) and len(got) == 2:
+                value, kind = got
+            else:
+                value, kind = got, ("exact" if got is not None else "miss")
+        unpacked = _unpack_cache(value)
+        if unpacked is None:
+            return None
+        output, raw_text, usage = unpacked
+        text = raw_text or json.dumps(output, ensure_ascii=False)
+        return ModelResponse(text=text, usage=usage, raw=output), kind
+
+    def _store_cache(
+        self,
+        contract: RoleContract,
+        user_input: str,
+        evidence: list[str] | None,
+        output: dict[str, Any],
+        raw_text: str,
+        usage,
+    ) -> None:
+        cache = self._response_cache
+        if cache is None:
+            return
+        cache.put(
+            contract,
+            self._cache_question(user_input),
+            evidence,
+            _pack_cache(output, raw_text, usage),
+        )
 
     def _memory_snapshot(self, contract: RoleContract) -> dict[str, Any]:
         snap: dict[str, Any] = {}

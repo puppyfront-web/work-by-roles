@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 0 省 Token**（会审主流程。构造参数都是可选的；唯一的默认行为变化是未分配专家不再空跑，可用 `skip_unassigned_experts=False` 恢复）：
+  - 提示词段序改为「安全护栏 → 团队共享上下文 → 角色契约 → 动态材料」。同一次运行里的专家从第一个 token 起共享前缀；不传 `shared_context` 时不插入空段，也不为凑 1024 token 缓存门槛而填充
+  - `ReviewSession(skip_unassigned_experts=True)`：协调者没有分配子任务的专家不再拿原始问题空跑。设为 `False` 恢复旧行为
+  - 模型请求携带契约 `token_quota.max_completion_tokens` 作为 `max_tokens`
+  - `token_budget` 接入会审：全场 `max_total_tokens` 与 `per_role` 可配。超限跳过该角色并写 `token_budget_exceeded` 审计；`on_exceed=reject` 也不会把异常抛出 `run()`。有预算时专家改为串行，便于用前一位的实际用量挡住后一位
+  - `response_cache` 可选接入 `ContractBoundCache`（默认关闭）。语义缓存只在 `allow_semantic_cache=True` 时做近似命中。命中会再跑契约校验
+  - `TokenUsage` / `TokenMeter` 记录供应商缓存字段（OpenAI `cached_tokens`、DeepSeek `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`、Anthropic `cache_read_input_tokens` / `cache_creation_input_tokens`），并用调用方给出的单价估算节省
+  - 离线报告：`python scripts/token_savings_report.py`（启发式计数 + 演示 Invoker，不需要 API Key）
+
 ## [2.2.0] · 2026-11-21
 
 ### Security

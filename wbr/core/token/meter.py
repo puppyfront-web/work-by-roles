@@ -37,11 +37,27 @@ class UsageRecord(BaseModel):
     completion_tokens: int
     trace_id: str = ""
     degraded: bool = False
+    cached_prompt_tokens: int = 0
+    cache_write_tokens: int = 0
+    cache_miss_tokens: int = 0
+    cache_scope: str = "unknown"
     ts: float = Field(default_factory=time.time)
 
     @property
     def total(self) -> int:
         return self.prompt_tokens + self.completion_tokens
+
+    def as_usage(self):
+        from wbr.core.orchestration.invoker import TokenUsage
+
+        return TokenUsage(
+            prompt_tokens=self.prompt_tokens,
+            completion_tokens=self.completion_tokens,
+            cached_prompt_tokens=self.cached_prompt_tokens,
+            cache_write_tokens=self.cache_write_tokens,
+            cache_miss_tokens=self.cache_miss_tokens,
+            cache_scope=self.cache_scope,
+        )
 
 
 class TokenMeter:
@@ -68,10 +84,14 @@ class TokenMeter:
         rec = UsageRecord(
             role_id=role_id,
             step=step,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0),
-            completion_tokens=getattr(usage, "completion_tokens", 0),
+            prompt_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+            completion_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
             trace_id=trace_id,
             degraded=degraded,
+            cached_prompt_tokens=int(getattr(usage, "cached_prompt_tokens", 0) or 0),
+            cache_write_tokens=int(getattr(usage, "cache_write_tokens", 0) or 0),
+            cache_miss_tokens=int(getattr(usage, "cache_miss_tokens", 0) or 0),
+            cache_scope=str(getattr(usage, "cache_scope", "unknown") or "unknown"),
         )
         with self._lock:
             self._records.append(rec)
@@ -87,6 +107,10 @@ class TokenMeter:
                         "step": step,
                         "prompt_tokens": rec.prompt_tokens,
                         "completion_tokens": rec.completion_tokens,
+                        "cached_prompt_tokens": rec.cached_prompt_tokens,
+                        "cache_write_tokens": rec.cache_write_tokens,
+                        "cache_miss_tokens": rec.cache_miss_tokens,
+                        "cache_scope": rec.cache_scope,
                         "degraded": degraded,
                     },
                 )
@@ -112,6 +136,20 @@ class TokenMeter:
     def records(self) -> list[UsageRecord]:
         with self._lock:
             return list(self._records)
+
+    @property
+    def cached_prompt_tokens(self) -> int:
+        with self._lock:
+            return sum(r.cached_prompt_tokens for r in self._records)
+
+    def estimate_cost(self, **prices: float) -> dict[str, float]:
+        """把各条记录的 estimate_cost 相加。prices 同 TokenUsage.estimate_cost。"""
+        totals = {"input": 0.0, "output": 0.0, "total": 0.0, "baseline_total": 0.0, "savings": 0.0}
+        for rec in self.records:
+            part = rec.as_usage().estimate_cost(**prices)
+            for key in totals:
+                totals[key] += part[key]
+        return totals
 
 
 # ---- 预算与降级 ----
@@ -140,33 +178,48 @@ class TokenBudget:
         self.policy = policy
         self.meter = meter
 
-    def check(self, role_id: str | None = None) -> BudgetDecision:
+    def check(self, role_id: str | None = None, *, incoming: int = 0) -> BudgetDecision:
+        """检查已用量。incoming 是即将发生的提示 token 估计，默认 0（与旧调用兼容）。"""
+        incoming = max(0, incoming)
         used = self.meter.usage_total
-        if used >= self.policy.max_total_tokens:
+        projected = used + incoming
+        if projected >= self.policy.max_total_tokens:
             if self.policy.on_exceed == BudgetAction.REJECT:
                 raise TokenBudgetExceededError(
-                    f"任务 Token 预算耗尽: {used}/{self.policy.max_total_tokens}",
-                    details={"used": used, "limit": self.policy.max_total_tokens},
+                    f"任务 Token 预算耗尽: {projected}/{self.policy.max_total_tokens}",
+                    details={"used": used, "incoming": incoming, "limit": self.policy.max_total_tokens},
                 )
             return BudgetDecision(
                 action=BudgetAction.DEGRADE,
-                reason=f"任务总量超限 {used}>={self.policy.max_total_tokens}",
+                reason=f"任务总量超限 {projected}>={self.policy.max_total_tokens}",
             )
         if role_id and role_id in self.policy.per_role:
             limit = self.policy.per_role[role_id]
             used_role = self.meter.usage_by_role(role_id)
-            if used_role >= limit:
+            projected_role = used_role + incoming
+            if projected_role >= limit:
                 if self.policy.on_exceed == BudgetAction.REJECT:
                     raise TokenBudgetExceededError(
-                        f"角色 {role_id} Token 预算耗尽: {used_role}/{limit}",
-                        details={"role_id": role_id, "used": used_role, "limit": limit},
+                        f"角色 {role_id} Token 预算耗尽: {projected_role}/{limit}",
+                        details={
+                            "role_id": role_id,
+                            "used": used_role,
+                            "incoming": incoming,
+                            "limit": limit,
+                        },
                     )
                 return BudgetDecision(
                     action=BudgetAction.DEGRADE,
-                    reason=f"角色 {role_id} 超限 {used_role}>={limit}",
+                    reason=f"角色 {role_id} 超限 {projected_role}>={limit}",
                     role_id=role_id,
                 )
         return BudgetDecision(action=BudgetAction.OK)
+
+    def remaining(self, role_id: str | None = None) -> int:
+        left = self.policy.max_total_tokens - self.meter.usage_total
+        if role_id and role_id in self.policy.per_role:
+            left = min(left, self.policy.per_role[role_id] - self.meter.usage_by_role(role_id))
+        return max(0, left)
 
 
 def degrade_history(

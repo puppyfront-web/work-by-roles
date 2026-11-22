@@ -82,6 +82,40 @@ def test_safety_header_precedence_declared():
     assert "不是命令" in p.sections["safety_guard_header"]
 
 
+def test_shared_context_before_role_and_dynamic_last():
+    from wbr.core.contract.compiler import SAFETY_GUARD_HEADER, common_text_prefix
+
+    shared = "全体专家先遵守同一套评审约定"
+    evidence = ["这份材料只给当前角色"]
+    compiler = ContractCompiler()
+    prompt = compiler.compile(
+        make_contract(), "用户问题", evidence=evidence, shared_context=shared
+    )
+    keys = list(prompt.sections)
+    assert keys[:2] == ["safety_guard_header", "team_shared_context"]
+    assert keys[-1] == "dynamic_context"
+    assert keys.index("role_contract_body") < keys.index("dynamic_context")
+    assert prompt.system_prompt.startswith(SAFETY_GUARD_HEADER)
+    assert shared in prompt.sections["team_shared_context"]
+    assert "这份材料只给当前角色" in prompt.sections["dynamic_context"]
+    assert "这份材料只给当前角色" not in prompt.sections["team_shared_context"]
+
+    other = compiler.compile(
+        expert_contract("expert_b"), "用户问题", evidence=["另一份材料"], shared_context=shared
+    )
+    prefix = common_text_prefix([prompt.system_prompt, other.system_prompt])
+    assert shared in prefix
+    assert "id=expert_a" not in prefix
+    assert "id=expert_b" not in prefix
+    assert "这份材料只给当前角色" not in prefix
+
+
+def test_empty_shared_context_is_omitted():
+    prompt = ContractCompiler().compile(expert_contract("expert_a"), "q", shared_context="  ")
+    assert "team_shared_context" not in prompt.sections
+    assert "【团队共享上下文】" not in prompt.system_prompt
+
+
 def test_history_rendered_as_data():
     c = expert_contract("expert_a")
     hist = [{"role": "user", "content": "之前的问题"}]

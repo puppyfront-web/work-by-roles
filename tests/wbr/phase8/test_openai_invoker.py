@@ -79,6 +79,27 @@ def test_invoke_maps_contract_prompt_to_messages():
     assert resp.text == "结论文本"
     assert resp.usage.prompt_tokens == 100
     assert resp.usage.total == 150
+    assert "max_tokens" not in seen
+
+
+def test_invoke_sends_max_tokens_and_reads_cache_usage():
+    seen = {}
+
+    def handler(request):
+        seen.update(json.loads(request.content))
+        body = completion("ok")
+        body["usage"]["prompt_tokens_details"] = {"cached_tokens": 40}
+        body["usage"]["prompt_cache_hit_tokens"] = 40
+        return httpx_response(body)
+
+    inv = OpenAICompatInvoker(api_key="sk", model="deepseek-chat")
+    mock_client(handler, inv)
+    request = make_request()
+    request.max_tokens = 256
+    resp = inv.invoke(request)
+    assert seen["max_tokens"] == 256
+    assert resp.usage.cached_prompt_tokens == 40
+    assert resp.usage.cache_scope == "included"
 
 
 def test_model_by_role_override():
