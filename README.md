@@ -4,7 +4,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.1.1-green.svg)]()
+[![Version](https://img.shields.io/badge/version-2.2.0-green.svg)](CHANGELOG.md)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-blue.svg)](https://puppyfront-web.github.io/work-by-roles/)
 [![CI](https://github.com/puppyfront-web/work-by-roles/actions/workflows/ci.yml/badge.svg)](https://github.com/puppyfront-web/work-by-roles/actions/workflows/ci.yml)
 
 [中文](README.md) | [English](README_EN.md)
@@ -57,8 +58,13 @@ work-by-roles 的回答：为每个 LLM 角色建立一份**可版本化的角�
 ### 第 1 步 · 安装
 
 ```bash
-pip install "work-by-roles[server]"   # SDK + CLI + API 服务 + 画布（httpx 用于真实模型调用）
-# 或最小安装：pip install work-by-roles
+# 尚未发布到 PyPI。发布之后可以改为：pip install "work-by-roles[server]"
+pip install "work-by-roles[server] @ git+https://github.com/puppyfront-web/work-by-roles.git"
+
+# 只要 SDK / CLI（演示模式，不含 API，也不含真实模型的 httpx）：
+# pip install "work-by-roles @ git+https://github.com/puppyfront-web/work-by-roles.git"
+# 只接真实模型、不要 API 服务：
+# pip install "work-by-roles[llm] @ git+https://github.com/puppyfront-web/work-by-roles.git"
 ```
 
 ### 第 2 步 · 跑一次演示（无需任何模型 Key）
@@ -79,6 +85,8 @@ export WBR_LLM_API_KEY=sk-...        # API Key（本地端点填任意非空值�
 export WBR_LLM_MODEL=gpt-4o-mini     # 模型名
 # export WBR_LLM_BASE_URL=https://api.openai.com/v1   # OpenAI 可省略，其他厂商必填
 
+# --live 需要 httpx。上面的 [server] 已包含；若只装了最小包，再装可选依赖：
+# pip install "work-by-roles[llm] @ git+https://github.com/puppyfront-web/work-by-roles.git"
 wbr run-team arch_review_team "评审：订单系统微服务拆分方案" --live
 ```
 
@@ -97,9 +105,12 @@ wbr run-team arch_review_team "评审：订单系统微服务拆分方案" --liv
 ### 第 4 步 · 可视化画布
 
 ```bash
-uvicorn --factory wbr.app.api.main:create_app --port 8000
+# 默认只监听本机。未设置 WBR_API_KEY 时不要改成 --host 0.0.0.0。
+uvicorn --factory wbr.app.api.main:create_app --host 127.0.0.1 --port 8000
 # 浏览器打开 http://127.0.0.1:8000/canvas
 ```
+
+对外暴露时先 `export WBR_API_KEY=一段足够长的随机串`，再在画布页头填入同一密钥（请求头 `X-API-Key`）。也可以不设密钥，但必须放在已经做了鉴权的反向代理后面。详见 [docs/DEPLOY.md](docs/DEPLOY.md)。
 
 - **导入官方模板**：左上角下拉选择 → 导入，一键载入整套专家团契约
 - **搭建团队**：创建协调者 / 专家 / 复核人契约，拖拽节点调整布局
@@ -261,11 +272,14 @@ Core 仅依赖标准库 + Pydantic V2，**不发起任何网络调用**——模
 使用 Harness：先固化基线快照，变更后运行黄金用例回归，六项指标对比，能力退化自动告警。见 [docs/HARNESS.md](docs/HARNESS.md)。
 
 **Q：想搭建"用户自建专家团"平台，需要补充什么？**
-治理内核、REST API（契约 CRUD / 版本 / Diff、异步评审、Harness、审计导出）、可视化画布均已内置；需自行补充产品外壳：用户账号体系、模型 Key 管理、团队级 CRUD 与持久化（企业版多 Workspace 可直接复用）。
+治理内核、REST API（契约 CRUD / 版本 / Diff、异步评审、Harness、审计导出）、可视化画布均已内置；需自行补充产品外壳：用户账号体系、模型 Key 管理、团队级 CRUD 与持久化（企业版多 Workspace 可直接复用）。服务自带的 `WBR_API_KEY` 是单密钥，不能代替多用户账号。
+
+**Q：可以把 API 暴露到公网吗？**
+默认只监听 `127.0.0.1`。若必须对外，设置 `WBR_API_KEY`（画布页头填同一密钥），或放在已做鉴权的反向代理之后。未配置密钥时，服务一旦监听到非本机地址会在日志里告警。
 
 ## 文档
 
-- [架构设计方案 V2](docs/ARCHITECTURE_V2.md) · [SDK 全量 API](docs/SDK.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md)
+- [在线文档](https://puppyfront-web.github.io/work-by-roles/) · [架构设计方案 V2](docs/ARCHITECTURE_V2.md) · [SDK 全量 API](docs/SDK.md) · [LangGraph 接入](docs/INTEGRATION_LANGGRAPH.md) · [Harness 回归与指标](docs/HARNESS.md) · [部署指南](docs/DEPLOY.md)
 - 设计规格：[docs/spec/README.md](docs/spec/README.md)（SPEC-000~006 + 审核记录）· 阶段验收报告：[docs/acceptance/](docs/acceptance/)
 - 示例索引：[examples/README.md](examples/README.md) · 更新日志：[CHANGELOG.md](CHANGELOG.md)
 
@@ -277,7 +291,7 @@ Core 仅依赖标准库 + Pydantic V2，**不发起任何网络调用**——模
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests -q                           # 全量测试（370+ 用例）
+pytest tests -q                           # 全量测试（405 项；未配置 Redis 时跳过 1 项）
 pytest tests/wbr/phase5 -q                # 打包构建与性能基准（slow/performance 标记）
 ```
 

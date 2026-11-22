@@ -2,8 +2,10 @@
 :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --danger:#ef4444; --ok:#34d399; }
 * { box-sizing: border-box; }
 body { margin:0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background:var(--bg); color:var(--text); }
-header { display:flex; align-items:baseline; gap:12px; padding:12px 20px; border-bottom:1px solid var(--line); }
+header { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 20px; border-bottom:1px solid var(--line); }
 header h1 { font-size:18px; margin:0; }
+header .api-key { margin-left:auto; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+header .api-key input { width:220px; }
 .muted { color:var(--muted); font-size:12px; }
 main { display:grid; grid-template-columns: 1fr 380px; gap:0; height: calc(100vh - 53px); }
 #canvas-pane { border-right:1px solid var(--line); overflow:auto; }

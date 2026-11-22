@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "work-by-roles"
-version = "2.1.1"
+version = "2.2.0"
 description = "Contract-driven expert-team governance system: role contracts, native review paradigm, isolated memory, Harness regression gates, contract-bound cache, full-chain audit (work-by-roles)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-  {name = "Work-by-Roles Contributors", email = "open@work-by-roles.example"}
+  {name = "Work-by-Roles Contributors", email = "puppy.front@gmail.com"}
 ]
 keywords = [
   "expert-team", "role-contract", "llm-governance", "langgraph",
@@ -46,6 +46,9 @@ dev = [
 langgraph = [
   "langgraph>=0.2",
   "langchain-core>=0.2",
+]
+llm = [
+  "httpx>=0.26",
 ]
 server = [
   "fastapi>=0.110",

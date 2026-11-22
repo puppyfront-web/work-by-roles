@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 import wbr
 from wbr.adapters.demo import SchemaDemoInvoker
+from wbr.app.api.auth import ApiKeyMiddleware, install_security_scheme, resolve_api_key
 from wbr.app.store import ContractRegistry
 from wbr.app.tasks.queue import (
     InlineTaskQueue,
@@ -47,6 +48,7 @@ _ERROR_STATUS = {
     "E9005": 409,  # 无变化
     "E9006": 404,  # 任务不存在
     "E9007": 404,  # 用例库不存在
+    "E9008": 401,  # 缺少或无效的 API Key
     "E9022": 422,  # 请求体校验失败
 }
 
@@ -128,8 +130,13 @@ def create_app(
     invoker: Any | None = None,
     data_root: str | Path | None = None,
     queue: TaskQueue | None = None,
+    api_key: str | None = None,
 ) -> Any:
-    """构建 FastAPI 应用。fastapi 缺失时抛带指引的 AppError。"""
+    """构建 FastAPI 应用。fastapi 缺失时抛带指引的 AppError。
+
+    api_key 为 None 时读取环境变量 WBR_API_KEY；传入空字符串则强制关闭鉴权。
+    密钥非空时，除健康检查与画布静态资源外的接口都要带 X-API-Key 或 Bearer。
+    """
     try:
         from fastapi import FastAPI, Query, Request
         from fastapi.exceptions import RequestValidationError
@@ -141,6 +148,7 @@ def create_app(
             "API 服务需要安装可选依赖: pip install 'work-by-roles[server]' (fastapi/uvicorn/httpx)"
         ) from e
 
+    configured_key = resolve_api_key(api_key)
     root = Path(data_root) if data_root else Path("./wbr-data")
     if invoker is None:
         # 环境变量配置了真实模型（WBR_LLM_API_KEY + WBR_LLM_MODEL）则自动启用，否则回落演示 Invoker
@@ -175,6 +183,7 @@ def create_app(
             await services.queue.stop()
 
     app = FastAPI(title="work-by-roles API", version=wbr.__version__, lifespan=lifespan)
+    app.add_middleware(ApiKeyMiddleware, api_key=configured_key)
 
     # ---- 统一错误体 ----
     @app.exception_handler(WBRError)
@@ -203,6 +212,7 @@ def create_app(
         return {
             "status": "ok",
             "version": wbr.__version__,
+            "auth_required": bool(configured_key),
             "components": {
                 "registry": True,
                 "queue": type(services.queue).__name__,
@@ -379,4 +389,5 @@ def create_app(
             "live": not isinstance(services.invoker, _DemoInvoker),
         }
 
+    install_security_scheme(app, enabled=bool(configured_key))
     return app

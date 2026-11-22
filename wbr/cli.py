@@ -102,7 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("team")
     run.add_argument("question")
     run.add_argument("--live", action="store_true",
-                     help="调用真实模型（需 WBR_LLM_API_KEY / WBR_LLM_MODEL，可选 WBR_LLM_BASE_URL）")
+                     help="调用真实模型（需 WBR_LLM_API_KEY / WBR_LLM_MODEL，"
+                          "可选 WBR_LLM_BASE_URL；httpx 来自可选依赖 [llm]）")
     run.add_argument("--demo-output", action="store_true", help="静默演示提示")
     run.set_defaults(func=cmd_run_team)
 

@@ -4,6 +4,7 @@
 "use strict";
 
 const API = "/api/v1";
+const KEY_STORAGE = "wbr-api-key";
 const state = {
   contracts: [],          // 契约摘要列表
   selected: null,         // 当前编辑的 role_id
@@ -20,8 +21,29 @@ const el = (tag, attrs = {}, text) => {
   return n;
 };
 
+function currentKey() {
+  const input = $("api-key");
+  if (input && input.value.trim()) return input.value.trim();
+  return sessionStorage.getItem(KEY_STORAGE) || "";
+}
+
+function persistKey() {
+  const value = $("api-key").value.trim();
+  if (value) sessionStorage.setItem(KEY_STORAGE, value);
+  else sessionStorage.removeItem(KEY_STORAGE);
+}
+
+function authHeaders(base) {
+  const headers = Object.assign({}, base);
+  const key = currentKey();
+  if (key) headers["X-API-Key"] = key;
+  return headers;
+}
+
 async function api(path, opts) {
-  const res = await fetch(API + path, opts);
+  const options = Object.assign({}, opts);
+  options.headers = authHeaders(options.headers);
+  const res = await fetch(API + path, options);
   if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -32,10 +54,19 @@ async function api(path, opts) {
 }
 
 /* ---------- 契约列表 ---------- */
+let refreshTicket = 0;
 async function refresh() {
-  const res = await fetch("/canvas/api-bootstrap");
+  const ticket = ++refreshTicket;
+  const res = await fetch("/canvas/api-bootstrap", { headers: authHeaders() });
+  if (ticket !== refreshTicket) return;
+  if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    const msg = body.error ? `${body.error.code}: ${body.error.message}` : "需要 API Key";
+    throw new Error(msg);
+  }
   if (!res.ok) throw new Error("bootstrap " + res.status);
   const boot = await res.json();
+  if (ticket !== refreshTicket) return;
   state.contracts = boot.contracts || [];
   $("api-version").textContent = "v" + boot.version + " · " +
     (boot.live ? `真实模型（${boot.invoker}）` : "演示模式（未配置 WBR_LLM_* 环境变量）");
@@ -345,14 +376,21 @@ function renderResult(result) {
 }
 
 /* ---------- 官方模板导入 ---------- */
+let templateTicket = 0;
 async function loadTemplates() {
+  const ticket = ++templateTicket;
   const sel = $("tpl-select");
+  const previous = sel.value;
+  sel.innerHTML = "";
+  sel.appendChild(el("option", { value: "" }, "导入官方模板…"));
   try {
     const teams = await api("/templates");
+    if (ticket !== templateTicket) return;
     teams.forEach((t) => {
       sel.appendChild(el("option", { value: t.name }, `${t.name}（${t.roles.length} 角色）`));
     });
-  } catch (e) { /* 旧版 API 无此端点，静默降级 */ }
+    if (previous) sel.value = previous;
+  } catch (e) { /* 旧版 API 无此端点或尚未带上密钥时静默降级 */ }
 }
 
 async function importTemplate() {
@@ -368,8 +406,43 @@ async function importTemplate() {
   }
 }
 
+async function noteAuthMode() {
+  try {
+    const res = await fetch(API + "/healthz");
+    if (!res.ok) return;
+    const body = await res.json();
+    $("api-key-hint").textContent = body.auth_required
+      ? "已启用鉴权，请填写与服务器相同的密钥"
+      : "未启用鉴权，仅建议本机访问";
+    if (body.auth_required && !currentKey()) $("api-key").focus();
+  } catch (e) {
+    $("api-key-hint").textContent = "";
+  }
+}
+
+function applyApiKey() {
+  persistKey();
+  noteAuthMode();
+  loadTemplates();
+  return refresh();
+}
+
+function commitApiKey() {
+  applyApiKey().catch((e) => {
+    $("api-version").textContent = "API 不可用: " + e.message;
+  });
+}
+
 /* ---------- 启动 ---------- */
 window.addEventListener("DOMContentLoaded", () => {
+  const stored = sessionStorage.getItem(KEY_STORAGE);
+  if (stored) $("api-key").value = stored;
+  $("api-key").addEventListener("change", commitApiKey);
+  $("api-key").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    commitApiKey();
+  });
   $("btn-refresh").addEventListener("click", refresh);
   $("btn-new").addEventListener("click", newContract);
   $("btn-save").addEventListener("click", saveContract);
@@ -378,6 +451,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("btn-run").addEventListener("click", runReview);
   $("btn-import-template").addEventListener("click", importTemplate);
   $("f-schema").addEventListener("input", (e) => schemaFeedback(e.target.value));
+  noteAuthMode();
   loadTemplates();
   refresh().catch((e) => {
     $("api-version").textContent = "API 不可用: " + e.message;

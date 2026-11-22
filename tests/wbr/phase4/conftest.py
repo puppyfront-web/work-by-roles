@@ -23,7 +23,7 @@ def contract_payload(cid="expert_a", role_type="expert"):
 def client(tmp_path):
     from fastapi.testclient import TestClient
 
-    app = create_app(data_root=tmp_path / "data")
+    app = create_app(data_root=tmp_path / "data", api_key="")
     with TestClient(app) as c:
         yield c
 

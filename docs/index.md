@@ -27,7 +27,8 @@ work-by-roles 的回答：为每个 LLM 角色建立一份**可版本化的角�
 ## 30 秒跑通（无需任何模型 Key）
 
 ```bash
-pip install "work-by-roles[server]"
+# 尚未发布到 PyPI。发布后可改为 pip install "work-by-roles[server]"
+pip install "work-by-roles[server] @ git+https://github.com/puppyfront-web/work-by-roles.git"
 wbr run-team arch_review_team "评审：订单系统微服务拆分方案"
 ```
 
@@ -49,7 +50,7 @@ wbr run-team arch_review_team "评审：订单系统微服务拆分方案" --liv
 | [SDK 全量 API](SDK.md) | RoleContract / ReviewSession / 记忆 / 缓存 / 审计 |
 | [LangGraph 接入](INTEGRATION_LANGGRAPH.md) | `WBRGuard` 3 行接入存量 Graph |
 | [Harness 回归与指标](HARNESS.md) | 黄金用例、基线快照、六项指标、退化检测 |
-| [部署指南](DEPLOY.md) | 生产部署、存储选型、OTel |
+| [部署指南](DEPLOY.md) | 本机监听、API Key、反向代理 |
 | [真实项目验证](REAL_WORLD_VALIDATION.md) | 真实项目接入的验证流程 |
 | [设计规格](spec/README.md) | SPEC-000~006 + 审核记录 |
 | [验收总结](acceptance/FINAL.md) | 阶段验收报告汇总 |
