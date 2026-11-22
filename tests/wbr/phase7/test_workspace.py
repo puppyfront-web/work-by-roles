@@ -28,6 +28,10 @@ def test_name_constraints(tmp_path):
         reg.create("Bad-Name")
     with pytest.raises(AppError, match="名称"):
         reg.create("x" * 40)
+    with pytest.raises(AppError, match="名称"):
+        reg.get("..")
+    with pytest.raises(AppError, match="名称"):
+        reg.registry("../outside")
 
 
 def test_contract_isolation(tmp_path):

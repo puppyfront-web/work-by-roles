@@ -272,7 +272,7 @@ Core 仅依赖标准库 + Pydantic V2，**不发起任何网络调用**——模
 使用 Harness：先固化基线快照，变更后运行黄金用例回归，六项指标对比，能力退化自动告警。见 [docs/HARNESS.md](docs/HARNESS.md)。
 
 **Q：想搭建"用户自建专家团"平台，需要补充什么？**
-治理内核、REST API（契约 CRUD / 版本 / Diff、异步评审、Harness、审计导出）、可视化画布均已内置；需自行补充产品外壳：用户账号体系、模型 Key 管理、团队级 CRUD 与持久化（企业版多 Workspace 可直接复用）。服务自带的 `WBR_API_KEY` 是单密钥，不能代替多用户账号。
+治理内核、REST API（契约 CRUD / 版本 / Diff、异步评审、Harness、审计导出）、可视化画布均已内置。多团队隔离用请求头 `X-WBR-Workspace`（见 [docs/DEPLOY.md](docs/DEPLOY.md)），不带头时仍是原来的单目录。需自行补充的产品外壳：用户账号体系，以及每人自己的模型 Key。`WBR_API_KEY` 是整站一把密钥，不能代替多用户账号。
 
 **Q：可以把 API 暴露到公网吗？**
 默认只监听 `127.0.0.1`。若必须对外，设置 `WBR_API_KEY`（画布页头填同一密钥），或放在已做鉴权的反向代理之后。未配置密钥时，服务一旦监听到非本机地址会在日志里告警。
@@ -291,7 +291,7 @@ Core 仅依赖标准库 + Pydantic V2，**不发起任何网络调用**——模
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests -q                           # 全量测试（405 项；未配置 Redis 时跳过 1 项）
+pytest tests -q                           # 全量测试（413 项；未配置 Redis 时跳过 1 项）
 pytest tests/wbr/phase5 -q                # 打包构建与性能基准（slow/performance 标记）
 ```
 

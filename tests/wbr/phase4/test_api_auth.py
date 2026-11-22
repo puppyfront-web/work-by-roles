@@ -25,6 +25,8 @@ _PROTECTED = (
     ("post", "/api/v1/reviews"),
     ("post", "/api/v1/harness/regressions"),
     ("get", "/api/v1/audits/export"),
+    ("get", "/api/v1/workspaces"),
+    ("post", "/api/v1/workspaces"),
     ("get", "/api/v1/templates"),
     ("post", "/api/v1/templates/arch_review_team/import"),
     ("get", "/canvas/api-bootstrap"),

@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Added
+- **API 接入多 Workspace**（SPEC-008 当时明确留给 App 层的接线）：请求头 `X-WBR-Workspace` 把契约、用例库、会审/回归任务和画布 bootstrap 切到 `<data_root>/workspaces/<name>/`。不带头时仍用原来的默认目录，已有客户端不用改。新增 `GET/POST /api/v1/workspaces`、`DELETE /api/v1/workspaces/{name}`，以及 `POST /api/v1/workspaces/{name}/contracts/{role_id}/copy`（沿用带血缘的 `copy_contract`）。画布工具栏可填写 workspace 名，只存在当前浏览器会话。审计导出仍是进程级，不按 workspace 切开。
+
 ## [2.2.0] · 2026-11-21
 
 ### Security

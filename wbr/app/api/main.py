@@ -25,6 +25,7 @@ from wbr.app.tasks.queue import (
     TaskQueue,
     TaskRecord,
 )
+from wbr.app.workspace import WorkspaceRegistry
 from wbr.core.audit.pack import AuditPackBuilder
 from wbr.core.audit.trail import AuditTrail
 from wbr.core.contract.models import RoleContract
@@ -71,14 +72,22 @@ class RegressionSubmit(BaseModel):
     stability_runs: int = Field(default=1, ge=1, le=5)
 
 
+class WorkspaceCreate(BaseModel):
+    name: str
+
+
+class ContractCopy(BaseModel):
+    source: str
+
+
 class _DemoInvoker(SchemaDemoInvoker):
     """默认演示 Invoker：Schema 驱动确定性输出，任意契约形状零违例（无外部 LLM 依赖）。"""
 
 
-def _resolve_contracts(services: _Services, cids: list[str]) -> dict[str, RoleContract]:
+def _resolve_contracts(registry: ContractRegistry, cids: list[str]) -> dict[str, RoleContract]:
     out: dict[str, RoleContract] = {}
     for cid in cids:
-        c = services.registry.get(cid)
+        c = registry.get(cid)
         if c is None:
             raise AppError(f"契约不存在: {cid}", code="E9003")
         out[cid] = c
@@ -88,7 +97,8 @@ def _resolve_contracts(services: _Services, cids: list[str]) -> dict[str, RoleCo
 def _handle_review(services: _Services, record: TaskRecord) -> dict:
     payload = record.payload
     contracts = _resolve_contracts(
-        services, [payload["coordinator"], *payload["experts"], payload["verifier"]]
+        services.registry_for(record),
+        [payload["coordinator"], *payload["experts"], payload["verifier"]],
     )
     session = ReviewSession(
         coordinator_contract=contracts[payload["coordinator"]],
@@ -103,7 +113,7 @@ def _handle_review(services: _Services, record: TaskRecord) -> dict:
 
 def _handle_regression(services: _Services, record: TaskRecord) -> dict:
     payload = record.payload
-    contracts = _resolve_contracts(services, payload["contract_ids"])
+    contracts = _resolve_contracts(services.registry_for(record), payload["contract_ids"])
     suite = CaseSuite.model_validate(payload["suite"])
     baseline = None
     if payload.get("baseline"):
@@ -115,14 +125,42 @@ def _handle_regression(services: _Services, record: TaskRecord) -> dict:
     return json.loads(report.to_json())
 
 
+class _Scope:
+    def __init__(self, registry, task_store, suite_dir: Path, workspace: str | None) -> None:
+        self.registry = registry
+        self.task_store = task_store
+        self.suite_dir = suite_dir
+        self.workspace = workspace
+
+
 class _Services:
-    def __init__(self, *, registry, queue, audit, invoker, data_root, task_store) -> None:
+    def __init__(
+        self, *, registry, queue, audit, invoker, data_root, task_store, workspaces,
+    ) -> None:
         self.registry = registry
         self.queue = queue
         self.audit = audit
         self.invoker = invoker
         self.data_root = data_root
         self.task_store = task_store
+        self.workspaces = workspaces
+
+    def registry_for(self, record: TaskRecord) -> ContractRegistry:
+        if record.workspace:
+            return self.workspaces.registry(record.workspace)
+        return self.registry
+
+    def scope(self, workspace_header: str | None) -> _Scope:
+        name = (workspace_header or "").strip()
+        if not name:
+            return _Scope(self.registry, self.task_store, self.data_root / "suites", None)
+        self.workspaces.get(name)
+        return _Scope(
+            self.workspaces.registry(name),
+            self.workspaces.task_store(name),
+            self.workspaces.suite_path(name),
+            name,
+        )
 
 
 def create_app(
@@ -138,7 +176,7 @@ def create_app(
     密钥非空时，除健康检查与画布静态资源外的接口都要带 X-API-Key 或 Bearer。
     """
     try:
-        from fastapi import FastAPI, Query, Request
+        from fastapi import Depends, FastAPI, Header, Query, Request
         from fastapi.exceptions import RequestValidationError
         from fastapi.responses import FileResponse, JSONResponse
         from fastapi.staticfiles import StaticFiles
@@ -162,6 +200,7 @@ def create_app(
         invoker=invoker,
         data_root=root,
         task_store=JsonTaskStore(root / "tasks"),
+        workspaces=WorkspaceRegistry(root),
     )
 
     def _dispatch(record: TaskRecord) -> Any:
@@ -198,6 +237,19 @@ def create_app(
             "message": json.dumps(exc.errors()[:3], ensure_ascii=False, default=str),
         }})
 
+    def _owned(scope: _Scope, record: TaskRecord | None) -> TaskRecord | None:
+        if record is None or record.workspace != scope.workspace:
+            return None
+        return record
+
+    def _load_task(scope: _Scope, task_id: str) -> TaskRecord:
+        record = _owned(scope, services.queue.get(task_id))
+        if record is None:
+            record = _owned(scope, scope.task_store.load(task_id))
+        if record is None:
+            raise AppError(f"任务不存在: {task_id}", code="E9006")
+        return record
+
     def _parse_contract(body: ContractPayload) -> RoleContract:
         try:
             contract = RoleContract.model_validate(body.contract)
@@ -205,6 +257,11 @@ def create_app(
             raise AppError(f"契约结构不合法: {e.errors()[:3]}", code="E9022") from e
         contract.meta.content_hash = RoleContract.compute_hash(contract)
         return contract
+
+    def _workspace_name(
+        x_wbr_workspace: str | None = Header(default=None, alias="X-WBR-Workspace"),
+    ) -> str | None:
+        return x_wbr_workspace
 
     # ---- 健康 ----
     @app.get("/api/v1/healthz")
@@ -223,41 +280,44 @@ def create_app(
 
     # ---- 契约 CRUD + 版本 ----
     @app.post("/api/v1/contracts", status_code=201)
-    def create_contract(body: ContractPayload):
-        saved = services.registry.create(_parse_contract(body))
+    def create_contract(body: ContractPayload, workspace: str | None = Depends(_workspace_name)):
+        saved = services.scope(workspace).registry.create(_parse_contract(body))
         return json.loads(saved.to_json())
 
     @app.get("/api/v1/contracts")
-    def list_contracts():
-        return [json.loads(c.to_json()) for c in services.registry.list()]
+    def list_contracts(workspace: str | None = Depends(_workspace_name)):
+        return [json.loads(c.to_json()) for c in services.scope(workspace).registry.list()]
 
     @app.get("/api/v1/contracts/{cid}")
-    def get_contract(cid: str):
-        c = services.registry.get(cid)
+    def get_contract(cid: str, workspace: str | None = Depends(_workspace_name)):
+        c = services.scope(workspace).registry.get(cid)
         if c is None:
             raise AppError(f"契约不存在: {cid}", code="E9003")
         return json.loads(c.to_json())
 
     @app.put("/api/v1/contracts/{cid}")
-    def update_contract(cid: str, body: ContractPayload):
-        updated, diff = services.registry.update(cid, _parse_contract(body))
+    def update_contract(
+        cid: str, body: ContractPayload, workspace: str | None = Depends(_workspace_name),
+    ):
+        updated, diff = services.scope(workspace).registry.update(cid, _parse_contract(body))
         return {"contract": json.loads(updated.to_json()),
                 "diff": diff.to_dict() if diff else None}
 
     @app.delete("/api/v1/contracts/{cid}", status_code=204)
-    def delete_contract(cid: str):
-        if not services.registry.delete(cid):
+    def delete_contract(cid: str, workspace: str | None = Depends(_workspace_name)):
+        if not services.scope(workspace).registry.delete(cid):
             raise AppError(f"契约不存在: {cid}", code="E9003")
 
     @app.get("/api/v1/contracts/{cid}/versions")
-    def list_versions(cid: str):
-        if services.registry.get(cid) is None:
+    def list_versions(cid: str, workspace: str | None = Depends(_workspace_name)):
+        registry = services.scope(workspace).registry
+        if registry.get(cid) is None:
             raise AppError(f"契约不存在: {cid}", code="E9003")
-        return services.registry.versions(cid)
+        return registry.versions(cid)
 
     @app.get("/api/v1/contracts/{cid}/versions/{version}")
-    def get_version(cid: str, version: str):
-        v = services.registry.get_version(cid, version)
+    def get_version(cid: str, version: str, workspace: str | None = Depends(_workspace_name)):
+        v = services.scope(workspace).registry.get_version(cid, version)
         if v is None:
             raise AppError(f"版本不存在: {cid}@{version}", code="E9003")
         return json.loads(v.to_json())
@@ -265,49 +325,53 @@ def create_app(
     @app.get("/api/v1/contracts/{cid}/diff")
     def diff_versions(
         cid: str,
+        workspace: str | None = Depends(_workspace_name),
         from_version: str | None = Query(default=None, alias="from"),
         to_version: str | None = Query(default=None, alias="to"),
     ):
         v1, v2 = from_version, to_version
         if not v1 or not v2:
             raise AppError("需要 from/to 查询参数", code="E9022")
-        report = services.registry.diff_versions(cid, v1, v2)
+        report = services.scope(workspace).registry.diff_versions(cid, v1, v2)
         if report is None:
             raise AppError(f"版本不存在: {cid} {v1}/{v2}", code="E9003")
         return report.to_dict()
 
     # ---- 会审调度 ----
     @app.post("/api/v1/reviews", status_code=202)
-    def submit_review(body: ReviewSubmit):
-        _resolve_contracts(services, [body.coordinator, *body.experts, body.verifier])
-        record = services.queue.submit(TaskRecord(kind=TaskKind.REVIEW, payload=body.model_dump()))
-        services.task_store.save(record)
+    def submit_review(body: ReviewSubmit, workspace: str | None = Depends(_workspace_name)):
+        scope = services.scope(workspace)
+        _resolve_contracts(scope.registry, [body.coordinator, *body.experts, body.verifier])
+        record = services.queue.submit(TaskRecord(
+            kind=TaskKind.REVIEW, payload=body.model_dump(), workspace=scope.workspace,
+        ))
+        scope.task_store.save(record)
         if isinstance(services.invoker, _DemoInvoker):
             services.invoker.expert_ids = list(body.experts)
             services.invoker.question = body.question
         return {"task_id": record.task_id, "status": record.status.value}
 
     @app.get("/api/v1/reviews")
-    def list_reviews():
+    def list_reviews(workspace: str | None = Depends(_workspace_name)):
+        scope = services.scope(workspace)
         return [{"task_id": r.task_id, "status": r.status.value, "created_at": r.created_at}
-                for r in services.queue.list() if r.kind == TaskKind.REVIEW]
+                for r in services.queue.list()
+                if r.kind == TaskKind.REVIEW and r.workspace == scope.workspace]
 
     @app.get("/api/v1/reviews/{task_id}")
-    def get_review(task_id: str):
-        record = services.queue.get(task_id) or services.task_store.load(task_id)
-        if record is None:
-            raise AppError(f"任务不存在: {task_id}", code="E9006")
+    def get_review(task_id: str, workspace: str | None = Depends(_workspace_name)):
+        record = _load_task(services.scope(workspace), task_id)
         return {"task_id": record.task_id, "status": record.status.value,
                 "error": record.error, "result": record.result}
 
     # ---- Harness 回归 ----
     @app.post("/api/v1/harness/suites", status_code=201)
-    def create_suite(suite: dict[str, Any]):
+    def create_suite(suite: dict[str, Any], workspace: str | None = Depends(_workspace_name)):
         try:
             validated = CaseSuite.model_validate(suite)
         except ValidationError as e:
             raise AppError(f"用例库不合法: {e.errors()[:3]}", code="E9022") from e
-        suite_dir = services.data_root / "suites"
+        suite_dir = services.scope(workspace).suite_dir
         suite_dir.mkdir(parents=True, exist_ok=True)
         (suite_dir / f"{validated.suite_id}.json").write_text(
             validated.model_dump_json(indent=2), encoding="utf-8"
@@ -315,24 +379,25 @@ def create_app(
         return json.loads(validated.model_dump_json())
 
     @app.get("/api/v1/harness/suites/{suite_id}")
-    def get_suite(suite_id: str):
-        p = services.data_root / "suites" / f"{suite_id}.json"
+    def get_suite(suite_id: str, workspace: str | None = Depends(_workspace_name)):
+        p = services.scope(workspace).suite_dir / f"{suite_id}.json"
         if not p.is_file():
             raise AppError(f"用例库不存在: {suite_id}", code="E9007")
         return json.loads(p.read_text(encoding="utf-8"))
 
     @app.post("/api/v1/harness/regressions", status_code=202)
-    def submit_regression(body: RegressionSubmit):
-        _resolve_contracts(services, body.contract_ids)
-        record = services.queue.submit(TaskRecord(kind=TaskKind.REGRESSION, payload=body.model_dump()))
-        services.task_store.save(record)
+    def submit_regression(body: RegressionSubmit, workspace: str | None = Depends(_workspace_name)):
+        scope = services.scope(workspace)
+        _resolve_contracts(scope.registry, body.contract_ids)
+        record = services.queue.submit(TaskRecord(
+            kind=TaskKind.REGRESSION, payload=body.model_dump(), workspace=scope.workspace,
+        ))
+        scope.task_store.save(record)
         return {"task_id": record.task_id, "status": record.status.value}
 
     @app.get("/api/v1/harness/regressions/{task_id}")
-    def get_regression(task_id: str):
-        record = services.queue.get(task_id) or services.task_store.load(task_id)
-        if record is None:
-            raise AppError(f"任务不存在: {task_id}", code="E9006")
+    def get_regression(task_id: str, workspace: str | None = Depends(_workspace_name)):
+        record = _load_task(services.scope(workspace), task_id)
         return {"task_id": record.task_id, "status": record.status.value,
                 "error": record.error, "report": record.result}
 
@@ -344,18 +409,38 @@ def create_app(
         return list_teams()
 
     @app.post("/api/v1/templates/{team}/import", status_code=201)
-    def import_template(team: str):
+    def import_template(team: str, workspace: str | None = Depends(_workspace_name)):
         from wbr.templates.registry import load_team
 
+        registry = services.scope(workspace).registry
         contracts = load_team(team)  # 未知名抛 E9003
         imported, skipped = [], []
         for rid in sorted(contracts):
-            if services.registry.get(rid) is not None:
+            if registry.get(rid) is not None:
                 skipped.append(rid)
                 continue
-            services.registry.create(contracts[rid])
+            registry.create(contracts[rid])
             imported.append(rid)
         return {"team": team, "imported": imported, "skipped": skipped}
+
+    # ---- Workspace ----
+    @app.get("/api/v1/workspaces")
+    def list_workspaces():
+        return [{"name": ws.name} for ws in services.workspaces.list()]
+
+    @app.post("/api/v1/workspaces", status_code=201)
+    def create_workspace(body: WorkspaceCreate):
+        ws = services.workspaces.create(body.name)
+        return {"name": ws.name}
+
+    @app.delete("/api/v1/workspaces/{name}", status_code=204)
+    def delete_workspace(name: str):
+        services.workspaces.delete(name)
+
+    @app.post("/api/v1/workspaces/{name}/contracts/{role_id}/copy", status_code=201)
+    def copy_contract(name: str, role_id: str, body: ContractCopy):
+        copied = services.workspaces.copy_contract(body.source, name, role_id)
+        return json.loads(copied.to_json())
 
     # ---- 审计导出 ----
     @app.get("/api/v1/audits/export")
@@ -376,15 +461,17 @@ def create_app(
     app.mount("/canvas/static", StaticFiles(directory=str(_STATIC_DIR)), name="canvas-static")
 
     @app.get("/canvas/api-bootstrap")
-    def canvas_bootstrap():
+    def canvas_bootstrap(workspace: str | None = Depends(_workspace_name)):
+        scope = services.scope(workspace)
         return {
             "contracts": [
                 {"role_id": c.role_id, "role_type": c.role_type.value,
                  "version": c.meta.version, "content_hash": c.content_hash[:8],
                  "name": c.identity.name}
-                for c in services.registry.list()
+                for c in scope.registry.list()
             ],
             "version": wbr.__version__,
+            "workspace": scope.workspace,
             "invoker": type(services.invoker).__name__,
             "live": not isinstance(services.invoker, _DemoInvoker),
         }

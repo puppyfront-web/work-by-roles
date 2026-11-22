@@ -290,8 +290,9 @@ six metrics compared, degradation auto-flagged. See [docs/HARNESS.md](docs/HARNE
 
 **Q: What do I need to build a "users create their own expert teams" platform?**
 The governance kernel, REST API (contract CRUD/versioning/diff, async reviews, Harness, audit
-export), and visual canvas are built in. What you add: user accounts, model-key management,
-team-level CRUD and persistence (the enterprise multi-workspace layer is directly reusable).
+export), and visual canvas are built in. Team isolation is the `X-WBR-Workspace` header
+(see [docs/DEPLOY.md](docs/DEPLOY.md)); omit it and the server keeps the original single data
+directory. What you still add: user accounts, and each user's own model key.
 `WBR_API_KEY` is a single shared secret, not a multi-user account system.
 
 **Q: Can I expose the API on the public internet?**
@@ -318,7 +319,7 @@ financial report audit, and interview assessment are all in real demand).
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests -q                           # full suite (405 tests; 1 skipped without Redis)
+pytest tests -q                           # full suite (413 tests; 1 skipped without Redis)
 pytest tests/wbr/phase5 -q                # packaging & performance benchmarks (slow/performance marks)
 ```
 

@@ -22,7 +22,8 @@ def test_package_version_matches_pyproject_and_changelog():
     changelog = _read("CHANGELOG.md")
     assert f"## [{version}]" in changelog
     unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
-    assert "###" not in unreleased
+    assert "X-WBR-Workspace" in unreleased
+    assert "真实模型首跑" not in unreleased
 
 
 def test_readmes_point_at_git_install_and_docs():
