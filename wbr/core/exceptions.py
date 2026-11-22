@@ -70,6 +70,18 @@ class TokenBudgetExceededError(WBRError):
     default_code = "E5001"
 
 
+class AuditChainBroken(WBRError):
+    """审计哈希链断裂。details['broken_at'] 是第一条对不上的位置（从 0 起）。"""
+
+    default_code = "E5002"
+
+
+class AuditSchemaError(WBRError):
+    """审计库结构版本无法识别，或哈希算法与本内核不一致。"""
+
+    default_code = "E5003"
+
+
 class OrchestrationError(WBRError):
     default_code = "E6001"
 

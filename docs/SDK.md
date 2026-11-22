@@ -161,12 +161,30 @@ baseline.is_current(contracts, suite)   # 契约/用例漂移一致性
 
 ```python
 from wbr import AuditTrail, AuditPackBuilder, AuditEvent, AuditEventType
+from wbr import InMemoryAuditStore, SqliteAuditStore
 
-trail = AuditTrail(); trail.append(AuditEvent(event_type=..., trace_id=..., payload={...}))
+trail = AuditTrail()                       # 不挂存储：仍是内存列表，既有代码不用改
+trail.append(AuditEvent(event_type=..., trace_id=..., payload={...}))
 trail.events_for(trace_id); trail.tree(trace_id)
 pack = AuditPackBuilder(trail, include_contents=False).build(results=[review_result])
 pack.save("audit-pack.json")    # 脱敏导出 + content_digest 完整性
+
+store = SqliteAuditStore("audit.db")       # 或 InMemoryAuditStore()；只用标准库 sqlite3
+trail.attach_store(store)                  # 把库里已有事件装回 trail.events
+trail.append(event, run_id="task-1", session_id="task-1")
+store.query(run_id="task-1", event_type="expert_skipped", since=0, until=None, limit=100)
+store.verify()                  # ChainVerification；broken_at 为第一条断裂的位置
+store.verify(strict=True)       # 断裂时抛 AuditChainBroken（打开 SQLite 时默认就是严格校验）
 ```
+
+`create_app(audit_store=...)` 直接注入存储。`create_app(audit_db=path)` 或环境变量 `WBR_AUDIT_DB` 使用 SQLite；`audit_db=""` 强制内存。未传 `run_id` 时用事件的 `trace_id`。API 会审把 `task_id` 当作 `run_id`。
+
+查询接口（只读，跟随 `WBR_API_KEY`）：
+
+- `GET /api/v1/audits/events?run_id=&session_id=&trace_id=&event_type=&since=&until=&limit=`
+- `GET /api/v1/reviews/{task_id}/audits`
+
+Postgres 存储不要加进内核。wbr-studio 实现 `AuditStore`：同一套逻辑列（`audit_meta`、`audit_events`），追加时在事务里锁住链尾再写下一 `seq`，哈希必须调用 `wbr.core.audit.chain.audit_record_hash`（算法版本 `audit_record_hash.v1`，创世 `prev_hash` 为 64 个 0）。SQLite 这一份只保证单进程内的并发追加。
 
 ## 11. HITL 审批状态机
 

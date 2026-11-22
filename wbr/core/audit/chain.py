@@ -14,6 +14,8 @@ from wbr.core.audit.models import AuditEvent
 from wbr.core.canonical import canonical_json, sha256_hex
 
 GENESIS = "0" * 64
+# 持久化记录的哈希算法版本。wbr-studio 的 Postgres 实现必须沿用此版本，不要另写一套。
+HASH_ALG = "audit_record_hash.v1"
 
 
 class ChainedEvent(BaseModel):
@@ -34,6 +36,29 @@ def _hash(prev_hash: str, seq: int, event: AuditEvent) -> str:
         "prev_hash": prev_hash,
         "seq": seq,
         "event": event.model_dump(mode="json"),
+    })
+    return sha256_hex(payload)
+
+
+def audit_record_hash(
+    prev_hash: str,
+    seq: int,
+    event: AuditEvent,
+    *,
+    run_id: str,
+    session_id: str,
+) -> str:
+    """持久化审计记录的链式哈希（HASH_ALG）。
+
+    在事件全文之外把 run_id / session_id 一并定版，查询维度被改掉时链会断。
+    进程内 HashChainAuditor 仍只用事件正文，二者互不替换。
+    """
+    payload = canonical_json({
+        "event": event.model_dump(mode="json"),
+        "prev_hash": prev_hash,
+        "run_id": run_id,
+        "seq": seq,
+        "session_id": session_id,
     })
     return sha256_hex(payload)
 

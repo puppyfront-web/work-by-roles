@@ -25,7 +25,9 @@ from wbr.app.tasks.queue import (
     TaskQueue,
     TaskRecord,
 )
+from wbr.core.audit.models import AuditEventType
 from wbr.core.audit.pack import AuditPackBuilder
+from wbr.core.audit.store import AuditRunScope, AuditStore, resolve_audit_store
 from wbr.core.audit.trail import AuditTrail
 from wbr.core.contract.models import RoleContract
 from wbr.core.exceptions import AppError, WBRError
@@ -95,7 +97,8 @@ def _handle_review(services: _Services, record: TaskRecord) -> dict:
         expert_contracts=[contracts[c] for c in payload["experts"]],
         verifier_contract=contracts[payload["verifier"]],
         invoker=services.invoker,
-        audit=services.audit,
+        audit=AuditRunScope(services.audit, run_id=record.task_id),
+        session_id=record.task_id,
     )
     result = session.run(payload["question"])
     return json.loads(result.to_json())
@@ -108,7 +111,11 @@ def _handle_regression(services: _Services, record: TaskRecord) -> dict:
     baseline = None
     if payload.get("baseline"):
         baseline = BaselineSnapshot.model_validate(payload["baseline"])
-    engine = RegressionEngine(contracts=contracts, invoker=services.invoker, audit=services.audit)
+    engine = RegressionEngine(
+        contracts=contracts,
+        invoker=services.invoker,
+        audit=AuditRunScope(services.audit, run_id=record.task_id),
+    )
     report = engine.run_suite(
         suite, baseline=baseline, stability_runs=payload.get("stability_runs", 1)
     )
@@ -131,11 +138,16 @@ def create_app(
     data_root: str | Path | None = None,
     queue: TaskQueue | None = None,
     api_key: str | None = None,
+    audit_store: AuditStore | None = None,
+    audit_db: str | Path | None = None,
 ) -> Any:
     """构建 FastAPI 应用。fastapi 缺失时抛带指引的 AppError。
 
     api_key 为 None 时读取环境变量 WBR_API_KEY；传入空字符串则强制关闭鉴权。
     密钥非空时，除健康检查与画布静态资源外的接口都要带 X-API-Key 或 Bearer。
+
+    审计默认是内存存储。audit_store 优先；否则 audit_db 为 SQLite 路径
+    （空字符串强制内存）；两者都缺省时读取 WBR_AUDIT_DB。
     """
     try:
         from fastapi import FastAPI, Query, Request
@@ -155,10 +167,12 @@ def create_app(
         from wbr.adapters.llm import OpenAICompatInvoker
 
         invoker = OpenAICompatInvoker.from_env() or _DemoInvoker()
+    audit = AuditTrail()
+    audit.attach_store(resolve_audit_store(audit_store, audit_db))
     services = _Services(
         registry=ContractRegistry(root),
         queue=queue or InlineTaskQueue(lambda r: None),
-        audit=AuditTrail(),
+        audit=audit,
         invoker=invoker,
         data_root=root,
         task_store=JsonTaskStore(root / "tasks"),
@@ -181,6 +195,8 @@ def create_app(
         yield
         if isinstance(services.queue, InProcessTaskQueue):
             await services.queue.stop()
+        if services.audit.store is not None:
+            services.audit.store.close()
 
     app = FastAPI(title="work-by-roles API", version=wbr.__version__, lifespan=lifespan)
     app.add_middleware(ApiKeyMiddleware, api_key=configured_key)
@@ -209,6 +225,7 @@ def create_app(
     # ---- 健康 ----
     @app.get("/api/v1/healthz")
     def healthz():
+        audit_store = services.audit.store
         return {
             "status": "ok",
             "version": wbr.__version__,
@@ -217,6 +234,7 @@ def create_app(
                 "registry": True,
                 "queue": type(services.queue).__name__,
                 "audit": True,
+                "audit_backend": audit_store.backend_name if audit_store is not None else "memory",
                 "invoker": type(services.invoker).__name__,
             },
         }
@@ -357,7 +375,81 @@ def create_app(
             imported.append(rid)
         return {"team": team, "imported": imported, "skipped": skipped}
 
-    # ---- 审计导出 ----
+    # ---- 审计查询（只读）与导出 ----
+    def _audit_page(
+        *,
+        run_id: str | None = None,
+        session_id: str | None = None,
+        trace_id: str | None = None,
+        event_type: str | None = None,
+        since: float | None = None,
+        until: float | None = None,
+        limit: int = 200,
+    ) -> dict[str, Any]:
+        if since is not None and until is not None and since > until:
+            raise AppError("since 不能晚于 until", code="E9022")
+        parsed_type: str | None = None
+        if event_type:
+            try:
+                parsed_type = AuditEventType(event_type).value
+            except ValueError as exc:
+                raise AppError(f"未知审计事件类型: {event_type}", code="E9022") from exc
+        store = services.audit.store
+        if store is None:
+            raise AppError("审计存储未就绪", code="E9001")
+        records = store.query(
+            run_id=run_id,
+            session_id=session_id,
+            trace_id=trace_id,
+            event_type=parsed_type,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+        chain = store.verify()
+        return {"chain": chain.model_dump(), "events": [record.to_dict() for record in records]}
+
+    @app.get("/api/v1/audits/events")
+    def list_audit_events(
+        run_id: str | None = Query(default=None),
+        session_id: str | None = Query(default=None),
+        trace_id: str | None = Query(default=None),
+        event_type: str | None = Query(default=None),
+        since: float | None = Query(default=None),
+        until: float | None = Query(default=None),
+        limit: int = Query(default=200, ge=1, le=1000),
+    ):
+        return _audit_page(
+            run_id=run_id,
+            session_id=session_id,
+            trace_id=trace_id,
+            event_type=event_type,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+
+    @app.get("/api/v1/reviews/{task_id}/audits")
+    def list_review_audits(
+        task_id: str,
+        event_type: str | None = Query(default=None),
+        since: float | None = Query(default=None),
+        until: float | None = Query(default=None),
+        limit: int = Query(default=200, ge=1, le=1000),
+    ):
+        record = services.queue.get(task_id) or services.task_store.load(task_id)
+        if record is None:
+            raise AppError(f"任务不存在: {task_id}", code="E9006")
+        page = _audit_page(
+            run_id=task_id,
+            event_type=event_type,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+        page["run_id"] = task_id
+        return page
+
     @app.get("/api/v1/audits/export")
     def export_audit(
         contents: str = Query(default="false"),

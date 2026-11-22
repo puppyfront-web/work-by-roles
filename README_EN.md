@@ -117,6 +117,14 @@ uvicorn --factory wbr.app.api.main:create_app --host 127.0.0.1 --port 8000
 
 To expose the service, `export WBR_API_KEY` to a long random string and paste the same value into the canvas header (`X-API-Key`). Leaving the key unset is fine only behind a reverse proxy that already authenticates. See [docs/DEPLOY.md](docs/DEPLOY.md).
 
+Audit events stay in process memory unless you opt into SQLite (stdlib only, safe for concurrent appends from one process):
+
+```bash
+export WBR_AUDIT_DB=/var/lib/wbr/audit.db
+```
+
+Each row stores `prev_hash` and `event_hash`. Opening the file verifies the chain; a tampered database refuses to load (`AuditChainBroken`, `broken_at` is the first bad index). Read them back with `GET /api/v1/reviews/{task_id}/audits` or `GET /api/v1/audits/events` (filter by run, session, trace, event type, or time). When `WBR_API_KEY` is set, those routes require the key too. A Postgres store belongs in wbr-studio: implement the same `AuditStore` and call `audit_record_hash`. The kernel does not take a database driver.
+
 - **Import official templates** — pick one from the dropdown, click Import
 - **Assemble your own team** — create coordinator/expert/verifier contracts, drag nodes
 - **Edit contracts** — double-click any node to edit SOP, forbidden zones, tool whitelist,
@@ -236,7 +244,7 @@ Three ways to assemble a team: **canvas forms** (no YAML), **copy an official te
 | 💾 **Contract-bound cache** | cache key includes contract hash; contract change = automatic invalidation; optional semantic hit |
 | 🛡️ **Anti-injection** | bilingual injection rule set + second-order isolation + boundary escaping |
 | 🙈 **PII redaction** | email/phone/ID/secret/card/IP rules, stable placeholders, extensible |
-| 🔍 **Full-chain audit** | TraceID-linked typed events, exportable audit packs |
+| 🔍 **Full-chain audit** | TraceID-linked typed events, exportable audit packs; optional SQLite via `WBR_AUDIT_DB` |
 | 🧭 **Intent reasoning** | coordinator pipeline: intent classification / slot extraction / conflict detection / confidence thresholds |
 | 🔁 **Controlled inner loop** | per-role multi-round reason-retrieve-refine; rounds/tokens/exit conditions contractualized; escalates to HITL |
 | 🔌 **LangGraph compatible** | `WBRGuard` 3-line integration; resume/HITL naturally compatible |
@@ -244,7 +252,7 @@ Three ways to assemble a team: **canvas forms** (no YAML), **copy an official te
 | 📚 **Role knowledge base** | private/shared knowledge docs, retrieval feeds the evidence channel |
 | 🔭 **OpenTelemetry** | zero-intrusion OTel bridge (spans/metrics), can be disabled |
 | 🔄 **Feedback loop** | online negative feedback aggregates into golden cases for regression |
-| 🔒 **Audit hash chain** (enterprise) | chained hashing of audit events; tamper detection with breakpoint location |
+| 🔒 **Audit hash chain** (enterprise) | chained hashes with a located break; SQLite re-checks after restart. Postgres is another `AuditStore` in the product layer |
 | 🏢 **Multi-workspace** (enterprise) | 4-dimension isolation; explicit cross-workspace copy with lineage |
 | ⚔️ **Controlled debate** (enterprise) | bounded debate rounds on detected disagreements; concessions stop it; history preserved |
 | 📦 **Baseline bundle** (enterprise) | contracts + cases + baselines packaged as one, integrity-checked migration |
@@ -293,6 +301,9 @@ The governance kernel, REST API (contract CRUD/versioning/diff, async reviews, H
 export), and visual canvas are built in. What you add: user accounts, model-key management,
 team-level CRUD and persistence (the enterprise multi-workspace layer is directly reusable).
 `WBR_API_KEY` is a single shared secret, not a multi-user account system.
+
+**Q: Do audit events survive a restart?**
+Not by default. Set `WBR_AUDIT_DB` to a file path and the events plus their hash chain go into SQLite. That file is for one process. Multi-process or multi-replica deployments should implement `AuditStore` (Postgres) in wbr-studio; the kernel interface stays the same.
 
 **Q: Can I expose the API on the public internet?**
 Bind `127.0.0.1` by default. If the port must be reachable, set `WBR_API_KEY` (same value in
