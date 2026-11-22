@@ -9,7 +9,17 @@ __version__ = "2.2.0"
 
 # ---- 基础设施 ----
 # ---- 审计 ----
-from wbr.core.audit import AuditEvent, AuditEventType, AuditTrail, RoleBehaviorRecord
+from wbr.core.audit import (
+    AuditEvent,
+    AuditEventType,
+    AuditRunScope,
+    AuditStore,
+    AuditTrail,
+    InMemoryAuditStore,
+    RoleBehaviorRecord,
+    SqliteAuditStore,
+    resolve_audit_store,
+)
 from wbr.core.audit.chain import ChainedEvent, ChainVerification, HashChainAuditor, HashChainTrail
 from wbr.core.audit.pack import AuditPack, AuditPackBuilder
 from wbr.core.audit_bus import AuditBus
@@ -45,6 +55,8 @@ from wbr.core.contract import (
 from wbr.core.exceptions import (
     AdapterError,
     AppError,
+    AuditChainBroken,
+    AuditSchemaError,
     CacheError,
     ConfigError,
     ContractCompileError,
@@ -145,7 +157,8 @@ __all__ = [
     # 异常
     "WBRError", "ConfigError", "ContractValidationError", "ContractCompileError",
     "SchemaValidationError", "ForbiddenViolationError", "MemoryPermissionDeniedError",
-    "SecurityViolationError", "TokenBudgetExceededError", "OrchestrationError",
+    "SecurityViolationError", "TokenBudgetExceededError", "AuditChainBroken", "AuditSchemaError",
+    "OrchestrationError",
     "HarnessError", "CacheError", "AdapterError", "ToolPermissionDeniedError", "AppError",
     # 契约
     "RoleContract", "RoleIdentity", "RoleType", "Sop", "SopStep", "ForbiddenRule",
@@ -154,6 +167,7 @@ __all__ = [
     "ContractCompiler", "CompiledPrompt", "ContractDiffEngine", "DiffReport", "ContractChange",
     # 审计
     "AuditEvent", "AuditEventType", "AuditTrail", "RoleBehaviorRecord",
+    "AuditStore", "InMemoryAuditStore", "SqliteAuditStore", "AuditRunScope", "resolve_audit_store",
     "AuditPack", "AuditPackBuilder",
     # 记忆 / 编排
     "MemoryHub", "MemoryRecord", "MemoryStore", "InMemoryMemoryStore",

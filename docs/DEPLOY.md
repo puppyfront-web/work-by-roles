@@ -58,6 +58,8 @@ uvicorn.run(app, host='127.0.0.1', port=8000)
 └── tasks/<task_id>.json                # 任务记录（重启恢复）
 ```
 
+审计库不放在这个目录里，除非你把 `WBR_AUDIT_DB` 指到这里（例如 `$DATA/audit.db`）。
+
 ## 异步任务
 
 - 默认 `InProcessTaskQueue`（asyncio worker，lifespan 自动起停）：`POST /api/v1/reviews`、
@@ -72,7 +74,7 @@ uvicorn.run(app, host='127.0.0.1', port=8000)
 2. **模型接入**：`create_app(invoker=...)` 注入生产 ModelInvoker（超时/重试/限流在此封装）。
 3. **安全模式**：对外暴露时建议 `WBRGuard(security="block")` 语义接入到自定义节点，
    并启用输入侧 `guard_user_input(block_on=HIGH)`。`WBR_API_KEY` 只保护 HTTP API，不代替输入侧防护。
-4. **审计留存**：定期把 `/api/v1/audits/export` 的审计包归档到对象存储（JSON、含 content_digest）。导出接口在启用密钥后同样需要鉴权。
+4. **审计留存**：默认只在内存。`export WBR_AUDIT_DB=/var/lib/wbr/audit.db` 后改为 SQLite（标准库，单进程多线程追加）。打开时校验哈希链，篡改会让进程起不来（`AuditChainBroken.details.broken_at`）。只读查询：`GET /api/v1/audits/events` 与 `GET /api/v1/reviews/{task_id}/audits`（`run_id` 即 task_id），启用密钥后同样要鉴权。多副本不要共用这个文件；Postgres 实现放在 wbr-studio，实现 `AuditStore` 并调用 `wbr.core.audit.chain.audit_record_hash`（`HASH_ALG=audit_record_hash.v1`），逻辑列与 `audit_events` / `audit_meta` 一致。`/api/v1/audits/export` 仍可把审计包归档到对象存储。
 5. **缓存后端**：多副本共享缓存使用 `adapters.storage.redis_backend.RedisCacheBackend`。
 6. **反向代理**：uvicorn 前置 Nginx/Caddy 终止 TLS；`/canvas` 与 `/api/v1` 同源无需 CORS。代理若代替应用做鉴权，不要把未鉴权的流量转到应用。
 

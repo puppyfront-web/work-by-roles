@@ -4,13 +4,18 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from wbr.core.audit.models import AuditEvent, AuditEventType, RoleBehaviorRecord, TraceTree
+from wbr.core.audit.store import AuditStore
 
 
 class AuditTrail(BaseModel):
-    """进程内审计轨迹（线程安全）。可对接 AuditBus 广播。"""
+    """进程内审计轨迹（线程安全）。可对接 AuditBus 广播。
+
+    不调用 attach_store 时只保留内存列表，既有调用方不受影响。
+    挂上 AuditStore 之后，append 写入存储；attach_store 会把已有记录装回列表。
+    """
 
     events: list[AuditEvent] = Field(default_factory=list)
     behaviors: list[RoleBehaviorRecord] = Field(default_factory=list)
@@ -18,10 +23,30 @@ class AuditTrail(BaseModel):
         default_factory=threading.RLock, exclude=True, repr=False,
         validation_alias="lock", serialization_alias="lock",
     )
+    _store: AuditStore | None = PrivateAttr(default=None)
 
-    def append(self, event: AuditEvent) -> None:
+    @property
+    def store(self) -> AuditStore | None:
+        return self._store
+
+    def attach_store(self, store: AuditStore) -> None:
+        """绑定存储，并用存储中的现有记录替换内存事件列表。"""
+        self._store = store
+        self.events[:] = [record.event for record in store.query()]
+
+    def append(
+        self,
+        event: AuditEvent,
+        *,
+        run_id: str | None = None,
+        session_id: str | None = None,
+    ) -> None:
         with self.lock:
-            self.events.append(event)
+            if self._store is None:
+                self.events.append(event)
+                return
+            record = self._store.append(event, run_id=run_id, session_id=session_id)
+            self.events.append(record.event)
 
     def append_behavior(self, record: RoleBehaviorRecord) -> None:
         with self.lock:
