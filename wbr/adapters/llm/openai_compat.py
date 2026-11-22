@@ -2,7 +2,7 @@
 
 覆盖 OpenAI / DeepSeek / Kimi / Qwen(DashScope 兼容模式) / GLM / Ollama / vLLM 等。
 契约编译产物天然映射为两条消息：system_prompt → system，user_block → user。
-httpx 惰性导入：Core 保持零网络依赖，未安装 server 附加依赖时给出安装指引。
+httpx 惰性导入：Core 保持零网络依赖，未安装 llm 附加依赖时给出安装指引。
 
 环境变量（构造参数优先）：
     WBR_LLM_BASE_URL   默认 https://api.openai.com/v1
@@ -77,7 +77,7 @@ class OpenAICompatInvoker:
                 import httpx
             except ImportError as e:  # pragma: no cover
                 raise AdapterError(
-                    "OpenAICompatInvoker 需要 httpx：pip install 'work-by-roles[server]'"
+                    "OpenAICompatInvoker 需要 httpx：pip install 'work-by-roles[llm]'"
                 ) from e
             self._client = httpx.Client(
                 base_url=self.base_url, headers=self._default_headers(), timeout=self.timeout

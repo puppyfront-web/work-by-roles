@@ -5,7 +5,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.1.1-green.svg)]()
+[![Version](https://img.shields.io/badge/version-2.2.0-green.svg)](CHANGELOG.md)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-blue.svg)](https://puppyfront-web.github.io/work-by-roles/)
 [![CI](https://github.com/puppyfront-web/work-by-roles/actions/workflows/ci.yml/badge.svg)](https://github.com/puppyfront-web/work-by-roles/actions/workflows/ci.yml)
 
 [中文](README.md) | English
@@ -62,8 +63,13 @@ Teams can **do work** as well as **pass judgment**: the review paradigm is not l
 ### Step 1 · Install
 
 ```bash
-pip install "work-by-roles[server]"   # SDK + CLI + API service + canvas (httpx for live models)
-# or minimal: pip install work-by-roles
+# Not on PyPI yet. After publication this becomes: pip install "work-by-roles[server]"
+pip install "work-by-roles[server] @ git+https://github.com/puppyfront-web/work-by-roles.git"
+
+# SDK / CLI only (demo mode: no API server, no httpx for live models):
+# pip install "work-by-roles @ git+https://github.com/puppyfront-web/work-by-roles.git"
+# Live models without the API server:
+# pip install "work-by-roles[llm] @ git+https://github.com/puppyfront-web/work-by-roles.git"
 ```
 
 ### Step 2 · Run the demo (no model key needed)
@@ -86,6 +92,8 @@ export WBR_LLM_API_KEY=sk-...        # your key (any non-empty value for local e
 export WBR_LLM_MODEL=gpt-4o-mini     # model name
 # export WBR_LLM_BASE_URL=https://api.openai.com/v1   # optional for OpenAI
 
+# --live needs httpx. [server] already includes it; a minimal install needs:
+# pip install "work-by-roles[llm] @ git+https://github.com/puppyfront-web/work-by-roles.git"
 wbr run-team arch_review_team "Review: monolith → microservices split" --live
 ```
 
@@ -102,9 +110,12 @@ wbr run-team arch_review_team "Review: monolith → microservices split" --live
 ### Step 4 · Visual canvas
 
 ```bash
-uvicorn --factory wbr.app.api.main:create_app --port 8000
+# Bind localhost unless you have set WBR_API_KEY. Do not switch this to 0.0.0.0 otherwise.
+uvicorn --factory wbr.app.api.main:create_app --host 127.0.0.1 --port 8000
 # open http://127.0.0.1:8000/canvas
 ```
+
+To expose the service, `export WBR_API_KEY` to a long random string and paste the same value into the canvas header (`X-API-Key`). Leaving the key unset is fine only behind a reverse proxy that already authenticates. See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 - **Import official templates** — pick one from the dropdown, click Import
 - **Assemble your own team** — create coordinator/expert/verifier contracts, drag nodes
@@ -281,10 +292,16 @@ six metrics compared, degradation auto-flagged. See [docs/HARNESS.md](docs/HARNE
 The governance kernel, REST API (contract CRUD/versioning/diff, async reviews, Harness, audit
 export), and visual canvas are built in. What you add: user accounts, model-key management,
 team-level CRUD and persistence (the enterprise multi-workspace layer is directly reusable).
+`WBR_API_KEY` is a single shared secret, not a multi-user account system.
+
+**Q: Can I expose the API on the public internet?**
+Bind `127.0.0.1` by default. If the port must be reachable, set `WBR_API_KEY` (same value in
+the canvas header) or put the process behind a reverse proxy that authenticates. Without a key,
+a non-localhost bind address is logged as a warning.
 
 ## Docs
 
-- [Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) ·
+- [Docs site](https://puppyfront-web.github.io/work-by-roles/) · [Architecture](docs/ARCHITECTURE_V2.md) · [SDK API](docs/SDK.md) ·
   [LangGraph integration](docs/INTEGRATION_LANGGRAPH.md) · [Harness](docs/HARNESS.md) ·
   [Deploy](docs/DEPLOY.md)
 - Specs: [docs/spec/README.md](docs/spec/README.md) (SPEC-000~006 + review records) ·
@@ -301,7 +318,7 @@ financial report audit, and interview assessment are all in real demand).
 
 ```bash
 pip install -e ".[dev,langgraph,server]"
-pytest tests -q                           # full suite (370+ cases)
+pytest tests -q                           # full suite (405 tests; 1 skipped without Redis)
 pytest tests/wbr/phase5 -q                # packaging & performance benchmarks (slow/performance marks)
 ```
 

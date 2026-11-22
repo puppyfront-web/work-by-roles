@@ -1,6 +1,6 @@
 # work-by-roles 专家团治理系统 · V2.1.1 架构设计方案
 
-> 状态：与代码同步（V2.1.1）· 上游规格：docs/spec/SPEC-000~009 · 验收证据：docs/acceptance/
+> 状态：架构主体写于 V2.1.1；运行时版本 2.2.0（可选 API Key、`[llm]` 额外依赖与发布说明见 [CHANGELOG](../CHANGELOG.md)）· 上游规格：docs/spec/SPEC-000~009 · 验收证据：docs/acceptance/
 
 ---
 
@@ -154,8 +154,8 @@ final_answer（通过=综合结论；未通过=标注复核意见）
 
 ## 8. 部署形态
 
-- **SDK 嵌入**：`pip install work-by-roles[langgraph]`，存量 LangGraph 项目 3 行接入（WBRGuard）；
-- **独立平台**：`pip install work-by-roles[server]` + `uvicorn --factory wbr.app.api.main:create_app` → API(/api/v1) + 画布(/canvas)；
+- **SDK 嵌入**：`pip install "work-by-roles[langgraph] @ git+https://github.com/puppyfront-web/work-by-roles.git"`（发布到 PyPI 后可去掉 Git 地址），存量 LangGraph 项目 3 行接入（WBRGuard）；
+- **独立平台**：安装 `[server]` 后 `uvicorn --factory wbr.app.api.main:create_app --host 127.0.0.1` → API(/api/v1) + 画布(/canvas)。对外暴露前设置 `WBR_API_KEY`，或只经已鉴权的反向代理；
 - **企业多租户**：WorkspaceRegistry 目录级隔离；缓存/记忆可切 Redis 共享；审计包定期归档；
 - **数据布局**：`<data_root>/{contracts,suites,tasks,workspaces}`，全部 JSON，重启可恢复。
 

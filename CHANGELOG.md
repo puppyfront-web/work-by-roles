@@ -14,13 +14,14 @@
   - `TokenUsage` / `TokenMeter` 记录供应商缓存字段（OpenAI `cached_tokens`、DeepSeek `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`、Anthropic `cache_read_input_tokens` / `cache_creation_input_tokens`），并用调用方给出的单价估算节省
   - 离线报告：`python scripts/token_savings_report.py`（启发式计数 + 演示 Invoker，不需要 API Key）
 
-### Fixed
-- **真实模型首跑暴露的三个引擎缺陷**（DeepSeek deepseek-chat 实测）：
-  1. Verifier 返回嵌套 scores（`{"维度": {"score": …}}`）时 Verdict 构造崩溃 → `_coerce_scores` 容错转换
-  2. 禁区字面匹配把"模型自检时复述规则原文"系统性误判为违规（规则本身编译进 system prompt）→ 否定感知 tripwire（规则拆段 + 命中前近旁否定词豁免）
-  3. 专家输入只含协调者子指令、不携带原始问题 → 真实协调者产出薄指令时专家集体跑题/拒稿 → 专家输入改为"原始问题 + [你的子任务]"，回归测试断言 user_block 必含原始问题
+## [2.2.0] · 2026-11-21
+
+### Security
+- **可选 API Key**：环境变量 `WBR_API_KEY` 非空时，除 `GET /api/v1/healthz` 与画布静态资源外，契约 CRUD、异步会审、Harness、模板导入、审计导出以及画布 bootstrap 都要带请求头 `X-API-Key` 或 `Authorization: Bearer`。未设置密钥时与原先一样可直接本机调用。进程实际监听地址不是本机（如 `0.0.0.0`）且未配置密钥时，日志会告警。画布页头可填写密钥，只保存在当前浏览器会话。
 
 ### Added
+- **`[llm]` 可选依赖**：`httpx` 可单独安装（`pip install 'work-by-roles[llm]'`），`wbr run-team --live` 不必再装整套 `[server]`。`[server]` 仍包含 httpx，API 检测到 `WBR_LLM_*` 后自动切换真实模型的行为不变。
+- **PyPI Trusted Publishing 工作流**（`.github/workflows/publish.yml`）：只在推送形如 `v2.2.0` 的 tag 时构建并发布。推送到分支或打开 PR 不会触发。
 - **定位纠偏 + 第四个官方模板 `content_creation_team`（多角度竞稿团）**：专家团不等于评审团——会审范式同样适用于生产场景。构成：创作协调者 + 故事型 / 干货型 / 案例数据型三位写手并行竞稿 + 主编终审（平台调性 0.35 / 内容质量 0.35 / 目标达成 0.3），复核人承担主编 / 质量门禁角色，final_answer 即终稿全文；写手契约内置禁区（禁止编造数据、禁止虚构敏感领域经历等）
 - **`SchemaDemoInvoker`（`wbr/adapters/demo.py`）**：通用 Schema 驱动演示 Invoker——按契约输出 Schema 递归生成满足 required 约束的确定性回放（enum 取首项 / number 0.85 / minLength 自动补齐），任意新模板演示零违例，CLI 与画布统一替换；新增防回归测试"全部官方模板 × 演示 Invoker 零违例跑通"
 - **第三个官方专家团模板 `content_review_team`（内容营销会审团）**：协调者 + 事实核查 / 平台合规 / 转化力三位专家 + 终审复核人（事实准确性 0.4 / 合规安全性 0.4 / 转化力 0.2 三维评审标准）；协调者 SOP 支持把核心卖点交叉分派给事实核查与转化力专家，分歧自动留存；CLI 与画布演示 Invoker 按"契约 Schema required 字段"生成对应形状的演示输出（claims / violations / scores / findings）
@@ -29,8 +30,20 @@
 - **API 自动切换**：`create_app` 检测到 `WBR_LLM_*` 环境变量自动启用真实 Invoker，`/api/v1/healthz` 与画布页头显示当前模式（真实模型/演示模式）
 - **画布模板导入**：`GET /api/v1/templates` + `POST /api/v1/templates/{team}/import`；画布左上角一键导入官方专家团模板（已存在的契约自动跳过）
 
+### Changed
+- 版本号 2.2.0：`pyproject.toml`、`wbr.__version__` 与本 changelog 对齐。
+- `requirements.txt` 只保留运行时依赖（`pydantic` / `pyyaml` / `jsonschema`），与 `pyproject.toml` 一致；pytest 不再列为运行依赖。
+- README 安装命令在包进入 PyPI 之前改为从 Git 安装，并注明发布后的 `pip install` 写法；版本徽章、文档站链接与测试数量同步到当前仓库。
+
+### Fixed
+- **真实模型首跑暴露的三个引擎缺陷**（DeepSeek deepseek-chat 实测）：
+  1. Verifier 返回嵌套 scores（`{"维度": {"score": …}}`）时 Verdict 构造崩溃 → `_coerce_scores` 容错转换
+  2. 禁区字面匹配把"模型自检时复述规则原文"系统性误判为违规（规则本身编译进 system prompt）→ 否定感知 tripwire（规则拆段 + 命中前近旁否定词豁免）
+  3. 专家输入只含协调者子指令、不携带原始问题 → 真实协调者产出薄指令时专家集体跑题/拒稿 → 专家输入改为"原始问题 + [你的子任务]"，回归测试断言 user_block 必含原始问题
+
 ### Docs
 - README 中英双语重写：新增受众定位（适合谁/不适合谁）、典型场景表、零到一五步上手指南（演示→真模型→画布→SDK）、自定义专家团最小 YAML 示例、FAQ
+- 部署文档默认 `--host 127.0.0.1`。对外暴露必须配置 `WBR_API_KEY`，或经已鉴权的反向代理。
 
 ### Removed
 - **移除 Legacy 工作流框架**（V2.1 之前的多角色技能工作流 CLI，已冻结维护超过一年）：`work_by_roles` 包、`workflow`/`workflow-cli`/`workflow-bootstrap` 命令、旧测试套件（tests/unit、tests/integration、tests/e2e、tests/cli 等，存在 33 个存量失败）、旧文档（QUICKSTART、ROLES_AND_SKILLS、LEGACY_README、SKILLS_LAYERED_CLASSIFICATION、V1 ARCHITECTURE）与 `skills/`、`teams/` 资产目录。
