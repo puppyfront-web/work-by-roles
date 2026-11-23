@@ -67,7 +67,15 @@ cd studio/frontend && npm install && npm run dev
 | `STUDIO_FERNET_KEY` | 供应商密钥的 Fernet 密钥。为空则从 `STUDIO_SECRET_KEY` 派生。轮换后旧密文无法解密 |
 | `STUDIO_RUN_INLINE` | `1` 时不经过 Redis |
 | `STUDIO_CORS_ORIGINS` | 逗号分隔。Vite 开发默认走代理，不依赖 CORS |
-| `STUDIO_JWT_TTL_MINUTES` | 登录有效期，默认 7 天 |
+| `STUDIO_JWT_TTL_MINUTES` | 访问令牌有效期，默认 7 天 |
+| `STUDIO_REFRESH_TTL_DAYS` | 刷新令牌有效期，默认 30 天。`POST /api/auth/refresh` 轮换；旧令牌再次使用会作废该用户全部会话 |
+| `STUDIO_RUN_TIMEOUT_SECONDS` | `running` 超过该秒数标为失败，默认 900。API 启动时扫一次，worker 启动时和之后每分钟再扫 |
+| `STUDIO_INVITE_TTL_HOURS` | 邀请链接有效期，默认 72 |
+| `STUDIO_EMAIL_TOKEN_TTL_HOURS` | 邮箱验证令牌有效期，默认 24 |
+| `STUDIO_AUTH_RATE_LIMIT` | 认证接口滑动窗口内允许的次数，默认 20 |
+| `STUDIO_AUTH_RATE_WINDOW_SECONDS` | 窗口长度，默认 60 |
+| `STUDIO_RATE_LIMIT_BACKEND` | `memory`（默认，单进程）或 `redis`（多副本）。Redis 出错时这一次请求放行，避免登录整体不可用 |
+| `STUDIO_REQUIRE_EMAIL_VERIFICATION` | `1` 时未验证邮箱不能写运行、契约、成员和密钥 |
 
 供应商 API Key 只出现在创建请求里。之后的接口只返回末四位 `key_hint`。库里是密文。
 
@@ -89,17 +97,39 @@ cd studio/frontend && npm run typecheck && npm run build
 
 `wbr/` 和 `studio/` 是 MIT 开源核心。`ee/` 预留给商业许可功能，当前没有功能代码。外部贡献需要签署 CLA，见仓库根目录的 `CLA.md` 和 `CONTRIBUTING.md`。
 
-## 阶段 2 还没做
+## 阶段 2
 
-- 工作区成员、邀请和角色；现在一个工作区只有所有者
-- SSO、邮箱验证、限流
-- 卡住的 `running` 恢复、取消运行
-- 跨运行的缓存命中报表；单次运行的用量已经落库
-- 在界面里编辑契约（内核画布仍在 `wbr/app`）
-- `ee/`：组织管理、审计导出包、席位许可
+工作区有四种角色：`owner`、`admin`、`member`、`viewer`。非成员访问工作区资源得到 404。
+
+| 能力 | viewer | member | admin | owner |
+|---|---|---|---|---|
+| 读团队、运行、用量、成员、密钥提示 | 是 | 是 | 是 | 是 |
+| 发起和取消运行，编辑契约 | | 是 | 是 | 是 |
+| 供应商密钥、邀请、改角色、移除成员 | | | 是 | 是 |
+| 把所有者转给别人 | | | | 是 |
+
+邀请是一次性链接，明文只在创建响应和邮件正文里出现。默认邮件器把正文打到日志 `wbr_studio.mail`，不连外部邮件服务。替换 `wbr_studio.mailer.set_mailer`。
+
+取消 `queued` 会立刻结束。取消 `running` 会在下一次模型调用前停下。重复取消已取消的运行返回当前状态。`completed` / `failed` 返回 409。入队使用稳定的任务 id，`execute_run` 只接手 `queued`，重复调用不会再跑一遍。
+
+`running` 超过 `STUDIO_RUN_TIMEOUT_SECONDS` 会被标成失败。worker 启动时、之后每分钟，以及 API 进程启动时各扫一次。正在进行的那一次模型调用不会被中途掐断。
+
+`GET /api/workspaces/{id}/usage?days=30` 汇总已结束运行的 prompt、completion、缓存命中 token 和估算费用，按天、模型、角色分组，并给出缓存命中率。
+
+团队契约每次内容变更追加 `contract_versions`。运行记下开始时的版本号，之后再改契约不影响这次运行。
+
+密码至少 10 位，且同时包含字母和数字。登录、注册、刷新和邮箱验证走滑动窗口限流。`POST /api/auth/logout` 递增 `token_version`，已发出的访问令牌和刷新令牌一起失效。
+
+## 还留在 `ee/`
+
+- SSO（OIDC / SAML）
+- 审计链导出包和保留策略
+- 席位与许可校验
 
 ## English
 
 wbr-studio is the product shell on the MIT `wbr` kernel. Register a workspace, store an OpenAI-compatible API key encrypted at rest, create a team from a bundled template, and run Coordinator → parallel experts → Verifier. An Arq worker calls `ReviewSession`. Prompt, completion, and cached tokens are stored on the run. Each workspace has one Postgres audit hash chain locked at the tail and hashed with the kernel's `audit_record_hash`.
 
-Start with `./studio/dev.sh` (Docker). UI at http://localhost:5173, API docs at http://localhost:8000/docs. Tests: `pytest studio/backend/tests -q` against `STUDIO_TEST_DATABASE_URL`. The key is never returned after create. `ee/` is a commercial-license placeholder with no features yet. Contributions need the CLA in `CLA.md`.
+Start with `./studio/dev.sh` (Docker). UI at http://localhost:5173, API docs at http://localhost:8000/docs. Tests: `pytest studio/backend/tests -q` against `STUDIO_TEST_DATABASE_URL`. The key is never returned after create.
+
+Phase 2 adds workspace roles (owner, admin, member, viewer), token invites through a pluggable log mailer, run cancel plus a stuck-run reaper (`STUDIO_RUN_TIMEOUT_SECONDS`), a per-workspace usage report, versioned role contracts, auth rate limits, email verification, and refresh-token revocation. SSO, audit export, and seat licensing stay in `ee/` as TODOs. Contributions need the CLA in `CLA.md`.
