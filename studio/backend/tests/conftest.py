@@ -21,8 +21,14 @@ os.environ["STUDIO_SECRET_KEY"] = "test-secret-key-at-least-32-bytes"
 os.environ["STUDIO_FERNET_KEY"] = "d2JyLXN0dWRpby10ZXN0LWtleS0zMi1ieXRlcyEhISE="
 os.environ["STUDIO_RUN_INLINE"] = "1"
 os.environ["REDIS_URL"] = "redis://127.0.0.1:6379/0"
+os.environ["STUDIO_AUTH_RATE_LIMIT"] = "10000"
+os.environ["STUDIO_RATE_LIMIT_BACKEND"] = "memory"
+os.environ["STUDIO_REQUIRE_EMAIL_VERIFICATION"] = "0"
 
-_TABLES = "audit_events, audit_chains, runs, teams, provider_keys, workspaces, users"
+_TABLES = (
+    "audit_events, audit_chains, runs, contract_versions, teams, provider_keys, "
+    "workspace_invites, workspace_members, refresh_tokens, auth_tokens, workspaces, users"
+)
 
 
 def _truncate(engine) -> None:
@@ -78,6 +84,23 @@ def client(db):
     with TestClient(create_app()) as test_client:
         yield test_client
     set_invoker_builder(None)
+
+
+@pytest.fixture
+def mailbox():
+    from wbr_studio.mailer import set_mailer
+
+    class Inbox:
+        def __init__(self) -> None:
+            self.messages: list[dict[str, str]] = []
+
+        def send(self, *, to: str, subject: str, text: str) -> None:
+            self.messages.append({"to": to, "subject": subject, "text": text})
+
+    inbox = Inbox()
+    set_mailer(inbox)
+    yield inbox
+    set_mailer(None)
 
 
 @pytest.fixture

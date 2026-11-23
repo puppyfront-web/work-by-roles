@@ -14,15 +14,48 @@ def iso(value: datetime | None) -> str | None:
 
 
 def user_out(user: User) -> dict[str, Any]:
-    return {"id": str(user.id), "email": user.email, "created_at": iso(user.created_at)}
-
-
-def workspace_out(workspace: Workspace) -> dict[str, Any]:
     return {
+        "id": str(user.id),
+        "email": user.email,
+        "email_verified": user.email_verified,
+        "created_at": iso(user.created_at),
+    }
+
+
+def workspace_out(workspace: Workspace, role: str | None = None) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "id": str(workspace.id),
         "name": workspace.name,
         "created_at": iso(workspace.created_at),
     }
+    if role is not None:
+        body["role"] = role
+    return body
+
+
+def member_out(member, email: str) -> dict[str, Any]:
+    return {
+        "user_id": str(member.user_id),
+        "email": email,
+        "role": member.role,
+        "created_at": iso(member.created_at),
+    }
+
+
+def invite_out(invite, token: str | None = None) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "id": str(invite.id),
+        "email": invite.email,
+        "role": invite.role,
+        "expires_at": iso(invite.expires_at),
+        "accepted_at": iso(invite.accepted_at),
+        "revoked_at": iso(invite.revoked_at),
+        "created_at": iso(invite.created_at),
+    }
+    if token is not None:
+        body["token"] = token
+        body["invite_path"] = f"/invite/{token}"
+    return body
 
 
 def key_out(row: ProviderKey) -> dict[str, Any]:
@@ -54,6 +87,7 @@ def team_out(team: Team, *, with_contracts: bool) -> dict[str, Any]:
         "name": team.name,
         "template_name": team.template_name,
         "roles": role_summaries(team.contracts),
+        "current_version": team.current_version,
         "created_at": iso(team.created_at),
         "updated_at": iso(team.updated_at),
     }
@@ -69,6 +103,9 @@ def run_out(run: Run) -> dict[str, Any]:
         "team_id": str(run.team_id),
         "provider_key_id": str(run.provider_key_id) if run.provider_key_id else None,
         "status": run.status,
+        "cancel_requested": run.cancel_requested,
+        "model": run.model,
+        "contract_version": run.contract_version,
         "question": run.question,
         "token_budget": run.token_budget,
         "trace_id": run.trace_id,

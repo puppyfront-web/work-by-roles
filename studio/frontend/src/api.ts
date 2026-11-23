@@ -1,4 +1,35 @@
-export type Workspace = { id: string; name: string; created_at: string };
+export type Workspace = { id: string; name: string; created_at: string; role?: string };
+
+export type User = { id: string; email: string; email_verified: boolean; created_at: string };
+
+export type Member = { user_id: string; email: string; role: string; created_at: string };
+
+export type Invite = {
+  id: string;
+  email: string;
+  role: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  token?: string;
+  invite_path?: string;
+};
+
+export type InvitePreview = { email: string; role: string; workspace_name: string; expires_at: string };
+
+const ROLE_RANK: Record<string, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
+
+export function can(role: string | undefined, minimum: string): boolean {
+  return (ROLE_RANK[role ?? ""] ?? -1) >= (ROLE_RANK[minimum] ?? 99);
+}
+
+export function roleLabel(role: string): string {
+  if (role === "owner") return "所有者";
+  if (role === "admin") return "管理员";
+  if (role === "member") return "成员";
+  if (role === "viewer") return "只读";
+  return role;
+}
 
 export type ProviderKey = {
   id: string;
@@ -20,8 +51,17 @@ export type Team = {
   name: string;
   template_name: string | null;
   roles: RoleSummary[];
+  current_version: number;
+  contracts?: Record<string, unknown>[];
   created_at: string;
   updated_at: string;
+};
+
+export type ContractVersion = {
+  version: number;
+  created_at: string;
+  created_by: string | null;
+  created_by_email: string | null;
 };
 
 export type TemplateInfo = {
@@ -63,10 +103,32 @@ export type RunResult = {
   }[];
 };
 
+export type UsageBucket = {
+  prompt_tokens: number;
+  completion_tokens: number;
+  cached_prompt_tokens: number;
+  cost_total: number;
+  cache_hit_rate: number;
+  runs?: number;
+};
+
+export type UsageReport = {
+  from: string;
+  to: string;
+  days: number;
+  totals: UsageBucket;
+  by_day: (UsageBucket & { day: string })[];
+  by_model: (UsageBucket & { model: string })[];
+  by_role: (UsageBucket & { role_id: string })[];
+};
+
 export type Run = {
   id: string;
   team_id: string;
   status: string;
+  cancel_requested: boolean;
+  model: string | null;
+  contract_version: number | null;
   question: string;
   token_budget: number | null;
   trace_id: string | null;
@@ -118,7 +180,34 @@ function detailOf(data: unknown): string {
   return "请求失败";
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function refreshSession(): Promise<boolean> {
+  const refresh = localStorage.getItem("studio_refresh");
+  if (!refresh) return false;
+  const response = await fetch("/api/auth/refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refresh }),
+  });
+  if (!response.ok) return false;
+  const data = (await response.json()) as { access_token: string; refresh_token: string };
+  localStorage.setItem("studio_token", data.access_token);
+  localStorage.setItem("studio_refresh", data.refresh_token);
+  return true;
+}
+
+export function saveSession(access: string, refresh: string) {
+  localStorage.setItem("studio_token", access);
+  localStorage.setItem("studio_refresh", refresh);
+}
+
+export function clearSession() {
+  localStorage.removeItem("studio_token");
+  localStorage.removeItem("studio_refresh");
+}
+
+export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
   const token = localStorage.getItem("studio_token");
@@ -128,8 +217,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const text = await response.text();
   const data = text ? (JSON.parse(text) as unknown) : null;
   if (!response.ok) {
-    if (response.status === 401 && token) {
-      localStorage.removeItem("studio_token");
+    if (response.status === 401 && token && retry && !path.startsWith("/api/auth/")) {
+      refreshInFlight ??= refreshSession().finally(() => {
+        refreshInFlight = null;
+      });
+      if (await refreshInFlight) return api<T>(path, init, false);
+      clearSession();
       window.dispatchEvent(new Event("studio-unauthorized"));
     }
     throw new ApiError(response.status, detailOf(data));

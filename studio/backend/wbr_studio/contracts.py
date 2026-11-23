@@ -41,6 +41,8 @@ def contracts_from_template(name: str) -> list[dict[str, Any]]:
 
 def dump_contracts(contracts: list[RoleContract]) -> list[dict[str, Any]]:
     _require_shape(contracts)
+    for contract in contracts:
+        contract.refresh_hash()
     return [contract.model_dump(mode="json", by_alias=True) for contract in contracts]
 
 

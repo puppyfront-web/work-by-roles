@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from wbr_studio.deps import get_db, get_workspace
-from wbr_studio.models import ProviderKey, Workspace
+from wbr_studio.deps import WorkspaceContext, get_db, manage_workspace, read_workspace
+from wbr_studio.models import ProviderKey
 from wbr_studio.present import key_out
 from wbr_studio.schemas import ProviderKeyIn
 from wbr_studio.security import SecretError, encrypt_secret, key_hint
@@ -18,12 +18,12 @@ router = APIRouter()
 
 @router.get("/{workspace_id}/provider-keys")
 def list_keys(
-    workspace: Workspace = Depends(get_workspace),
+    ctx: WorkspaceContext = Depends(read_workspace),
     db: Session = Depends(get_db),
 ) -> list[dict]:
     rows = db.scalars(
         select(ProviderKey)
-        .where(ProviderKey.workspace_id == workspace.id)
+        .where(ProviderKey.workspace_id == ctx.workspace.id)
         .order_by(ProviderKey.created_at.desc())
     ).all()
     return [key_out(row) for row in rows]
@@ -32,7 +32,7 @@ def list_keys(
 @router.post("/{workspace_id}/provider-keys", status_code=201)
 def create_key(
     body: ProviderKeyIn,
-    workspace: Workspace = Depends(get_workspace),
+    ctx: WorkspaceContext = Depends(manage_workspace),
     db: Session = Depends(get_db),
 ) -> dict:
     try:
@@ -40,7 +40,7 @@ def create_key(
     except SecretError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     row = ProviderKey(
-        workspace_id=workspace.id,
+        workspace_id=ctx.workspace.id,
         name=body.name,
         base_url=body.base_url,
         model=body.model,
@@ -55,11 +55,11 @@ def create_key(
 @router.delete("/{workspace_id}/provider-keys/{key_id}", status_code=204)
 def delete_key(
     key_id: uuid.UUID,
-    workspace: Workspace = Depends(get_workspace),
+    ctx: WorkspaceContext = Depends(manage_workspace),
     db: Session = Depends(get_db),
 ) -> None:
     row = db.get(ProviderKey, key_id)
-    if row is None or row.workspace_id != workspace.id:
+    if row is None or row.workspace_id != ctx.workspace.id:
         raise HTTPException(status_code=404, detail="密钥不存在")
     db.delete(row)
     db.commit()

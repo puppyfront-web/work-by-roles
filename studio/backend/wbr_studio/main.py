@@ -1,20 +1,35 @@
 """wbr-studio HTTP 入口。"""
 from __future__ import annotations
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from wbr_studio.api import router
+from wbr_studio.reaper import reap_stuck_runs
 from wbr_studio.settings import get_settings
+
+_log = logging.getLogger("wbr_studio")
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    try:
+        reap_stuck_runs()
+    except Exception as exc:
+        _log.warning("startup reap failed (%s)", type(exc).__name__)
+    yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     if not settings.studio_secret_key:
         raise RuntimeError("STUDIO_SECRET_KEY 未设置")
-    app = FastAPI(title="wbr-studio", version="0.1.0")
+    app = FastAPI(title="wbr-studio", version="0.1.0", lifespan=_lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins() or ["http://localhost:5173"],

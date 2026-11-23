@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { api, type AuditPage, type Run, type Team } from "../api";
+import { api, can, type AuditPage, type Run, type Team } from "../api";
 
 function statusClass(status: string): string {
   if (status === "completed") return "pill ok";
@@ -9,7 +9,7 @@ function statusClass(status: string): string {
   return "pill wait";
 }
 
-export function RunNewPage({ workspaceId }: { workspaceId: string }) {
+export function RunNewPage({ workspaceId, role }: { workspaceId: string; role: string }) {
   const [params] = useSearchParams();
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState(params.get("team") ?? "");
@@ -71,17 +71,18 @@ export function RunNewPage({ workspaceId }: { workspaceId: string }) {
         <label><span>缓存命中单价</span><input value={cachedPrice} onChange={(e) => setCachedPrice(e.target.value)} /></label>
         <label><span>输出单价</span><input value={outputPrice} onChange={(e) => setOutputPrice(e.target.value)} /></label>
         {error ? <p className="error">{error}</p> : null}
-        <button type="submit">开始</button>
+        <button type="submit" disabled={!can(role, "member")}>开始</button>
       </form>
     </section>
   );
 }
 
-export function RunDetailPage({ workspaceId }: { workspaceId: string }) {
+export function RunDetailPage({ workspaceId, role }: { workspaceId: string; role: string }) {
   const { runId } = useParams();
   const [run, setRun] = useState<Run | null>(null);
   const [audit, setAudit] = useState<AuditPage | null>(null);
   const [error, setError] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!runId) return;
@@ -121,6 +122,22 @@ export function RunDetailPage({ workspaceId }: { workspaceId: string }) {
       <div className="row">
         <h1>会审结果</h1>
         <span className={statusClass(run.status)}>{run.status}</span>
+        {can(role, "member") && (run.status === "queued" || run.status === "running") ? (
+          <button
+            className="quiet"
+            type="button"
+            disabled={cancelling}
+            onClick={() => {
+              setCancelling(true);
+              api<Run>(`/api/workspaces/${workspaceId}/runs/${run.id}/cancel`, { method: "POST" })
+                .then(setRun)
+                .catch((err: unknown) => setError(err instanceof Error ? err.message : "取消失败"))
+                .finally(() => setCancelling(false));
+            }}
+          >
+            {run.cancel_requested ? "取消中" : "取消"}
+          </button>
+        ) : null}
       </div>
       <p>{run.question}</p>
       {run.error ? <p className="error">{run.error}</p> : null}

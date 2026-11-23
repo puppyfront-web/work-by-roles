@@ -5,14 +5,14 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from wbr.core.exceptions import AuditSchemaError
 from wbr_studio.audit_store import PostgresAuditStore
 from wbr_studio.db import get_engine
-from wbr_studio.deps import get_current_user, get_db, get_workspace
-from wbr_studio.models import ProviderKey, Run, Team, User, Workspace
+from wbr_studio.deps import WorkspaceContext, get_db, read_workspace, write_workspace
+from wbr_studio.models import ProviderKey, Run, Team, utcnow
 from wbr_studio.present import run_out
 from wbr_studio.queue import enqueue_run
 from wbr_studio.schemas import RunCreate
@@ -28,22 +28,22 @@ def _uuid(value: str, label: str) -> uuid.UUID:
         raise HTTPException(status_code=422, detail=f"{label} 不是有效 id") from exc
 
 
-def _run_or_404(db: Session, workspace: Workspace, run_id: uuid.UUID) -> Run:
+def _run_or_404(db: Session, ctx: WorkspaceContext, run_id: uuid.UUID) -> Run:
     run = db.get(Run, run_id)
-    if run is None or run.workspace_id != workspace.id:
+    if run is None or run.workspace_id != ctx.workspace.id:
         raise HTTPException(status_code=404, detail="运行不存在")
     return run
 
 
-def _key_for_run(db: Session, workspace: Workspace, body: RunCreate) -> ProviderKey:
+def _key_for_run(db: Session, ctx: WorkspaceContext, body: RunCreate) -> ProviderKey:
     if body.provider_key_id:
         key = db.get(ProviderKey, _uuid(body.provider_key_id, "provider_key_id"))
-        if key is None or key.workspace_id != workspace.id:
+        if key is None or key.workspace_id != ctx.workspace.id:
             raise HTTPException(status_code=404, detail="供应商密钥不存在")
         return key
     key = db.scalars(
         select(ProviderKey)
-        .where(ProviderKey.workspace_id == workspace.id)
+        .where(ProviderKey.workspace_id == ctx.workspace.id)
         .order_by(ProviderKey.created_at.desc())
     ).first()
     if key is None:
@@ -54,20 +54,21 @@ def _key_for_run(db: Session, workspace: Workspace, body: RunCreate) -> Provider
 @router.post("/{workspace_id}/runs", status_code=201)
 async def start_run(
     body: RunCreate,
-    workspace: Workspace = Depends(get_workspace),
-    user: User = Depends(get_current_user),
+    ctx: WorkspaceContext = Depends(write_workspace),
     db: Session = Depends(get_db),
 ) -> dict:
     team = db.get(Team, _uuid(body.team_id, "team_id"))
-    if team is None or team.workspace_id != workspace.id:
+    if team is None or team.workspace_id != ctx.workspace.id:
         raise HTTPException(status_code=404, detail="团队不存在")
-    key = _key_for_run(db, workspace, body)
+    key = _key_for_run(db, ctx, body)
     run = Run(
-        workspace_id=workspace.id,
+        workspace_id=ctx.workspace.id,
         team_id=team.id,
-        created_by=user.id,
+        created_by=ctx.user.id,
         provider_key_id=key.id,
         status="queued",
+        model=key.model,
+        contract_version=team.current_version,
         question=body.question,
         token_budget=body.token_budget,
         input_price=body.input_price,
@@ -89,9 +90,9 @@ async def start_run(
 
 
 @router.get("/{workspace_id}/runs")
-def list_runs(workspace: Workspace = Depends(get_workspace), db: Session = Depends(get_db)) -> list[dict]:
+def list_runs(ctx: WorkspaceContext = Depends(read_workspace), db: Session = Depends(get_db)) -> list[dict]:
     rows = db.scalars(
-        select(Run).where(Run.workspace_id == workspace.id).order_by(Run.created_at.desc()).limit(100)
+        select(Run).where(Run.workspace_id == ctx.workspace.id).order_by(Run.created_at.desc()).limit(100)
     ).all()
     return [run_out(row) for row in rows]
 
@@ -99,20 +100,46 @@ def list_runs(workspace: Workspace = Depends(get_workspace), db: Session = Depen
 @router.get("/{workspace_id}/runs/{run_id}")
 def get_run(
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_workspace),
+    ctx: WorkspaceContext = Depends(read_workspace),
     db: Session = Depends(get_db),
 ) -> dict:
-    return run_out(_run_or_404(db, workspace, run_id))
+    return run_out(_run_or_404(db, ctx, run_id))
+
+
+@router.post("/{workspace_id}/runs/{run_id}/cancel")
+def cancel_run(
+    run_id: uuid.UUID,
+    ctx: WorkspaceContext = Depends(write_workspace),
+    db: Session = Depends(get_db),
+) -> dict:
+    run = _run_or_404(db, ctx, run_id)
+    now = utcnow()
+    queued = db.execute(
+        update(Run)
+        .where(Run.id == run_id, Run.status == "queued")
+        .values(status="cancelled", error="已取消", finished_at=now, cancel_requested=True)
+    )
+    if not queued.rowcount:
+        db.execute(
+            update(Run)
+            .where(Run.id == run_id, Run.status == "running")
+            .values(cancel_requested=True)
+        )
+    db.commit()
+    db.refresh(run)
+    if run.status in {"completed", "failed"}:
+        raise HTTPException(status_code=409, detail="运行已结束")
+    return run_out(run)
 
 
 @router.get("/{workspace_id}/runs/{run_id}/audit")
 def run_audit(
     run_id: uuid.UUID,
-    workspace: Workspace = Depends(get_workspace),
+    ctx: WorkspaceContext = Depends(read_workspace),
     db: Session = Depends(get_db),
 ) -> dict:
-    run = _run_or_404(db, workspace, run_id)
-    store = PostgresAuditStore(get_engine(), workspace.id)
+    run = _run_or_404(db, ctx, run_id)
+    store = PostgresAuditStore(get_engine(), ctx.workspace.id)
     try:
         chain = store.verify()
     except AuditSchemaError as exc:
@@ -126,8 +153,8 @@ def run_audit(
 
 
 @router.get("/{workspace_id}/audit/verify")
-def verify_chain(workspace: Workspace = Depends(get_workspace)) -> dict:
-    store = PostgresAuditStore(get_engine(), workspace.id)
+def verify_chain(ctx: WorkspaceContext = Depends(read_workspace)) -> dict:
+    store = PostgresAuditStore(get_engine(), ctx.workspace.id)
     try:
         chain = store.verify()
     except AuditSchemaError as exc:

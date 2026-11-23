@@ -14,6 +14,14 @@
 
 计划中的企业能力放在这里，例如组织与席位、SSO、审计导出包、保留策略。许可文本是 `ee/LICENSE`，目前是给维护者替换的草稿，还不能当成已经生效的商业合同。
 
+## TODO（还不要在这里实现）
+
+自托管团队需要的成员、邀请和角色已经在 `studio/`。下面这些仍然留在企业许可里，不进 MIT 目录：
+
+- SSO（OIDC / SAML）
+- 审计链导出包、保留策略
+- 席位数量和许可校验
+
 约束：
 
 - `wbr/` 和 `studio/` 不导入 `ee`
@@ -23,3 +31,5 @@
 ## English
 
 `ee/` is the commercial-license boundary. It has no features yet. The MIT grant covers `wbr/` and `studio/`. `ee/LICENSE` is a placeholder the maintainer must finalize before any enterprise code is added. Open-core packages must not import `ee`.
+
+TODO, not implemented here: SSO (OIDC/SAML), audit export and retention, seat licensing. Workspace members already live in `studio/` because a self-hosted team needs them.
