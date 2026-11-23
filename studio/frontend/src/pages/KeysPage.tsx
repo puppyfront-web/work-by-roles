@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 
-import { api, type ProviderKey } from "../api";
+import { api, can, type ProviderKey } from "../api";
 
-export function KeysPage({ workspaceId }: { workspaceId: string }) {
+export function KeysPage({ workspaceId, role }: { workspaceId: string; role: string }) {
   const [keys, setKeys] = useState<ProviderKey[]>([]);
   const [error, setError] = useState("");
   const [name, setName] = useState("默认");
@@ -42,7 +42,7 @@ export function KeysPage({ workspaceId }: { workspaceId: string }) {
     <section>
       <h1>供应商密钥</h1>
       <p className="muted">密钥只在服务端加密保存。页面上之后只能看到末四位。</p>
-      <form className="card" onSubmit={submit}>
+      {can(role, "admin") ? <form className="card" onSubmit={submit}>
         <label><span>名称</span><input value={name} onChange={(e) => setName(e.target.value)} required /></label>
         <label><span>Base URL</span><input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required /></label>
         <label><span>模型</span><input value={model} onChange={(e) => setModel(e.target.value)} required /></label>
@@ -52,7 +52,7 @@ export function KeysPage({ workspaceId }: { workspaceId: string }) {
         </label>
         {error ? <p className="error">{error}</p> : null}
         <button type="submit">保存</button>
-      </form>
+      </form> : <p className="muted">只有管理员可以保存或删除密钥。</p>}
       {keys.map((key) => (
         <article className="card row" key={key.id}>
           <div>
@@ -60,7 +60,7 @@ export function KeysPage({ workspaceId }: { workspaceId: string }) {
             <div className="muted">{key.model} · {key.base_url}</div>
             <div>····{key.key_hint}</div>
           </div>
-          <button className="quiet" type="button" onClick={() => remove(key.id)}>删除</button>
+          {can(role, "admin") ? <button className="quiet" type="button" onClick={() => remove(key.id)}>删除</button> : null}
         </article>
       ))}
     </section>

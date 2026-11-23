@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api, type Team, type TemplateInfo } from "../api";
+import { api, can, type Team, type TemplateInfo } from "../api";
 
-export function TeamsPage({ workspaceId }: { workspaceId: string }) {
+export function TeamsPage({ workspaceId, role }: { workspaceId: string; role: string }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [error, setError] = useState("");
 
@@ -17,7 +17,7 @@ export function TeamsPage({ workspaceId }: { workspaceId: string }) {
     <section>
       <div className="row">
         <h1>团队</h1>
-        <Link className="button" to="/teams/new">从模板创建</Link>
+        {can(role, "member") ? <Link className="button" to="/teams/new">从模板创建</Link> : null}
       </div>
       {error ? <p className="error">{error}</p> : null}
       {teams.length === 0 ? <p className="muted">还没有团队。</p> : null}
@@ -25,7 +25,10 @@ export function TeamsPage({ workspaceId }: { workspaceId: string }) {
         <article className="card" key={team.id}>
           <div className="row">
             <strong>{team.name}</strong>
-            <Link to={`/runs/new?team=${team.id}`}>发起会审</Link>
+            <span>
+              <Link to={`/teams/${team.id}/contract`}>契约 v{team.current_version}</Link>
+              {can(role, "member") ? <> · <Link to={`/runs/new?team=${team.id}`}>发起会审</Link></> : null}
+            </span>
           </div>
           <p className="muted">{team.template_name ?? "自定义契约"}</p>
           <div>{team.roles.map((role) => (

@@ -1,13 +1,23 @@
 import { FormEvent, useEffect, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 
-import { ApiError, api, type Workspace } from "./api";
+import { ApiError, api, clearSession, saveSession, type User, type Workspace } from "./api";
+import { ContractPage } from "./pages/ContractPage";
+import { InvitePage } from "./pages/InvitePage";
 import { KeysPage } from "./pages/KeysPage";
+import { MembersPage } from "./pages/MembersPage";
 import { RunDetailPage, RunNewPage } from "./pages/RunPage";
 import { TeamNewPage, TeamsPage } from "./pages/TeamsPage";
+import { UsagePage } from "./pages/UsagePage";
+import { VerifyPage } from "./pages/VerifyPage";
 
 export function token(): string | null {
   return localStorage.getItem("studio_token");
+}
+
+function safeNext(value: string | null): string {
+  if (value && value.startsWith("/") && !value.startsWith("//")) return value;
+  return "/teams";
 }
 
 export function App() {
@@ -23,47 +33,100 @@ export function App() {
     return () => window.removeEventListener("studio-unauthorized", onLost);
   }, [navigate]);
 
-  if (!authed) {
-    return (
-      <Routes>
-        <Route path="/register" element={<AuthPage mode="register" onAuth={() => setAuthed(true)} />} />
-        <Route path="*" element={<AuthPage mode="login" onAuth={() => setAuthed(true)} />} />
-      </Routes>
-    );
+  function logout() {
+    const current = token();
+    if (current) {
+      void fetch("/api/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${current}` } });
+    }
+    clearSession();
+    setAuthed(false);
   }
 
-  return <Shell onLogout={() => { localStorage.removeItem("studio_token"); setAuthed(false); }} />;
+  return (
+    <Routes>
+      <Route path="/invite/:token" element={<InvitePage authed={authed} />} />
+      <Route path="/verify-email" element={<VerifyPage />} />
+      {authed ? (
+        <Route path="*" element={<Shell onLogout={logout} />} />
+      ) : (
+        <>
+          <Route path="/register" element={<AuthPage mode="register" onAuth={() => setAuthed(true)} />} />
+          <Route path="*" element={<AuthPage mode="login" onAuth={() => setAuthed(true)} />} />
+        </>
+      )}
+    </Routes>
+  );
 }
 
 function Shell({ onLogout }: { onLogout: () => void }) {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaceId, setWorkspaceId] = useState("");
+  const [me, setMe] = useState<User | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     api<Workspace[]>("/api/workspaces")
-      .then((rows) => setWorkspace(rows[0] ?? null))
+      .then((rows) => {
+        setWorkspaces(rows);
+        setWorkspaceId((current) => current || rows[0]?.id || "");
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "无法加载工作区"));
+    api<User>("/api/auth/me")
+      .then(setMe)
+      .catch(() => setMe(null));
   }, []);
+
+  const workspace = workspaces.find((item) => item.id === workspaceId) ?? null;
+
+  async function resend() {
+    setNotice("");
+    try {
+      await api("/api/auth/resend-verification", { method: "POST" });
+      setNotice("验证信已写入服务日志。");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "发送失败");
+    }
+  }
 
   return (
     <div className="shell">
       <header className="top">
-        <div className="brand">wbr-studio <span>{workspace?.name ?? ""}</span></div>
+        <div className="brand">
+          wbr-studio
+          {workspaces.length > 1 ? (
+            <select value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)}>
+              {workspaces.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          ) : <span>{workspace?.name ?? ""}</span>}
+        </div>
         <nav>
           <NavLink to="/teams">团队</NavLink>
           <NavLink to="/keys">密钥</NavLink>
+          <NavLink to="/members">成员</NavLink>
+          <NavLink to="/usage">用量</NavLink>
           <NavLink to="/runs/new">发起会审</NavLink>
           <button className="quiet" type="button" onClick={onLogout}>退出</button>
         </nav>
       </header>
+      {me && !me.email_verified ? (
+        <p className="banner">
+          邮箱尚未验证。
+          <button className="quiet" type="button" onClick={resend}>重发验证信</button>
+          {notice ? <span>{notice}</span> : null}
+        </p>
+      ) : null}
       {error ? <p className="error">{error}</p> : null}
       {workspace ? (
         <Routes>
-          <Route path="/teams" element={<TeamsPage workspaceId={workspace.id} />} />
+          <Route path="/teams" element={<TeamsPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
           <Route path="/teams/new" element={<TeamNewPage workspaceId={workspace.id} />} />
-          <Route path="/keys" element={<KeysPage workspaceId={workspace.id} />} />
-          <Route path="/runs/new" element={<RunNewPage workspaceId={workspace.id} />} />
-          <Route path="/runs/:runId" element={<RunDetailPage workspaceId={workspace.id} />} />
+          <Route path="/teams/:teamId/contract" element={<ContractPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
+          <Route path="/keys" element={<KeysPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
+          <Route path="/members" element={<MembersPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
+          <Route path="/usage" element={<UsagePage workspaceId={workspace.id} />} />
+          <Route path="/runs/new" element={<RunNewPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
+          <Route path="/runs/:runId" element={<RunDetailPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
           <Route path="*" element={<Navigate to="/teams" replace />} />
         </Routes>
       ) : null}
@@ -73,7 +136,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
 function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: () => void }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [error, setError] = useState("");
@@ -88,13 +152,13 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: () => 
       const body = mode === "login"
         ? { email, password }
         : { email, password, workspace_name: workspaceName };
-      const result = await api<{ access_token: string }>(path, {
+      const result = await api<{ access_token: string; refresh_token: string }>(path, {
         method: "POST",
         body: JSON.stringify(body),
       });
-      localStorage.setItem("studio_token", result.access_token);
+      saveSession(result.access_token, result.refresh_token);
       onAuth();
-      navigate("/teams");
+      navigate(safeNext(params.get("next")));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "登录失败");
     } finally {
@@ -113,8 +177,17 @@ function AuthPage({ mode, onAuth }: { mode: "login" | "register"; onAuth: () => 
         </label>
         <label>
           <span>密码</span>
-          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" minLength={8} required />
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            minLength={mode === "register" ? 10 : 8}
+            required
+          />
         </label>
+        {mode === "register" ? (
+          <p className="hint">至少 10 位，并且同时包含字母和数字。</p>
+        ) : null}
         {mode === "register" ? (
           <label>
             <span>工作区名称</span>

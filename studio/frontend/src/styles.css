@@ -30,7 +30,7 @@ header.top {
 
 .brand span { color: #8a8175; font-size: 14px; margin-left: 8px; }
 
-nav { display: flex; gap: 14px; align-items: center; }
+nav { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 
 nav a { text-decoration: none; }
 
@@ -118,3 +118,39 @@ pre {
 .auth { max-width: 420px; margin: 48px auto; }
 
 .muted { color: #6d645a; }
+
+.banner {
+  background: #fff1cc;
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bars { display: grid; gap: 8px; }
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 90px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.bar-track { background: #efe7da; border-radius: 999px; height: 10px; }
+
+.bar-fill { background: #0f5c45; height: 10px; border-radius: 999px; min-width: 2px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee4d6; }
+
+.versions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+
+textarea.code { min-height: 360px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+
+.brand select, .row > select { width: auto; }
