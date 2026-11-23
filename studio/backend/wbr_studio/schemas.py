@@ -10,6 +10,13 @@ def _stripped(value: str) -> str:
     return value.strip()
 
 
+def normalize_email(value: str) -> str:
+    text = value.strip().lower()
+    if "@" not in text or text.startswith("@") or text.endswith("@") or " " in text:
+        raise ValueError("邮箱格式不正确")
+    return text
+
+
 class RegisterIn(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=8, max_length=128)
@@ -18,10 +25,16 @@ class RegisterIn(BaseModel):
     @field_validator("email")
     @classmethod
     def _email(cls, value: str) -> str:
-        text = value.strip().lower()
-        if "@" not in text or text.startswith("@") or text.endswith("@") or " " in text:
-            raise ValueError("邮箱格式不正确")
-        return text
+        return normalize_email(value)
+
+    @model_validator(mode="after")
+    def _password_policy(self) -> RegisterIn:
+        from wbr_studio.security import password_problem
+
+        message = password_problem(self.password, self.email)
+        if message:
+            raise ValueError(message)
+        return self
 
     @field_validator("workspace_name")
     @classmethod
@@ -36,7 +49,7 @@ class LoginIn(BaseModel):
     @field_validator("email")
     @classmethod
     def _email(cls, value: str) -> str:
-        return value.strip().lower()
+        return normalize_email(value)
 
 
 class WorkspaceIn(BaseModel):
@@ -148,3 +161,55 @@ class RunCreate(BaseModel):
         if self.cached_input_price is not None and self.input_price is None:
             raise ValueError("设置 cached_input_price 时需要同时提供输入和输出单价")
         return self
+
+
+class InviteIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    role: str = "member"
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str) -> str:
+        return normalize_email(value)
+
+    @field_validator("role")
+    @classmethod
+    def _role(cls, value: str) -> str:
+        if value not in {"admin", "member", "viewer"}:
+            raise ValueError("角色只能是 admin、member 或 viewer")
+        return value
+
+
+class RoleIn(BaseModel):
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def _role(cls, value: str) -> str:
+        if value not in {"owner", "admin", "member", "viewer"}:
+            raise ValueError("角色无效")
+        return value
+
+
+class TokenIn(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+
+    @field_validator("token")
+    @classmethod
+    def _token(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("令牌不能为空")
+        return text
+
+
+class RefreshIn(BaseModel):
+    refresh_token: str = Field(min_length=20, max_length=512)
+
+    @field_validator("refresh_token")
+    @classmethod
+    def _token(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("令牌不能为空")
+        return text

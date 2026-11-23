@@ -5,6 +5,7 @@ import base64
 import hashlib
 import hmac
 import os
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -83,13 +84,30 @@ def key_hint(plaintext: str) -> str:
     return plaintext[-4:]
 
 
-def encode_token(user_id: uuid.UUID) -> str:
+def password_problem(password: str, email: str = "") -> str | None:
+    """返回拒绝原因。登录不调用这里，已有口令不会被新策略锁在门外。"""
+    if len(password) < 10:
+        return "密码至少 10 位"
+    if len(password) > 128:
+        return "密码过长"
+    if not any(char.isalpha() for char in password) or not any(char.isdigit() for char in password):
+        return "密码需要同时包含字母和数字"
+    local = email.split("@", 1)[0]
+    if len(local) >= 4 and local.lower() in password.lower():
+        return "密码不能包含邮箱名"
+    return None
+
+
+def encode_token(user_id: uuid.UUID, token_version: int = 0) -> str:
     settings = get_settings()
     if not settings.studio_secret_key:
         raise AuthError("STUDIO_SECRET_KEY 未设置")
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
+        "tv": token_version,
+        "typ": "access",
+        "jti": secrets.token_hex(8),
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.studio_jwt_ttl_minutes)).timestamp()),
     }
@@ -97,10 +115,14 @@ def encode_token(user_id: uuid.UUID) -> str:
     return token if isinstance(token, str) else token.decode()
 
 
-def decode_token(token: str) -> uuid.UUID:
+def decode_token(token: str) -> tuple[uuid.UUID, int]:
     settings = get_settings()
     try:
         payload = jwt.decode(token, settings.studio_secret_key, algorithms=["HS256"])
-        return uuid.UUID(str(payload["sub"]))
+        if payload.get("typ") not in (None, "access"):
+            raise AuthError("登录已失效")
+        return uuid.UUID(str(payload["sub"])), int(payload.get("tv", 0))
+    except AuthError:
+        raise
     except (jwt.PyJWTError, ValueError, KeyError, TypeError) as exc:
         raise AuthError("登录已失效") from exc

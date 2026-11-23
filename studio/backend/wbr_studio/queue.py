@@ -14,6 +14,6 @@ async def enqueue_run(run_id: str) -> None:
 
     pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
     try:
-        await pool.enqueue_job("run_review", run_id)
+        await pool.enqueue_job("run_review", run_id, _job_id=f"run-{run_id}")
     finally:
         await pool.close()
