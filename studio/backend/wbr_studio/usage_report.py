@@ -24,6 +24,8 @@ def _empty() -> dict[str, Any]:
         "completion_tokens": 0,
         "cached_prompt_tokens": 0,
         "cost_total": 0.0,
+        "saved_tokens": 0,
+        "saved_cost": 0.0,
         "runs": 0,
     }
 
@@ -33,13 +35,32 @@ def _finish(bucket: dict[str, Any]) -> dict[str, Any]:
     return bucket
 
 
-def _add(bucket: dict[str, Any], prompt: int, completion: int, cached: int, cost: float, *, run: bool) -> None:
+def _add(
+    bucket: dict[str, Any],
+    prompt: int,
+    completion: int,
+    cached: int,
+    cost: float,
+    *,
+    run: bool,
+    saved_tokens: int = 0,
+    saved_cost: float = 0.0,
+) -> None:
     bucket["prompt_tokens"] += prompt
     bucket["completion_tokens"] += completion
     bucket["cached_prompt_tokens"] += cached
     bucket["cost_total"] += cost
+    bucket["saved_tokens"] += saved_tokens
+    bucket["saved_cost"] += saved_cost
     if run:
         bucket["runs"] += 1
+
+
+def _saved(run: Run) -> tuple[int, float]:
+    receipt = run.savings_receipt or {}
+    if not isinstance(receipt, dict):
+        return 0, 0.0
+    return int(receipt.get("saved_tokens") or 0), float(receipt.get("saved_cost") or 0.0)
 
 
 def _role_cost(item: dict[str, Any], run: Run) -> float:
@@ -84,8 +105,27 @@ def build_usage(db: Session, workspace_id: uuid.UUID, days: int, now: datetime |
             continue
         day = finished.astimezone(timezone.utc).date().isoformat()
         model = run.model or "unknown"
-        _add(totals, run.prompt_tokens, run.completion_tokens, run.cached_prompt_tokens, run.cost_total, run=True)
-        _add(by_day.setdefault(day, _empty()), run.prompt_tokens, run.completion_tokens, run.cached_prompt_tokens, run.cost_total, run=True)
+        saved_tokens, saved_cost = _saved(run)
+        _add(
+            totals,
+            run.prompt_tokens,
+            run.completion_tokens,
+            run.cached_prompt_tokens,
+            run.cost_total,
+            run=True,
+            saved_tokens=saved_tokens,
+            saved_cost=saved_cost,
+        )
+        _add(
+            by_day.setdefault(day, _empty()),
+            run.prompt_tokens,
+            run.completion_tokens,
+            run.cached_prompt_tokens,
+            run.cost_total,
+            run=True,
+            saved_tokens=saved_tokens,
+            saved_cost=saved_cost,
+        )
         _add(by_model.setdefault(model, _empty()), run.prompt_tokens, run.completion_tokens, run.cached_prompt_tokens, run.cost_total, run=True)
         payload = run.result_json or {}
         for item in payload.get("usage_by_role") or []:
@@ -108,7 +148,7 @@ def build_usage(db: Session, workspace_id: uuid.UUID, days: int, now: datetime |
         "totals": _finish(totals),
         "by_day": [{"day": day, **_finish(bucket)} for day, bucket in by_day.items()],
         "by_model": [
-            {"model": name, **_finish(bucket)}
+            {"model": name, **_without_savings(bucket)}
             for name, bucket in sorted(by_model.items(), key=lambda item: item[1]["cost_total"], reverse=True)
         ],
         "by_role": [
@@ -118,7 +158,14 @@ def build_usage(db: Session, workspace_id: uuid.UUID, days: int, now: datetime |
     }
 
 
-def _public_role(bucket: dict[str, Any]) -> dict[str, Any]:
+def _without_savings(bucket: dict[str, Any]) -> dict[str, Any]:
     finished = _finish(bucket)
+    finished.pop("saved_tokens", None)
+    finished.pop("saved_cost", None)
+    return finished
+
+
+def _public_role(bucket: dict[str, Any]) -> dict[str, Any]:
+    finished = _without_savings(bucket)
     finished.pop("runs", None)
     return finished

@@ -74,7 +74,10 @@ export function UsagePage({ workspaceId }: { workspaceId: string }) {
             <div className="metric"><b>{tokens(report.totals.cached_prompt_tokens)}</b><span>cache-hit tokens</span></div>
             <div className="metric"><b>{percent(report.totals.cache_hit_rate)}</b><span>缓存命中率</span></div>
             <div className="metric"><b>{money(report.totals.cost_total)}</b><span>估算费用</span></div>
+            <div className="metric"><b>{tokens(report.totals.saved_tokens ?? 0)}</b><span>累计节省 tokens</span></div>
+            <div className="metric"><b>{money(report.totals.saved_cost ?? 0)}</b><span>估算节省费用</span></div>
           </div>
+          <p className="hint">节省来自每次运行的回执（基线减实际），不是比例。</p>
           <article className="card">
             <h2>按天</h2>
             {report.by_day.length === 0 ? <p className="muted">这段时间没有已结束的运行。</p> : (

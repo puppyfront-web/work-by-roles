@@ -48,6 +48,7 @@ wbr run-team arch_review_team "评审：订单系统微服务拆分方案" --liv
 |---|---|
 | [架构设计](ARCHITECTURE_V2.md) | 三层架构、治理内核全貌、设计决策 |
 | [SDK 全量 API](SDK.md) | RoleContract / ReviewSession / 记忆 / 缓存 / 审计 |
+| [节省回执](SAVINGS.md) | 基线、三条杠杆、何时节省为 0 |
 | [LangGraph 接入](INTEGRATION_LANGGRAPH.md) | `WBRGuard` 3 行接入存量 Graph |
 | [Harness 回归与指标](HARNESS.md) | 黄金用例、基线快照、六项指标、退化检测 |
 | [部署指南](DEPLOY.md) | 本机监听、API Key、反向代理 |

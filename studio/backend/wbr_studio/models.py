@@ -149,6 +149,7 @@ class Run(Base):
     cost_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     cost_baseline: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     cost_savings: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    savings_receipt: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     result_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
     trace_id: Mapped[str | None] = mapped_column(String(64))

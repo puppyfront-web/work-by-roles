@@ -205,6 +205,15 @@ def _save_result(db: Session, run: Run, result: Any, meter: TokenMeter) -> None:
     run.cost_total = float(cost["total"])
     run.cost_baseline = float(cost["baseline_total"])
     run.cost_savings = float(cost["savings"])
+    receipt = result.savings
+    if receipt is not None and run.input_price is not None and run.output_price is not None:
+        receipt = receipt.priced(
+            input_price=run.input_price,
+            output_price=run.output_price,
+            cached_input_price=run.cached_input_price,
+        )
+        result.savings = receipt
+    run.savings_receipt = receipt.model_dump(mode="json") if receipt is not None else None
     payload = result.model_dump(mode="json")
     payload["usage_by_role"] = [
         {

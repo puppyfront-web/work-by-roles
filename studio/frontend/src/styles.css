@@ -147,6 +147,13 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee4d6; }
 
+@media (max-width: 720px) {
+  .lever-table thead { display: none; }
+  .lever-table tr { display: block; padding: 8px 0; }
+  .lever-table td { display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 2px 0; }
+  .lever-table td::before { content: attr(data-label); color: #6d645a; }
+}
+
 .versions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 
 textarea.code { min-height: 360px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
