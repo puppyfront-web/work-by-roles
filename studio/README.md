@@ -81,6 +81,8 @@ cd studio/frontend && npm install && npm run dev
 
 会审费用是估算：创建运行时可以带上每 token 的 `input_price`、`output_price`、`cached_input_price`。缓存命中 token 来自供应商 usage（OpenAI 的 `prompt_tokens_details.cached_tokens` 等），由内核 `parse_provider_usage` 解析。不填单价则只记 token，费用为 0。
 
+每次运行另外保存内核的节省回执 `savings_receipt`（公式见仓库 `docs/SAVINGS.md`）。它给出基线 token/费用、实际 token/费用、节省，以及 `shared_prefix`、`skipped_unassigned`、`cache_hit`。旧的 `cost_savings` 仍是按次调用的缓存差价合计，不替代回执。用量接口把回执里的 `saved_tokens` 和 `saved_cost` 按工作区相加。这里不展示节省比例。
+
 ## 测试
 
 工作室测试会清空 `STUDIO_TEST_DATABASE_URL`（默认 `postgresql+psycopg://studio:studio@127.0.0.1:5432/studio`）。不要把它指向有数据的库。
@@ -114,7 +116,7 @@ cd studio/frontend && npm run typecheck && npm run build
 
 `running` 超过 `STUDIO_RUN_TIMEOUT_SECONDS` 会被标成失败。worker 启动时、之后每分钟，以及 API 进程启动时各扫一次。正在进行的那一次模型调用不会被中途掐断。
 
-`GET /api/workspaces/{id}/usage?days=30` 汇总已结束运行的 prompt、completion、缓存命中 token 和估算费用，按天、模型、角色分组，并给出缓存命中率。
+`GET /api/workspaces/{id}/usage?days=30` 汇总已结束运行的 prompt、completion、缓存命中 token 和估算费用，按天、模型、角色分组，并给出缓存命中率。`totals` 和 `by_day` 加上回执里的 `saved_tokens`、`saved_cost`。
 
 团队契约每次内容变更追加 `contract_versions`。运行记下开始时的版本号，之后再改契约不影响这次运行。
 
@@ -132,4 +134,4 @@ wbr-studio is the product shell on the MIT `wbr` kernel. Register a workspace, s
 
 Start with `./studio/dev.sh` (Docker). UI at http://localhost:5173, API docs at http://localhost:8000/docs. Tests: `pytest studio/backend/tests -q` against `STUDIO_TEST_DATABASE_URL`. The key is never returned after create.
 
-Phase 2 adds workspace roles (owner, admin, member, viewer), token invites through a pluggable log mailer, run cancel plus a stuck-run reaper (`STUDIO_RUN_TIMEOUT_SECONDS`), a per-workspace usage report, versioned role contracts, auth rate limits, email verification, and refresh-token revocation. SSO, audit export, and seat licensing stay in `ee/` as TODOs. Contributions need the CLA in `CLA.md`.
+Phase 2 adds workspace roles (owner, admin, member, viewer), token invites through a pluggable log mailer, run cancel plus a stuck-run reaper (`STUDIO_RUN_TIMEOUT_SECONDS`), a per-workspace usage report, versioned role contracts, auth rate limits, email verification, and refresh-token revocation. Each finished run stores a kernel savings receipt (`savings_receipt`); usage totals sum `saved_tokens` and `saved_cost` from that receipt. SSO, audit export, and seat licensing stay in `ee/` as TODOs. Contributions need the CLA in `CLA.md`.

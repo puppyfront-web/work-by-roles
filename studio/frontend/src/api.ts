@@ -103,12 +103,39 @@ export type RunResult = {
   }[];
 };
 
+export type SavingsLever = {
+  id: string;
+  tokens: number;
+  cost: number;
+  cached_tokens: number;
+  roles: string[];
+};
+
+export type BudgetSkip = { role_id: string; step: string };
+
+export type SavingsReceipt = {
+  formula: string;
+  live_run: boolean;
+  baseline_tokens: number;
+  actual_tokens: number;
+  saved_tokens: number;
+  baseline_cost: number;
+  actual_cost: number;
+  saved_cost: number;
+  cached_prompt_tokens: number;
+  levers: SavingsLever[];
+  budget_skipped: BudgetSkip[];
+  notes: string[];
+};
+
 export type UsageBucket = {
   prompt_tokens: number;
   completion_tokens: number;
   cached_prompt_tokens: number;
   cost_total: number;
   cache_hit_rate: number;
+  saved_tokens?: number;
+  saved_cost?: number;
   runs?: number;
 };
 
@@ -138,6 +165,7 @@ export type Run = {
   cost_total: number;
   cost_baseline: number;
   cost_savings: number;
+  savings: SavingsReceipt | null;
   error: string | null;
   result: RunResult | null;
   created_at: string;

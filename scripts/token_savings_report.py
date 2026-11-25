@@ -1,7 +1,10 @@
-"""离线对比官方模板的提示 token：跳过未分配专家之前 / 之后，以及缓存重放。
+"""离线演示：用启发式计数和演示 Invoker 套同一份节省回执公式。
 
 用法：python scripts/token_savings_report.py
 不读取 API Key，也不访问网络。计数是启发式的（CJK≈1，其他≈1/4）。
+
+这不是某次线上会审的回执。live_run_receipt 固定为 false。
+回执字段与内核 SavingsReceipt（savings-receipt-v1）相同。
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ from wbr.core.cache import ContractBoundCache
 from wbr.core.orchestration.invoker import ModelResponse, TokenUsage
 from wbr.core.orchestration.review import ReviewSession
 from wbr.core.token.meter import HeuristicTokenCounter, TokenMeter
+from wbr.core.token.receipt import FORMULA_ID
 from wbr.core.token.savings import SAMPLE_SHARED_CONTEXT, measure_prompt_savings
 from wbr.templates.registry import list_teams, load_team_spec
 
@@ -73,7 +77,15 @@ def _replay(spec, counter: HeuristicTokenCounter) -> dict:
         "second_run_cache_hits": [
             o.role_id for o in second_result.expert_outcomes if o.cache_hit
         ],
+        "first_run_receipt": _demo_receipt(first_result.savings),
+        "second_run_receipt": _demo_receipt(second_result.savings),
     }
+
+
+def _demo_receipt(receipt) -> dict:
+    data = receipt.model_dump(mode="json")
+    data["live_run"] = False
+    return data
 
 
 def build_savings_report() -> dict:
@@ -92,14 +104,20 @@ def build_savings_report() -> dict:
         measured.update(_replay(spec, counter))
         teams.append(measured)
     return {
+        "kind": "offline_heuristic_demo",
+        "live_run_receipt": False,
+        "formula": FORMULA_ID,
         "counter": "heuristic_cjk_1_latin_div_4",
         "scenario": "协调者只分派第一位专家；旧行为仍调用其余专家。共享上下文使用固定的团队约定，不填充到 1024。",
+        "note": "演示回执使用 SavingsReceipt 同一公式，但由启发式计数和演示 Invoker 生成，不能当作线上运行回执。",
         "shared_context": SAMPLE_SHARED_CONTEXT,
         "question": QUESTION,
         "teams": teams,
         "deferred": [
+            "prompt_tokens_before/after 是提示词离线对比，不是 SavingsReceipt。回执见 first_run_receipt / second_run_receipt。",
             "供应商前缀缓存要共享前缀达到其门槛（OpenAI/Qwen 常见为 1024）才计费优惠；这里只保证前缀对齐，不填充。",
             "max_tokens 已按契约发出。演示输出短于上限，离线数字里看不到补全被截断的节省。",
+            "供应商不按段落拆开 cached_tokens。专家调用上的供应商缓存整笔记入 shared_prefix，不再按共享前缀长度切分。",
         ],
     }
 

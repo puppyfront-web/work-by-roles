@@ -7,6 +7,7 @@ import { InvitePage } from "./pages/InvitePage";
 import { KeysPage } from "./pages/KeysPage";
 import { MembersPage } from "./pages/MembersPage";
 import { RunDetailPage, RunNewPage } from "./pages/RunPage";
+import { SavingsPage } from "./pages/SavingsPage";
 import { TeamNewPage, TeamsPage } from "./pages/TeamsPage";
 import { UsagePage } from "./pages/UsagePage";
 import { VerifyPage } from "./pages/VerifyPage";
@@ -125,6 +126,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           <Route path="/keys" element={<KeysPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
           <Route path="/members" element={<MembersPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
           <Route path="/usage" element={<UsagePage workspaceId={workspace.id} />} />
+          <Route path="/savings" element={<SavingsPage />} />
           <Route path="/runs/new" element={<RunNewPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
           <Route path="/runs/:runId" element={<RunDetailPage workspaceId={workspace.id} role={workspace.role ?? "owner"} />} />
           <Route path="*" element={<Navigate to="/teams" replace />} />

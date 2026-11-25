@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -37,7 +38,14 @@ from wbr.core.orchestration.invoker import (
     parse_json_output,
 )
 from wbr.core.schema.validator import validate as schema_validate
-from wbr.core.token.meter import BudgetAction, TokenBudget
+from wbr.core.token.meter import BudgetAction, HeuristicTokenCounter, TokenBudget
+from wbr.core.token.receipt import (
+    BudgetSkip,
+    SavingsReceipt,
+    UnassignedFact,
+    UsageFact,
+    build_savings_receipt,
+)
 
 _CACHE_KIND = "review_output_v1"
 
@@ -145,6 +153,7 @@ class ReviewResult(BaseModel):
     expert_outcomes: list[ExpertOutcome] = Field(default_factory=list)
     verifier_verdict: Verdict | None = None
     disagreements: list[Disagreement] = Field(default_factory=list)
+    savings: SavingsReceipt | None = None
     final_answer: str = ""
     status: ReviewStatus = ReviewStatus.COMPLETED
     error: str | None = None
@@ -218,6 +227,10 @@ class ReviewSession:
         self._verifier_budget_reason = ""
         self._loop_snapshots: dict[str, Any] = {}
         self._compiler = ContractCompiler()
+        self._facts_lock = threading.Lock()
+        self._usage_facts: list[UsageFact] = []
+        self._unassigned_facts: list[UnassignedFact] = []
+        self._budget_skips: list[BudgetSkip] = []
 
     # ---- 公共入口 ----
     def run(
@@ -241,6 +254,10 @@ class ReviewSession:
         self._loop_snapshots = {
             s.role_id: s for s in (loop_snapshots or [])
         }
+        with self._facts_lock:
+            self._usage_facts = []
+            self._unassigned_facts = []
+            self._budget_skips = []
         self._emit(AuditEventType.SESSION_STARTED, payload={"question_digest": _digest(question)})
         started = time.time()
         try:
@@ -275,6 +292,7 @@ class ReviewSession:
             result.error = f"内部错误: {e}"
         finally:
             result.finished_at = time.time()
+            result.savings = self._savings_receipt()
             self._emit(
                 AuditEventType.REVIEW_COMPLETED,
                 payload={
@@ -293,6 +311,7 @@ class ReviewSession:
                 self._coordinator, compiled, question, None, result.trace_id, "coordinator"
             )
         except _BudgetSkip as exc:
+            self._remember_budget(self._coordinator.role_id, "coordinator")
             raise OrchestrationError(f"Coordinator 因 Token 预算超限已停止: {exc.reason}") from exc
         try:
             plan = parse_json_output(response.text)
@@ -341,28 +360,20 @@ class ReviewSession:
                 outcome.status = ExpertStatus.SKIPPED
                 outcome.skip_reason = "unassigned"
                 outcome.error = "未分配子任务，已跳过"
+                self._remember_unassigned(contract, question)
             else:
                 self._emit(
                     AuditEventType.EXPERT_STARTED, role_id=contract.role_id,
                     payload={"sub_question": sub_question},
                 )
-                evidence = self._collect_evidence(contract)
-                snapshot = (self._loop_snapshots or {}).get(contract.role_id)
-                if snapshot is not None:
-                    loop_ctx = (
-                        f"[内循环快照 {snapshot.role_id}] 轮次={snapshot.rounds_used} "
-                        f"结论={snapshot.conclusion} 证据={snapshot.evidence}"
-                    )
-                    evidence = [*(evidence or []), loop_ctx]
-                # 专家输入必须携带原始问题：协调者的 sub_question 是聚焦指令，
-                # 不保证自包含（真实协调者常产出"写故事型初稿"这类薄指令）。
-                expert_input = f"{question}\n\n[你的子任务] {sub_question}" if sub_question else question
+                expert_input, evidence = self._prepare_expert_call(contract, sub_question, question)
                 compiled = self._compile(contract, expert_input, evidence=evidence)
                 try:
                     response, cache_kind = self._obtain_model(
                         contract, compiled, expert_input, evidence, _trace_of(ctx) or "", "expert"
                     )
                 except _BudgetSkip as exc:
+                    self._remember_budget(contract.role_id, "expert")
                     outcome.status = ExpertStatus.SKIPPED
                     outcome.skip_reason = "budget"
                     outcome.error = f"Token 预算超限，已跳过: {exc.reason}"
@@ -435,6 +446,7 @@ class ReviewSession:
                 _trace_of(current_context()) or "", "verifier",
             )
         except _BudgetSkip as exc:
+            self._remember_budget(self._verifier.role_id, "verifier")
             self._verifier_budget_reason = exc.reason
             self._emit(
                 AuditEventType.VERIFIER_VERDICT,
@@ -618,6 +630,22 @@ class ReviewSession:
             self._emit(event_type, role_id=contract.role_id, payload={"detail": v.detail})
         return violations
 
+    def _prepare_expert_call(
+        self, contract: RoleContract, sub_question: str, question: str
+    ) -> tuple[str, list[str] | None]:
+        evidence = self._collect_evidence(contract)
+        snapshot = (self._loop_snapshots or {}).get(contract.role_id)
+        if snapshot is not None:
+            loop_ctx = (
+                f"[内循环快照 {snapshot.role_id}] 轮次={snapshot.rounds_used} "
+                f"结论={snapshot.conclusion} 证据={snapshot.evidence}"
+            )
+            evidence = [*(evidence or []), loop_ctx]
+        # 专家输入必须携带原始问题：协调者的 sub_question 是聚焦指令，
+        # 不保证自包含（真实协调者常产出"写故事型初稿"这类薄指令）。
+        expert_input = f"{question}\n\n[你的子任务] {sub_question}" if sub_question else question
+        return expert_input, evidence
+
     def _compile(self, contract: RoleContract, user_input: str, *, evidence: list[str] | None = None):
         compiled = self._compiler.compile(
             contract, user_input, evidence=evidence, shared_context=self._active_shared or None
@@ -750,6 +778,17 @@ class ReviewSession:
             outcome.status = ExpertStatus.COMPLETED
 
     def _record_usage(self, role_id: str, step: str, usage, trace_id: str) -> None:
+        fact = UsageFact(
+            role_id=role_id,
+            step=step,
+            prompt_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+            completion_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+            cached_prompt_tokens=int(getattr(usage, "cached_prompt_tokens", 0) or 0),
+            cache_write_tokens=int(getattr(usage, "cache_write_tokens", 0) or 0),
+            cache_scope=str(getattr(usage, "cache_scope", "unknown") or "unknown"),
+        )
+        with self._facts_lock:
+            self._usage_facts.append(fact)
         meters: list[Any] = []
         if self._budget is not None:
             meters.append(self._budget.meter)
@@ -757,6 +796,40 @@ class ReviewSession:
             meters.append(self._token_meter)
         for meter in meters:
             meter.record(role_id, step, usage, trace_id or "")
+
+    def _counter(self):
+        meter = self._token_meter
+        if meter is None and self._budget is not None:
+            meter = self._budget.meter
+        counter = getattr(meter, "counter", None) if meter is not None else None
+        return counter or HeuristicTokenCounter()
+
+    def _count_prompt(self, compiled) -> int:
+        return self._counter().count(compiled.system_prompt + "\n" + compiled.user_block)
+
+    def _remember_unassigned(self, contract: RoleContract, question: str) -> None:
+        expert_input, evidence = self._prepare_expert_call(contract, "", question)
+        compiled = self._compiler.compile(
+            contract,
+            expert_input,
+            evidence=evidence,
+            shared_context=self._active_shared or None,
+        )
+        fact = UnassignedFact(role_id=contract.role_id, prompt_tokens=self._count_prompt(compiled))
+        with self._facts_lock:
+            self._unassigned_facts.append(fact)
+
+    def _remember_budget(self, role_id: str, step: str) -> None:
+        fact = BudgetSkip(role_id=role_id, step=step)
+        with self._facts_lock:
+            self._budget_skips.append(fact)
+
+    def _savings_receipt(self) -> SavingsReceipt:
+        with self._facts_lock:
+            calls = list(self._usage_facts)
+            unassigned = list(self._unassigned_facts)
+            budget_skipped = list(self._budget_skips)
+        return build_savings_receipt(calls, unassigned, budget_skipped)
 
     def _cache_question(self, user_input: str) -> str:
         shared = (self._active_shared or "").strip()

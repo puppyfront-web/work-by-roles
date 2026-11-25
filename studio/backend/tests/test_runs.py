@@ -115,6 +115,17 @@ def test_run_uses_fake_invoker_and_records_cached_tokens(client, account):
     assert one["savings"] > 0
     assert body["cost_total"] == pytest.approx(one["total"] * len(invoker.calls))
     assert body["cost_savings"] == pytest.approx(one["savings"] * len(invoker.calls))
+    receipt = body["savings"]
+    assert receipt["formula"] == "savings-receipt-v1"
+    assert receipt["live_run"] is True
+    assert receipt["saved_tokens"] == 0
+    assert receipt["saved_cost"] == pytest.approx(body["cost_savings"])
+    assert receipt["baseline_tokens"] - receipt["actual_tokens"] == receipt["saved_tokens"]
+    levers = {item["id"]: item for item in receipt["levers"]}
+    assert levers["skipped_unassigned"]["tokens"] == 0
+    assert levers["shared_prefix"]["cached_tokens"] == 150 * len(experts)
+    assert levers["cache_hit"]["cached_tokens"] == 150 * 2
+    assert set(levers["shared_prefix"]["roles"]) == set(experts)
     verdict = body["result"]["verifier_verdict"]
     assert verdict["passed"] is True
     completed = [
@@ -141,6 +152,43 @@ def test_run_uses_fake_invoker_and_records_cached_tokens(client, account):
         headers=account["headers"],
     )
     assert chain.json()["ok"] is True
+
+
+def test_unassigned_experts_are_a_receipt_lever(client, account):
+    team_id, experts = _team_and_key(client, account)
+    assigned = experts[:1]
+    set_invoker_builder(lambda _base, _key, _model: RecordingInvoker(assigned))
+    created = client.post(
+        f"/api/workspaces/{account['workspace_id']}/runs",
+        headers=account["headers"],
+        json={
+            "team_id": team_id,
+            "question": "只派第一位专家",
+            "input_price": 0.000002,
+            "output_price": 0.000008,
+            "cached_input_price": 0.0000005,
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    receipt = body["savings"]
+    levers = {item["id"]: item for item in receipt["levers"]}
+    assert set(levers["skipped_unassigned"]["roles"]) == set(experts[1:])
+    assert levers["skipped_unassigned"]["tokens"] > 0
+    assert levers["shared_prefix"]["roles"] == assigned
+    assert levers["shared_prefix"]["tokens"] == 0
+    assert levers["shared_prefix"]["cached_tokens"] == 150
+    assert receipt["saved_tokens"] == levers["skipped_unassigned"]["tokens"]
+    assert receipt["saved_cost"] == pytest.approx(
+        body["cost_savings"] + levers["skipped_unassigned"]["cost"]
+    )
+    assert receipt["budget_skipped"] == []
+    fetched = client.get(
+        f"/api/workspaces/{account['workspace_id']}/runs/{body['id']}",
+        headers=account["headers"],
+    )
+    assert fetched.status_code == 200
+    assert fetched.json()["savings"]["saved_tokens"] == receipt["saved_tokens"]
 
 
 def test_run_requires_a_provider_key(client, account):

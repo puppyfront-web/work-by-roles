@@ -118,6 +118,7 @@ def run_out(run: Run) -> dict[str, Any]:
         "cost_total": run.cost_total,
         "cost_baseline": run.cost_baseline,
         "cost_savings": run.cost_savings,
+        "savings": run.savings_receipt,
         "error": run.error,
         "result": run.result_json,
         "created_at": iso(run.created_at),

@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- **节省回执 `savings-receipt-v1`**：每次 `ReviewSession.run()` 附带 `result.savings`，用同一次会审的反事实基线对照实际用量，不发起第二次模型调用。杠杆为 `shared_prefix`、`skipped_unassigned`、`cache_hit`。优化未生效时 `saved_*` 为 0。预算跳过只列出、不计入节省。公式见 `docs/SAVINGS.md`。工作室把回执存在 `runs.savings_receipt`（迁移 `0003_savings_receipt`），运行页展示基线/实际/杠杆，用量报表累加 `saved_tokens` 与 `saved_cost`。`scripts/token_savings_report.py` 使用同一结构，但是离线演示，不是线上回执。
 - **持久化审计存储**：`AuditStore`（`append` / `query` / `verify`）。默认仍是内存，`AuditTrail()` 不挂存储时行为不变。`SqliteAuditStore` 只用标准库 sqlite3，单进程内多线程追加用锁和事务保住哈希链；`WBR_AUDIT_DB` 或 `create_app(audit_db=...)` / `create_app(audit_store=...)` 启用。每条记录保存 `prev_hash` 与 `event_hash`（连同 `run_id`、`session_id`）。`verify()` 返回第一条断裂位置，`verify(strict=True)` 以及再次打开被篡改的库会抛 `AuditChainBroken`。只读查询：`GET /api/v1/audits/events`、`GET /api/v1/reviews/{task_id}/audits`，跟随 `WBR_API_KEY`。`expert_skipped`、`token_budget_exceeded` 等会审事件走同一条 `append`。Postgres 留给 wbr-studio 实现同一个 `AuditStore` 并调用 `audit_record_hash`，内核不再加驱动。
 - **Phase 0 省 Token**（会审主流程。构造参数都是可选的；唯一的默认行为变化是未分配专家不再空跑，可用 `skip_unassigned_experts=False` 恢复）：
   - 提示词段序改为「安全护栏 → 团队共享上下文 → 角色契约 → 动态材料」。同一次运行里的专家从第一个 token 起共享前缀；不传 `shared_context` 时不插入空段，也不为凑 1024 token 缓存门槛而填充

@@ -130,6 +130,8 @@ DeepSeek `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`（都算在 prom
 Anthropic `cache_read_input_tokens` / `cache_creation_input_tokens`（相对 input 另计，`cache_scope=additional`）。
 单价由调用方传入，内核不定价。
 
+`run()` 结束时 `result.savings` 是一份节省回执（`savings-receipt-v1`，见 [SAVINGS.md](SAVINGS.md)）。它不发起第二次模型调用。`saved_tokens` / `saved_cost` 等于基线减去实际，也等于 `shared_prefix`、`skipped_unassigned`、`cache_hit` 三条杠杆之和。没传单价时费用为 0；需要金额时调用 `result.savings.priced(input_price=..., output_price=..., cached_input_price=...)`。优化没有生效时 `saved_*` 为 0。预算跳过记在 `budget_skipped`，不算节省。
+
 ## 8. 缓存（ContractBoundCache）
 
 ```python
